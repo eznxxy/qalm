@@ -84,19 +84,54 @@ export class ProjectsStore {
   }
 
   /**
-   * Counts non-archived projects matching `query` (substring on name). The
-   * default listing never counts archived rows, whatever the caller's role.
+   * Shared WHERE builder for the listing: non-Admins see only 'active'
+   * (`visibleStatuses`), Admins both; an explicit status filter narrows
+   * further; `query` is a substring match on name (ILIKE, wildcards escaped).
    */
-  async countVisible(query: string | null): Promise<number> {
-    const result = query
-      ? await this.db.query<{ count: string }>(
-          `SELECT count(*) AS count FROM projects
-           WHERE status <> 'archived' AND name ILIKE $1`,
-          [`%${escapeLike(query)}%`],
-        )
-      : await this.db.query<{ count: string }>(
-          `SELECT count(*) AS count FROM projects WHERE status <> 'archived'`,
-        );
+  private buildWhere(
+    visibleStatuses: Array<'active' | 'archived'>,
+    statusFilter: 'active' | 'archived' | null,
+    query: string | null,
+  ): { clause: string; values: unknown[] } {
+    const where: string[] = [];
+    const values: unknown[] = [];
+    if (visibleStatuses.length < 2) {
+      values.push(visibleStatuses[0] ?? PROJECT_STATUS_ACTIVE);
+      where.push(`status = $${values.length}`);
+    }
+    if (statusFilter !== null) {
+      values.push(statusFilter);
+      where.push(`status = $${values.length}`);
+    }
+    if (query !== null) {
+      values.push(`%${escapeLike(query)}%`);
+      where.push(`name ILIKE $${values.length}`);
+    }
+    return {
+      clause: where.length > 0 ? `WHERE ${where.join(' AND ')}` : '',
+      values,
+    };
+  }
+
+  /**
+   * Total row count of the exact filtered view the listing will render, so
+   * pagination meta (page/limit/total/total_pages) is consistent with `data`
+   * — including the Admin-only `status=archived` filter.
+   */
+  async countForList(params: {
+    visibleStatuses: Array<'active' | 'archived'>;
+    statusFilter: 'active' | 'archived' | null;
+    query: string | null;
+  }): Promise<number> {
+    const { clause, values } = this.buildWhere(
+      params.visibleStatuses,
+      params.statusFilter,
+      params.query,
+    );
+    const result = await this.db.query<{ count: string }>(
+      `SELECT count(*) AS count FROM projects ${clause}`,
+      values,
+    );
     return Number(result.rows[0]?.count ?? '0');
   }
 
@@ -112,21 +147,11 @@ export class ProjectsStore {
     limit: number;
     offset: number;
   }): Promise<ProjectRow[]> {
-    const where: string[] = [];
-    const values: unknown[] = [];
-    if (params.visibleStatuses.length < 2) {
-      values.push(params.visibleStatuses[0] ?? PROJECT_STATUS_ACTIVE);
-      where.push(`status = $${values.length}`);
-    }
-    if (params.statusFilter !== null) {
-      values.push(params.statusFilter);
-      where.push(`status = $${values.length}`);
-    }
-    if (params.query !== null) {
-      values.push(`%${escapeLike(params.query)}%`);
-      where.push(`name ILIKE $${values.length}`);
-    }
-    const clause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const { clause, values } = this.buildWhere(
+      params.visibleStatuses,
+      params.statusFilter,
+      params.query,
+    );
     const result = await this.db.query<ProjectRow>(
       `SELECT ${PROJECT_COLUMNS} FROM projects ${clause}
        ORDER BY name ASC

@@ -158,7 +158,13 @@ export class ProjectsService {
     const statusFilter: 'active' | 'archived' | null = q.status ?? null;
     const page = q.page ?? 1;
     const limit = q.limit ?? 25;
-    const total = await this.store.countVisible(q.query ?? null);
+    // Meta counts the exact same filtered view `data` renders, so pagination
+    // stays consistent (notably for the Admin-only archived filter).
+    const total = await this.store.countForList({
+      visibleStatuses,
+      statusFilter,
+      query: q.query ?? null,
+    });
     const rows = await this.store.listPage({
       visibleStatuses,
       statusFilter,
