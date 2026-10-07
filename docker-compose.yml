@@ -1,0 +1,22 @@
+# Qalm development services. Local dev only — credentials are throwaway.
+# Usage: docker compose up -d
+services:
+  postgres:
+    image: postgres:16
+    container_name: qalm-postgres
+    environment:
+      POSTGRES_USER: qalm
+      POSTGRES_PASSWORD: qalm
+      POSTGRES_DB: qalm
+    ports:
+      - '5432:5432'
+    volumes:
+      - qalm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U qalm -d qalm']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  qalm_pgdata:
