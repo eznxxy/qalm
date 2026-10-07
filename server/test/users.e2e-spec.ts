@@ -1,10 +1,10 @@
 import request from 'supertest';
+import * as bcrypt from 'bcryptjs';
 import {
   createTestApp,
   resetDb,
   resetRateLimit,
   refreshCookieOf,
-  seedUser,
   SHARED_FIXTURE_PASSWORD,
   TestApp,
 } from './helpers';
@@ -55,6 +55,15 @@ const firstUser = (res: request.Response): UserData => {
 describe('Admin user management API (integration)', () => {
   let test: TestApp;
   const tokens: Partial<Record<UserRole, string>> = {};
+  /**
+   * One bcrypt(12) hash of SHARED_FIXTURE_PASSWORD, computed once per suite.
+   * All four role fixtures share the same known password, so they can share
+   * one hash: this cuts the per-test fixture cost from 8 bcrypt ops
+   * (4 seeds + 4 login verifies) to 4 verifies, which keeps the suite stable
+   * on a loaded box. Tokens still come from the real login path; the
+   * Admin-created users in each test still hash for real through the API.
+   */
+  let fixtureHash = '';
 
   const as = (role: UserRole): { Authorization: string } => ({
     Authorization: `Bearer ${tokens[role]}`,
@@ -62,6 +71,7 @@ describe('Admin user management API (integration)', () => {
 
   beforeAll(async () => {
     test = await createTestApp();
+    fixtureHash = bcrypt.hashSync(SHARED_FIXTURE_PASSWORD, 12);
   });
 
   afterAll(async () => {
@@ -74,7 +84,11 @@ describe('Admin user management API (integration)', () => {
     // One real user per role; tokens come from the real login path.
     for (const role of ['admin', 'lead', 'tester', 'viewer'] as UserRole[]) {
       const email = `${role}@example.com`;
-      await seedUser(test.db, { email, role, name: `${role} User` });
+      await test.db.query(
+        `INSERT INTO users (email, name, role, password_hash, is_active, must_change_password)
+         VALUES ($1, $2, $3, $4, true, false)`,
+        [email, `${role} User`, role, fixtureHash],
+      );
       const res = await test.req
         .post('/api/v1/auth/login')
         .set('X-Forwarded-For', '203.0.113.50')
@@ -327,10 +341,8 @@ describe('Admin user management API (integration)', () => {
     });
 
     it('404 for an unknown id; 400 for a malformed uuid', async () => {
-      const { id } = await seedUser(test.db, { email: 'gone@example.com', role: 'viewer' });
-      await test.db.query('DELETE FROM refresh_tokens WHERE user_id = $1', [id]);
-      await test.db.query('DELETE FROM users WHERE id = $1', [id]);
-
+      // The nil UUID can never collide with a fixture id (fresh TRUNCATE per
+      // test), so it is a valid-but-absent id with no seeding needed.
       const missing = await test.req.get('/api/v1/users/00000000-0000-0000-0000-000000000000').set(as('admin'));
       expect(missing.status).toBe(404);
       expect(missing.body.error.code).toBe('NOT_FOUND');
