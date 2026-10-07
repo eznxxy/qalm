@@ -34,7 +34,8 @@ function passwordValid(pw) {
 }
 
 function publicUser(u) {
-  const { password, ...rest } = u;
+  const rest = { ...u };
+  delete rest.password;
   return rest;
 }
 

@@ -1,4 +1,4 @@
-const nextJest = require("next/jest");
+import nextJest from "next/jest.js";
 
 const createJestConfig = nextJest({ dir: "./" });
 
@@ -9,4 +9,6 @@ const config = {
   testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
 };
 
-module.exports = createJestConfig(config);
+// createJestConfig is exported this way to ensure that next/jest can load the
+// Next.js config which is async (see the Next.js jest guide).
+export default createJestConfig(config);
