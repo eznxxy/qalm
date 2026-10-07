@@ -201,14 +201,19 @@ function EditUserPanel({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function patch(body: Record<string, unknown>) {
+  /**
+   * PATCH the user. Returns the updated user on success; returns null on
+   * any failure (validation/conflict/network error — error state is set for
+   * display — or a dead session, which the auth layer owns and redirects).
+   * Callers decide what "success" means for them; nothing is fired from here.
+   */
+  async function patch(body: Record<string, unknown>): Promise<User | null> {
     setSubmitting(true);
     setError(null);
     try {
-      const updated = await api.updateUser(user.id, body);
-      onSaved(updated);
+      return await api.updateUser(user.id, body);
     } catch (err) {
-      if (isSessionDead(err)) return;
+      if (isSessionDead(err)) return null;
       if (err instanceof ApiError && err.status === 409) {
         setError(
           conflictMessage(
@@ -221,6 +226,7 @@ function EditUserPanel({
       } else {
         setError("Could not save changes. Please try again.");
       }
+      return null;
     } finally {
       setSubmitting(false);
     }
@@ -236,13 +242,16 @@ function EditUserPanel({
       onClose();
       return;
     }
-    await patch(body);
+    const updated = await patch(body);
+    if (updated) onSaved(updated);
   }
 
   async function handleResetPassword() {
     const newPassword = generatePassword();
-    await patch({ password: newPassword });
-    onSaved(user, newPassword);
+    // The one-time panel may only appear when the PATCH actually succeeded —
+    // a generated password that was never applied must never be shared.
+    const updated = await patch({ password: newPassword });
+    if (updated) onSaved(updated, newPassword);
   }
 
   return (
