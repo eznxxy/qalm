@@ -6,6 +6,18 @@ import { useSession } from "@/lib/session";
 import { ApiError } from "@/lib/api-error";
 
 /**
+ * Same-origin paths only: a valid redirect target must start with a single
+ * "/" and contain no scheme or authority (protocol-relative "//host",
+ * backslash forms, and absolute URLs all fall back to "/"). This closes the
+ * open redirect where `?next=//evil.com` would pass a plain startsWith("/")
+ * check and send the user off-site after login.
+ */
+export function sanitizeNextPath(raw: string | null | undefined): string {
+  if (typeof raw === "string" && /^\/(?!\/)/.test(raw)) return raw;
+  return "/";
+}
+
+/**
  * Login page with the first-time bootstrap gate.
  * - Login failures show ONE generic message (no user enumeration; 429 keeps
  *   its server-provided cool-down message because that is not an enumeration
@@ -18,7 +30,7 @@ export function LoginForm() {
   const { login, bootstrap, status, user } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/";
+  const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const [mode, setMode] = useState<"login" | "bootstrap">("login");
   const [email, setEmail] = useState("");
@@ -30,7 +42,7 @@ export function LoginForm() {
 
   useEffect(() => {
     if (status === "authenticated" && user) {
-      router.replace(nextPath.startsWith("/") ? nextPath : "/");
+      router.replace(nextPath);
     }
   }, [status, user, router, nextPath]);
 
@@ -50,7 +62,7 @@ export function LoginForm() {
       } else {
         await bootstrap({ name: name.trim(), email: email.trim(), password });
       }
-      router.replace(nextPath.startsWith("/") ? nextPath : "/");
+      router.replace(nextPath);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
