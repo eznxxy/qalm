@@ -1,6 +1,5 @@
 "use client";
 
-import { ReactNode } from "react";
 import { useSession } from "@/lib/session";
 
 /**
@@ -20,14 +19,5 @@ export function MustChangePasswordBanner() {
         Change password
       </a>
     </div>
-  );
-}
-
-export function AppShell({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <MustChangePasswordBanner />
-      {children}
-    </>
   );
 }
