@@ -39,6 +39,7 @@ npm run start:dev
 | `npm run migration:run` | Apply pending migrations (waits for the DB first) |
 | `npm run migration:revert` | Revert the most recent migration |
 | `node scripts/gen-env.js` | Create `.env` from scratch with a random JWT secret |
+| `npm run test:e2e` | Integration tests against the throwaway DB in `.env.test` (see below) |
 
 ## Environment (see `.env.example`)
 
@@ -52,8 +53,43 @@ npm run start:dev
 Config is validated before the server listens; a missing or invalid variable
 kills the process with a single aggregated `ConfigError` listing every problem.
 
-## API surface (this scaffold)
+## Integration tests (test/*.e2e-spec.ts)
 
+They boot the real app against a THROWAWAY scratch database. Credentials live
+in `server/.env.test` (gitignored, mode 600). One-time setup per environment:
+
+```bash
+# 1. an empty role + database (names are arbitrary; nothing is hard-coded)
+sudo -u postgres psql -v role=qalm_test_r -v db=qalm_test -v pw='<random>' <<'SQL'
+CREATE ROLE :"role" LOGIN PASSWORD :'pw';
+CREATE DATABASE :"db" OWNER :"role";
+SQL
+
+# 2. write .env.test (generates the JWT secret; the password never prints)
+QALM_TEST_DATABASE_URL='postgres://qalm_test_r:<random>@localhost:5432/qalm_test' \
+  node scripts/gen-env-test.js
+
+# 3. migrate the scratch DB and run the suite
+DATABASE_URL=$(grep '^DATABASE_URL=' .env.test | cut -d= -f2-) npm run migration:run
+npm run test:e2e
+```
+
+The suite truncates all tables between tests — never point `.env.test` at a
+database you care about. Run the unit suite independently with `npm test`
+(no database needed).
+
+## API surface (auth core, task 2b1)
+
+- `POST /api/v1/auth/bootstrap` — first Admin only, 409 afterwards
+- `POST /api/v1/auth/login` — uniform 401s; in-memory limit 10 fails / email+IP / 15 min → 429 + `Retry-After`
+- `POST /api/v1/auth/refresh` — 30-day rotating refresh token, HttpOnly
+  SameSite=Lax cookie on `/api/v1/auth`; reusing a rotated token revokes all
+  of that user's refresh tokens
+- `POST /api/v1/auth/logout` — revokes the presented refresh token, clears the cookie (204)
+- `GET|PATCH /api/v1/auth/me` — profile read; name change and self password
+  change (current password required, 400 on mismatch)
+- Access tokens: HS256 JWT, 15 min, `sub` + `role`, `iss=qalm`; deactivated
+  users are rejected immediately (guard re-checks the DB per request)
 - `GET /api/v1/health` — public infrastructure endpoint →
   `200 {"data":{"status":"ok"}}` (documented exception, not a feature contract).
 
@@ -95,12 +131,19 @@ deleting a user who owns a project blocked (`ON DELETE RESTRICT`).
 ```
 src/
   config.ts            boot-time env validation (fail-fast)
+  config.module.ts     global DI provider for the validated AppConfig
   errors.ts            ErrorCode union, ApiError, envelope types
-  main.ts              bootstrap: validate env, pipe, filter, listen
-  app.module.ts        root module (infra only; features come later)
+  main.ts              bootstrap: validate env, shared wiring, listen
+  app.setup.ts         HTTP wiring shared by main.ts and the test harness
+  app.module.ts        root module (wires feature modules)
+  db/                  pg Pool wrapper (boot ping, transactions)
+  auth/                bootstrap/login/refresh/logout/me, guard, DTOs,
+                       password + token services, rate limit, refresh store
+  users/               shared user queries (used by auth; admin API is 2b2)
   filters/             global exception filter -> shared envelope
   pipes/               global class-validator pipe -> VALIDATION_ERROR details
   health/              GET /api/v1/health
 migrations/            node-pg-migrate migrations (up/down)
-scripts/               migrate.js, wait-for-db.js, gen-env.js
+scripts/               migrate.js, wait-for-db.js, gen-env.js, gen-env-test.js
+test/                  integration suite (throwaway scratch DB, .env.test)
 ```
