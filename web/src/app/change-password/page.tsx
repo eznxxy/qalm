@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import { ApiError } from "@/lib/api-error";
@@ -11,6 +11,8 @@ function ChangePasswordForm() {
   const { user, setUser } = useSession();
   const router = useRouter();
 
+  // Name is prefilled once: RequireAuth only renders this form after the
+  // session is authenticated, so `user` is already loaded at mount.
   const [name, setName] = useState(user?.name ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -18,11 +20,6 @@ function ChangePasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    setName((prev) => (prev === "" ? user.name : prev));
-  }, [user]);
 
   function validate(): string | null {
     const changingPassword = newPassword !== "" || confirm !== "";
