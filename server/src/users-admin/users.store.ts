@@ -219,6 +219,11 @@ export class UsersStore {
       values.push(fields.mustChangePassword);
       assignments.push(`must_change_password = $${values.length + 1}`);
     }
+    // Empty PATCH `{}` is a no-op: re-read the row (no UPDATE, no
+    // updated_at bump) instead of building an invalid `SET ,` statement.
+    if (assignments.length === 0) {
+      return this.findById(id);
+    }
     const result = await this.db.query<AdminUserRow>(
       `UPDATE users SET ${assignments.join(', ')}, updated_at = now()
        WHERE id = $1
