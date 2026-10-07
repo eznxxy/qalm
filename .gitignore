@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+.next/
+
+# env & secrets — never commit (AGENTS.md)
+.env
+.env.*
+!.env.example
+
+# agent worktrees (per-task implementation checkouts)
+.worktrees/
+
+# misc
+*.log
+.DS_Store
+coverage/
