@@ -4,30 +4,22 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 
-/** Authenticated landing page: currently a session summary. */
+/**
+ * The projects list is the default landing page after login
+ * (docs/PRD-projects.md) — this route forwards to it immediately.
+ */
 export default function HomePage() {
-  const { user, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
+    else if (status === "authenticated") router.replace("/projects");
   }, [status, router]);
 
-  if (status !== "authenticated" || !user) {
-    return (
-      <div className="auth-loading" role="status" aria-live="polite">
-        Loading…
-      </div>
-    );
-  }
-
   return (
-    <main className="page">
-      <h1>Welcome, {user.name}</h1>
-      <p className="muted">
-        Signed in as {user.email} ({user.role}). Projects, test runs and reports
-        arrive in later slices — this page is the authenticated entry point.
-      </p>
-    </main>
+    <div className="auth-loading" role="status" aria-live="polite">
+      Loading…
+    </div>
   );
 }

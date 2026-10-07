@@ -33,7 +33,7 @@ export function AppNav() {
   return (
     <nav aria-label="Main navigation" className="app-nav">
       <span className="app-nav-brand">Qalm</span>
-      <Link href="/">Home</Link>
+      <Link href="/projects">Projects</Link>
       {isAdmin && <Link href="/users">Users</Link>}
       <span className="app-nav-spacer" />
       <span className="app-nav-user">

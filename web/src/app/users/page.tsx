@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
 import { RequireAuth, isSessionDead } from "@/components/require-auth";
@@ -392,6 +393,9 @@ function UsersAdminPage() {
         <div className="panel panel-error" role="alert">
           <h1>Forbidden</h1>
           <p>User management is available to Admins only.</p>
+          <p>
+            <Link href="/projects">Back to projects</Link>
+          </p>
         </div>
       </main>
     );

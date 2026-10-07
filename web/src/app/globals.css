@@ -334,6 +334,121 @@ button:disabled {
   color: var(--warn);
 }
 
+/* ---------- projects ---------- */
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.field input[aria-invalid="true"],
+.field textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.project-key-input {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  max-width: 10rem;
+}
+
+.cell-description {
+  color: var(--text-muted);
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+}
+
+.project-header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.project-key-line {
+  margin-top: 0;
+  color: var(--text-muted);
+}
+
+.project-meta {
+  font-size: 0.9rem;
+}
+
+.breadcrumb {
+  margin-top: 0;
+}
+
+a.button-link {
+  display: inline-block;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+a.button-link:hover,
+a.button-link:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+textarea {
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.45rem 0.6rem;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+  filter: brightness(1.1);
+}
+
+/* ---------- confirm dialog ---------- */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 12, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 26rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.dialog-actions {
+  margin-top: 1rem;
+}
+
 /* ---------- page + tables ---------- */
 
 .page {
