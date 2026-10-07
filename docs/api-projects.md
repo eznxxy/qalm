@@ -17,7 +17,7 @@ PRD: `docs/PRD-projects.md`. Auth and roles: `docs/api-auth.md`.
   "updated_at": "2026-10-07T12:00:00Z"
 }
 ```
-`status`: `active | archived`. `created_by`: id of the Admin who created it.
+`status`: `active | archived`. `created_by`: id of the Admin or Lead who created it.
 
 ### Validation
 | Field | Rules |
@@ -35,7 +35,7 @@ Query: `query` (substring match on `name`, optional), `status`
 - `200` → paginated `{ "data": [ ...projects ], "meta": { ... } }`
 - `401` if unauthenticated.
 
-### `POST /api/v1/projects` — Admin
+### `POST /api/v1/projects` — Admin, Lead
 ```json
 // request
 { "name": "Payments", "key": "pay", "description": "Checkout and billing flows" }
@@ -44,7 +44,7 @@ Query: `query` (substring match on `name`, optional), `status`
   `status: "active"`, `created_by` = caller id.
 - `400` `VALIDATION_ERROR` — rules table above (`details` names the field).
 - `409` `CONFLICT` — duplicate `name` or `key`; `details` names which.
-- `403` for non-Admin.
+- `403` for Tester and Viewer.
 
 ### `GET /api/v1/projects/:id` — any authenticated role
 - `200` → `{ "data": { ...project } }`
@@ -61,10 +61,10 @@ Query: `query` (substring match on `name`, optional), `status`
   `404` `NOT_FOUND` | `403` for non-Admin.
 - Status is **not** settable here; use archive/restore below.
 
-### `POST /api/v1/projects/:id/archive` — Admin
+### `POST /api/v1/projects/:id/archive` — Admin, Lead
 Sets `status = "archived"`. Idempotent (archiving an archived project → `200`).
 - `200` → `{ "data": { ...project } }`
-- `404` `NOT_FOUND` | `403` for non-Admin.
+- `404` `NOT_FOUND` | `403` for Tester and Viewer.
 
 ### `POST /api/v1/projects/:id/restore` — Admin
 Sets `status = "active"`. Idempotent.
@@ -78,10 +78,10 @@ No `DELETE /projects/:id` exists in MVP — archive instead (data-safety rule).
 | Endpoint | Admin | Lead | Tester | Viewer | Public |
 |---|---|---|---|---|---|
 | `GET /projects` | ✔ (any status filter) | ✔ (`status=active` only) | ✔ (`active` only) | ✔ (`active` only) | – |
-| `POST /projects` | ✔ | – | – | – | – |
+| `POST /projects` | ✔ | ✔ | – | – | – |
 | `GET /projects/:id` | ✔ | ✔ (active only) | ✔ (active only) | ✔ (active only) | – |
 | `PATCH /projects/:id` | ✔ | – | – | – | – |
-| `POST /projects/:id/archive` | ✔ | – | – | – | – |
+| `POST /projects/:id/archive` | ✔ | ✔ | – | – | – |
 | `POST /projects/:id/restore` | ✔ | – | – | – | – |
 
 ## Implementation notes (Hephaestus)
@@ -90,3 +90,5 @@ No `DELETE /projects/:id` exists in MVP — archive instead (data-safety rule).
   users, created_at/updated_at timestamptz). Case-insensitive uniqueness via
   unique indexes on `lower(name)` and `lower(key)`.
 - Projects reference users (`created_by`) — ship the auth migration first.
+- Role enforcement: create + archive allow `admin, lead`; patch + restore
+  allow `admin` only (decided in PRD-projects.md, Arif 2026-10-07).

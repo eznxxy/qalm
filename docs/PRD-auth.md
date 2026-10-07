@@ -1,6 +1,6 @@
 # PRD — Auth & Roles (MVP)
 
-Status: Draft — awaiting human approval
+Status: Approved — Arif, 2026-10-07
 Owner: Daedalus
 Task: qalm-1 (auth + projects slice)
 API contract: `docs/api-auth.md` (shared conventions in `docs/api-conventions.md`)
@@ -28,12 +28,14 @@ feature (projects, cases, runs) hangs off authenticated users with roles.
 ## Roles (product meaning)
 | Role | Can do |
 |---|---|
-| Admin | Everything: manage users and roles, create/edit/archive projects. |
-| Lead | Manage test suites, cases, plans, runs, milestones in all projects; execute runs. |
+| Admin | Everything: manage users and roles; create/edit/archive/restore projects. |
+| Lead | Manage test suites, cases, plans, runs, milestones in all projects; execute runs; create and archive projects. |
 | Tester | Record results in runs they are assigned to; read all projects/suites/cases. |
 | Viewer | Read-only across everything. |
 
 The precise per-endpoint authority is the API contract, not this table.
+(Project create/archive rights for Leads are decided in PRD-projects.md —
+they land in the projects slice, not in auth implementation.)
 
 ## User stories
 - As an operator of a fresh install, I can create the first Admin account
@@ -74,6 +76,9 @@ The precise per-endpoint authority is the API contract, not this table.
 7. Changing password with a wrong current password returns 400.
 8. Failed logins beyond the rate limit return 429 with a `Retry-After` header.
 
-## Open questions (for the human)
-1. Is the 15 min / 30 days session policy acceptable for MVP?
-2. Self-registration stays off for MVP — confirm.
+## Decisions (Arif, 2026-10-07)
+1. Session policy 15-min access / 30-day refresh: approved as specified.
+2. Self-registration stays off: confirmed (Admin-created accounts only).
+3. Leads can create and archive projects — decided in PRD-projects.md;
+   edit and restore remain Admin-only. No change to auth endpoints.
+4. Projects are archive-only, no hard delete: confirmed.
