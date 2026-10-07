@@ -81,6 +81,13 @@ describe('AdminUsersService + UsersStore (unit, in-memory users table)', () => {
     return rows;
   };
 
+  /** The store selects only the API columns; password_hash never leaves it. */
+  const toApiRow = (row: FakeUser): AdminUserRow => {
+    const rest: Record<string, unknown> = { ...row };
+    delete rest['passwordHash'];
+    return rest as unknown as AdminUserRow;
+  };
+
   const respond = (text: string, values: unknown[]): { rows: unknown[] } => {
     const t = text.replace(/\s+/g, ' ').trim();
 
@@ -136,8 +143,7 @@ describe('AdminUsersService + UsersStore (unit, in-memory users table)', () => {
       const page = filtered(t, values)
         .sort((a, b) => (a.emailLower < b.emailLower ? -1 : a.emailLower > b.emailLower ? 1 : 0))
         .slice(offset, offset + limit)
-        // The store selects only the API columns; password_hash never leaves.
-        .map(({ passwordHash: _hash, ...row }) => row);
+        .map(toApiRow);
       return { rows: page };
     }
     if (t.startsWith('UPDATE users SET')) {
@@ -153,8 +159,7 @@ describe('AdminUsersService + UsersStore (unit, in-memory users table)', () => {
         else if (column === 'must_change_password') row.must_change_password = Boolean(value);
       }
       row.updated_at = new Date('2026-10-08T00:00:01.000Z');
-      const { passwordHash: _hash, ...apiRow } = row;
-      return { rows: [apiRow] };
+      return { rows: [toApiRow(row)] };
     }
 
     throw new Error(`Fake DbService: unhandled SQL: ${text}`);
@@ -177,7 +182,7 @@ describe('AdminUsersService + UsersStore (unit, in-memory users table)', () => {
         return Promise.resolve(hash);
       },
       verify: (): Promise<boolean> => Promise.resolve(true),
-    } as unknown as PasswordService;
+    };
     const refreshTokens = {
       revokeActiveForUser: (userId: string): Promise<void> => {
         revokedActive.push(userId);
@@ -197,14 +202,13 @@ describe('AdminUsersService + UsersStore (unit, in-memory users table)', () => {
     service = moduleRef.get(AdminUsersService);
   });
 
-  const createDto = (overrides: Partial<CreateUserDto> = {}): CreateUserDto =>
-    ({
-      email: 'grace@example.com',
-      name: 'Grace Hopper',
-      role: 'tester',
-      password: 'temporal1',
-      ...overrides,
-    }) as CreateUserDto;
+  const createDto = (overrides: Partial<CreateUserDto> = {}): CreateUserDto => ({
+    email: 'grace@example.com',
+    name: 'Grace Hopper',
+    role: 'tester',
+    password: 'temporal1',
+    ...overrides,
+  });
 
   describe('create', () => {
     it('creates the user with must_change_password=true and a hashed password', async () => {
