@@ -2,8 +2,14 @@
  * Contract-stub API for local verification of the web app WITHOUT the real
  * NestJS server (card t_450d02f0 DoD: the API ships in t_a630e612 and is not
  * merged yet). Implements docs/api-auth.md + docs/api-conventions.md
- * faithfully: envelopes, snake_case, error shape, refresh-cookie rotation,
- * uniform 401, rate limiting, last-admin rule.
+ * faithfully: envelopes, snake_case, error shape, refresh-cookie rotation
+ * WITH replay revocation (presenting a rotated-out token 401s and revokes
+ * ALL of that user's remaining refresh tokens), citext-style email
+ * normalization (emails are lowercased/trimmed at write; login and the
+ * duplicate-email check compare normalized, like the real DB's CITEXT
+ * column), uniform 401, rate limiting, last-admin rule.
+ *
+ * Self-check for these two behaviors: node scripts/verify-stub-fidelity.mjs
  *
  * It is a TEST DOUBLE, not production code: plaintext in-memory passwords,
  * opaque unsigned tokens. Never point it at real users. Zero dependencies.
@@ -23,6 +29,8 @@ const PASSWORD_RE = /^.{8,}$/;
 const users = new Map();
 /** refresh token -> { userId, expiresAt } */
 const refreshTokens = new Map();
+/** rotated-out refresh token -> userId (tombstones; replay of one revokes the user's remaining tokens) */
+const rotatedOutRefresh = new Map();
 /** "email|ip" -> [timestamps] of failed logins */
 const loginFails = new Map();
 
@@ -37,6 +45,18 @@ function publicUser(u) {
   const rest = { ...u };
   delete rest.password;
   return rest;
+}
+
+/** citext-like: the real users.email column is CITEXT (case-insensitive). */
+function normalizeEmail(email) {
+  return String(email).trim().toLowerCase();
+}
+
+/** Delete every refresh token of the user (replay defense / forced logout). */
+function revokeAllUserRefreshTokens(userId) {
+  for (const [tok, entry] of refreshTokens) {
+    if (entry.userId === userId) refreshTokens.delete(tok);
+  }
 }
 
 function issueTokens(user) {
@@ -182,7 +202,7 @@ const server = http.createServer(async (req, res) => {
     const ts = now();
     const user = {
       id: uuid(),
-      email: email.trim(),
+      email: normalizeEmail(email),
       name: name.trim(),
       role: "admin",
       is_active: true,
@@ -208,7 +228,7 @@ const server = http.createServer(async (req, res) => {
         "Retry-After": "60",
       });
     }
-    const user = [...users.values()].find((u) => u.email === String(email ?? "").trim().toLowerCase() || u.email === String(email ?? "").trim());
+    const user = [...users.values()].find((u) => u.email === normalizeEmail(email));
     const ok = user && user.password === password && user.is_active;
     if (!ok) {
       recordFail(String(email ?? ""), ip);
@@ -224,6 +244,12 @@ const server = http.createServer(async (req, res) => {
   // ---------- POST /auth/refresh ----------
   if (route === "/auth/refresh" && method === "POST") {
     const cookie = parseCookies(req).qalm_refresh;
+    if (cookie && rotatedOutRefresh.has(cookie)) {
+      // Replay of a rotated-out token → 401 + revoke ALL of the user's
+      // remaining refresh tokens (docs/api-auth.md replay defense).
+      revokeAllUserRefreshTokens(rotatedOutRefresh.get(cookie));
+      return sendError(res, 401, "UNAUTHENTICATED", "Refresh token reused; all sessions revoked.");
+    }
     const entry = cookie ? refreshTokens.get(cookie) : undefined;
     if (!entry || entry.expiresAt < Date.now()) {
       return sendError(res, 401, "UNAUTHENTICATED", "Refresh token missing, expired, or reused.");
@@ -233,6 +259,7 @@ const server = http.createServer(async (req, res) => {
       refreshTokens.delete(cookie);
       return sendError(res, 401, "UNAUTHENTICATED", "Session no longer valid.");
     }
+    rotatedOutRefresh.set(cookie, user.id); // tombstone before rotation
     refreshTokens.delete(cookie); // rotate
     const tokens = issueTokens(user);
     return send(res, 200, {
@@ -318,7 +345,7 @@ const server = http.createServer(async (req, res) => {
     const body = await readJson(req, res);
     if (!body) return;
     const { email, name, role, password } = body;
-    if ([...users.values()].some((u) => u.email === String(email ?? "").trim())) {
+    if ([...users.values()].some((u) => u.email === normalizeEmail(email))) {
       return sendError(res, 409, "CONFLICT", "A user with this email already exists.", [
         { field: "email", issue: "already exists" },
       ]);
@@ -337,7 +364,7 @@ const server = http.createServer(async (req, res) => {
     const ts = now();
     const created = {
       id: uuid(),
-      email: email.trim(),
+      email: normalizeEmail(email),
       name: name.trim(),
       role,
       is_active: true,
