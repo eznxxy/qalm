@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -56,12 +58,14 @@ export class ProjectsController {
   }
 
   @Roles('admin', 'lead')
+  @HttpCode(HttpStatus.OK)
   @Post(':id/archive')
   async archive(@Param('id', ParseUUIDPipe) id: string) {
     return { data: await this.projects.archive(id) };
   }
 
   @Roles('admin')
+  @HttpCode(HttpStatus.OK)
   @Post(':id/restore')
   async restore(@Param('id', ParseUUIDPipe) id: string) {
     return { data: await this.projects.restore(id) };
