@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from './auth/auth.module';
+import { ConfigModule } from './config.module';
+import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
 
 /**
- * Root module. Feature modules (auth, users, projects) are added by their own
- * cards; this scaffold intentionally contains only infrastructure.
+ * Root module. Feature modules plug in here; the scaffold's health endpoint
+ * stays a documented public exception to auth (api-conventions.md).
  */
 @Module({
-  imports: [],
+  imports: [ConfigModule.register(), DbModule, AuthModule],
   controllers: [HealthController],
   providers: [],
 })
