@@ -78,6 +78,22 @@ The suite truncates all tables between tests — never point `.env.test` at a
 database you care about. Run the unit suite independently with `npm test`
 (no database needed).
 
+## API surface (user management, task 2b2)
+
+- `GET /api/v1/users` — Admin only; substring search on email/name (`query`),
+  `role` filter, `page`/`limit` envelope, sorted by `email` ascending
+- `POST /api/v1/users` — Admin creates a user (email, name, role, initial
+  password); `must_change_password=true` on the created user, 409 on a
+  case-insensitive duplicate email
+- `GET /api/v1/users/:id` — Admin reads one user (404 unknown, 400 malformed
+  uuid)
+- `PATCH /api/v1/users/:id` — Admin updates any subset of name/role/is_active/
+  password; a password reset sets `must_change_password=true` and revokes the
+  target's active refresh tokens; demoting/deactivating the last active Admin
+  → 409; empty PATCH is a 200 no-op
+- Lead/Tester/Viewer get 403 on every user-management endpoint; no DELETE
+  route exists (users are deactivated, never hard-deleted)
+
 ## API surface (auth core, task 2b1)
 
 - `POST /api/v1/auth/bootstrap` — first Admin only, 409 afterwards
@@ -139,7 +155,9 @@ src/
   db/                  pg Pool wrapper (boot ping, transactions)
   auth/                bootstrap/login/refresh/logout/me, guard, DTOs,
                        password + token services, rate limit, refresh store
-  users/               shared user queries (used by auth; admin API is 2b2)
+    users/               shared user queries (used by auth)
+    users-admin/         Admin user-management: DTOs, store, service, module
+    projects/            projects API (CRUD + archive/restore)
   filters/             global exception filter -> shared envelope
   pipes/               global class-validator pipe -> VALIDATION_ERROR details
   health/              GET /api/v1/health
