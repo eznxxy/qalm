@@ -2,10 +2,14 @@ import { createApiClient, ApiClient, RequestOptions } from "./api-client";
 import {
   AuthSession,
   BootstrapInput,
+  CreateProjectInput,
   CreateUserInput,
   LoginInput,
   PatchMeInput,
+  Project,
+  ProjectListQuery,
   RefreshResult,
+  UpdateProjectInput,
   UpdateUserInput,
   User,
   UserListQuery,
@@ -87,4 +91,33 @@ export const api = {
 
   updateUser: (id: string, input: UpdateUserInput) =>
     client.apiFetch<User>(`/users/${encodeURIComponent(id)}`, opts("PATCH", input)),
+
+  // ---- projects (docs/api-projects.md) ----
+  listProjects: (query: ProjectListQuery = {}) =>
+    client.apiFetchPage<Project>("/projects", {
+      query: {
+        query: query.query,
+        status: query.status,
+        page: query.page,
+        limit: query.limit,
+      },
+    }),
+
+  getProject: (id: string) =>
+    client.apiFetch<Project>(`/projects/${encodeURIComponent(id)}`),
+
+  createProject: (input: CreateProjectInput) =>
+    client.apiFetch<Project>("/projects", opts("POST", input)),
+
+  /** PATCH must not set status per the contract — this signature cannot. */
+  updateProject: (id: string, input: UpdateProjectInput) =>
+    client.apiFetch<Project>(`/projects/${encodeURIComponent(id)}`, opts("PATCH", input)),
+
+  /** Idempotent server-side (archiving an archived project → 200). */
+  archiveProject: (id: string) =>
+    client.apiFetch<Project>(`/projects/${encodeURIComponent(id)}/archive`, opts("POST")),
+
+  /** Admin only per the role matrix; idempotent. */
+  restoreProject: (id: string) =>
+    client.apiFetch<Project>(`/projects/${encodeURIComponent(id)}/restore`, opts("POST")),
 };

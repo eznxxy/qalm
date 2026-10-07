@@ -87,3 +87,41 @@ export interface UpdateUserInput {
   is_active?: boolean;
   password?: string;
 }
+
+// ---- projects (docs/api-projects.md) ----
+
+export type ProjectStatus = "active" | "archived";
+
+/** docs/api-projects.md § Resource: Project */
+export interface Project {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** POST /projects body. */
+export interface CreateProjectInput {
+  name: string;
+  key: string;
+  description?: string;
+}
+
+/** Any subset per contract PATCH /projects/:id; status is never settable. */
+export interface UpdateProjectInput {
+  name?: string;
+  key?: string;
+  description?: string;
+}
+
+export interface ProjectListQuery {
+  query?: string;
+  /** `archived` is Admin-only per the contract — the UI gates it on role. */
+  status?: ProjectStatus;
+  page?: number;
+  limit?: number;
+}
