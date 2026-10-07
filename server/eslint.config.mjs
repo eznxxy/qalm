@@ -28,7 +28,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.spec.ts'],
+    // Unit specs and HTTP integration specs: response bodies are untyped JSON,
+    // so strict `any` rules would be noise. Type-checked by tsconfig.spec.json.
+    files: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
