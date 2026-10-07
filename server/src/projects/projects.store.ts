@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ApiError } from '../errors';
 import { DbService } from '../db/db.service';
-import { PROJECT_STATUS_ACTIVE } from './projects.constants';
 
 /**
  * DB row shape of `projects` (migration 20261008000002). snake_case columns;
@@ -27,6 +26,7 @@ const UNIQUE_VIOLATION = '23505';
 interface PgErrorShape {
   code?: string;
   detail?: string;
+  constraint?: string;
 }
 
 function isUniqueViolation(error: unknown): error is (Error & PgErrorShape) {
@@ -84,33 +84,23 @@ export class ProjectsStore {
   }
 
   /**
-   * Shared WHERE builder for the listing: non-Admins see only 'active'
-   * (`visibleStatuses`), Admins both; an explicit status filter narrows
-   * further; `query` is a substring match on name (ILIKE, wildcards escaped).
+   * Shared WHERE builder for the listing. The default view is active-only for
+   * EVERYONE (contract: archived projects are excluded from the default
+   * listing for everyone; Admins reach archived rows only via the explicit
+   * status=archived filter, which the service 403-gates to Admin).
+   * `query` is a substring match on name (ILIKE, wildcards escaped).
    */
   private buildWhere(
-    visibleStatuses: Array<'active' | 'archived'>,
     statusFilter: 'active' | 'archived' | null,
     query: string | null,
   ): { clause: string; values: unknown[] } {
-    const where: string[] = [];
-    const values: unknown[] = [];
-    if (visibleStatuses.length < 2) {
-      values.push(visibleStatuses[0] ?? PROJECT_STATUS_ACTIVE);
-      where.push(`status = $${values.length}`);
-    }
-    if (statusFilter !== null) {
-      values.push(statusFilter);
-      where.push(`status = $${values.length}`);
-    }
+    const values: unknown[] = [statusFilter === 'archived' ? 'archived' : 'active'];
+    const where: string[] = ['status = $1'];
     if (query !== null) {
       values.push(`%${escapeLike(query)}%`);
       where.push(`name ILIKE $${values.length}`);
     }
-    return {
-      clause: where.length > 0 ? `WHERE ${where.join(' AND ')}` : '',
-      values,
-    };
+    return { clause: `WHERE ${where.join(' AND ')}`, values };
   }
 
   /**
@@ -119,15 +109,10 @@ export class ProjectsStore {
    * — including the Admin-only `status=archived` filter.
    */
   async countForList(params: {
-    visibleStatuses: Array<'active' | 'archived'>;
     statusFilter: 'active' | 'archived' | null;
     query: string | null;
   }): Promise<number> {
-    const { clause, values } = this.buildWhere(
-      params.visibleStatuses,
-      params.statusFilter,
-      params.query,
-    );
+    const { clause, values } = this.buildWhere(params.statusFilter, params.query);
     const result = await this.db.query<{ count: string }>(
       `SELECT count(*) AS count FROM projects ${clause}`,
       values,
@@ -136,22 +121,15 @@ export class ProjectsStore {
   }
 
   /**
-   * One page of the listing, contract-sorted by name ascending. For non-Admins
-   * (`visibleStatuses = ['active']`) archived rows are filtered server-side;
-   * Admins without a status filter see both statuses.
+   * One page of the listing, contract-sorted by name ascending.
    */
   async listPage(params: {
-    visibleStatuses: Array<'active' | 'archived'>;
     statusFilter: 'active' | 'archived' | null;
     query: string | null;
     limit: number;
     offset: number;
   }): Promise<ProjectRow[]> {
-    const { clause, values } = this.buildWhere(
-      params.visibleStatuses,
-      params.statusFilter,
-      params.query,
-    );
+    const { clause, values } = this.buildWhere(params.statusFilter, params.query);
     const result = await this.db.query<ProjectRow>(
       `SELECT ${PROJECT_COLUMNS} FROM projects ${clause}
        ORDER BY name ASC
@@ -184,6 +162,10 @@ export class ProjectsStore {
     }
   }
 
+  /**
+   * Sets exactly the provided fields. Placeholders start at $2: $1 is the
+   * WHERE id (parameters are appended in field order below).
+   */
   async update(
     id: string,
     fields: { name?: string; key?: string; description?: string },
@@ -192,15 +174,15 @@ export class ProjectsStore {
     const values: unknown[] = [];
     if (fields.name !== undefined) {
       values.push(fields.name);
-      assignments.push(`name = $${values.length}`);
+      assignments.push(`name = $${values.length + 1}`);
     }
     if (fields.key !== undefined) {
       values.push(fields.key);
-      assignments.push(`key = $${values.length}`);
+      assignments.push(`key = $${values.length + 1}`);
     }
     if (fields.description !== undefined) {
       values.push(fields.description);
-      assignments.push(`description = $${values.length}`);
+      assignments.push(`description = $${values.length + 1}`);
     }
     try {
       const result = await this.db.query<ProjectRow>(
@@ -244,8 +226,24 @@ export class ProjectsStore {
   }
 }
 
-/** detail is 'Key (name)=(...) already exists.' — extract the index column. */
+/**
+ * detail is 'Key (lower(name))=(...) already exists.' (expression index) —
+ * the reliable identifier is the constraint name in error.message.
+ */
 function uniqueFieldOf(error: Error & PgErrorShape): 'name' | 'key' {
-  const match = /\(([^)]+)\)/.exec(error.detail ?? '');
-  return match?.[1] === 'key' ? 'key' : 'name';
+  // node-pg fills `constraint` with the violated index name (migration 2):
+  //   projects_name_lower_unique / projects_key_lower_unique. Use it first.
+  const constraint = error.constraint ?? '';
+  if (constraint.includes('key')) return 'key';
+  if (constraint.includes('name')) return 'name';
+  // Fallback: the constraint name also appears in the driver message.
+  const message = error.message ?? '';
+  if (message.includes('projects_key_lower_unique')) return 'key';
+  if (message.includes('projects_name_lower_unique')) return 'name';
+  // Last resort: parse the detail columns, tolerating both "Key (key)=..."
+  // and the expression shape "Key (lower(key))=..." (lookarounds avoid
+  // matching 'name' as a substring inside nothing surprising).
+  const detail = error.detail ?? '';
+  if (/\((?=.*\bkey\b)/.test(detail)) return 'key';
+  return 'name';
 }

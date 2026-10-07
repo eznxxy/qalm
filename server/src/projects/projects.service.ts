@@ -150,23 +150,18 @@ export class ProjectsService {
       // write-forbidden ones (§ Role matrix: Lead/Tester/Viewer "active only").
       throw new ApiError('FORBIDDEN', 'Only admins can list archived projects.');
     }
-    // Default listing excludes archived for everyone; Admins with an explicit
-    // status get exactly that status.
-    const visibleStatuses: Array<'active' | 'archived'> = isAdmin
-      ? ['active', 'archived']
-      : ['active'];
+    // Default view is active-only for everyone; archived rows are reachable
+    // ONLY via the explicit status filter (Admin-gated above).
     const statusFilter: 'active' | 'archived' | null = q.status ?? null;
     const page = q.page ?? 1;
     const limit = q.limit ?? 25;
     // Meta counts the exact same filtered view `data` renders, so pagination
     // stays consistent (notably for the Admin-only archived filter).
     const total = await this.store.countForList({
-      visibleStatuses,
       statusFilter,
       query: q.query ?? null,
     });
     const rows = await this.store.listPage({
-      visibleStatuses,
       statusFilter,
       query: q.query ?? null,
       limit,

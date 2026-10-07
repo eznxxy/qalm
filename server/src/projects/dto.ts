@@ -68,7 +68,7 @@ export function IsProjectKey(): PropertyDecorator {
         defaultMessage(args: ValidationArguments): string {
           const value: unknown = args.value;
           const shape =
-            typeof value === 'string' && /^[a-z]+$/i.test(value)
+            typeof value === 'string' && /^[a-z0-9]+$/i.test(value)
               ? ` (got "${value}")`
               : '';
           return (
