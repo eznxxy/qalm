@@ -206,6 +206,10 @@ export class AuthService {
         ]);
       }
       await this.users.updatePassword(userId, await this.passwords.hash(params.new_password), false);
+      // Hardening beyond the letter of the contract: after a password change,
+      // refresh tokens issued under the old password stop working. The just
+      // used access token stays valid until its short 15-min expiry.
+      await this.refreshTokens.revokeActiveForUser(userId);
     }
     if (params.name !== undefined) {
       await this.users.updateName(userId, params.name);

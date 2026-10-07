@@ -48,8 +48,17 @@ export function parseCookies(header: string | undefined): Record<string, string>
     const eq = part.indexOf('=');
     if (eq <= 0) continue;
     const name = part.slice(0, eq).trim();
-    const value = part.slice(eq + 1).trim();
-    if (name) out[name] = decodeURIComponent(value);
+    const rawValue = part.slice(eq + 1).trim();
+    if (!name) continue;
+    let value = rawValue;
+    if (value.includes('%')) {
+      try {
+        value = decodeURIComponent(value);
+      } catch {
+        // Malformed percent-encoding: treat as literal instead of a 500.
+      }
+    }
+    out[name] = value;
   }
   return out;
 }
