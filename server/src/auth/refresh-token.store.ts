@@ -28,13 +28,23 @@ export class RefreshTokenStore {
   constructor(@Inject(DbService) private readonly db: DbService) {}
 
   /** Inserts a fresh active token for the user. */
-  async issue(userId: string, rawToken: string): Promise<void> {
+  async issue(
+    userId: string,
+    rawToken: string,
+    tx?: { query(text: string, values?: unknown[]): Promise<unknown> },
+  ): Promise<void> {
     const hash = hashRefreshToken(rawToken);
-    await this.db.query(
-      `INSERT INTO refresh_tokens (token_hash, user_id, expires_at)
-       VALUES ($1, $2, now() + make_interval(secs => $3))`,
-      [hash, userId, REFRESH_TOKEN_TTL_SECONDS],
-    );
+    const sql =
+      'INSERT INTO refresh_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, now() + make_interval(secs => $3))';
+    const values = [hash, userId, REFRESH_TOKEN_TTL_SECONDS];
+    // Inside a transaction (bootstrap) the token MUST be written on the same
+    // connection — the user row is not visible to other connections until
+    // commit, and the FK would (correctly) fail.
+    if (tx) {
+      await tx.query(sql, values);
+    } else {
+      await this.db.query(sql, values);
+    }
   }
 
   /** The token row for a presented raw token, if any (active or not). */

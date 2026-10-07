@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import type { PoolClient } from 'pg';
 import { AppConfig } from '../config';
 import { APP_CONFIG } from '../config.module';
 import { ApiError } from '../errors';
@@ -77,7 +78,7 @@ export class AuthService {
         throw new ApiError('INTERNAL', 'Bootstrap failed to create the admin user.');
       }
       const user = toUserDto(row);
-      return this.issueSession(user);
+      return this.issueSession(user, client);
     });
   }
 
@@ -217,10 +218,12 @@ export class AuthService {
     return this.me(userId);
   }
 
-  /** Shared session issuer: access JWT + refresh token persistence. */
-  private async issueSession(user: UserDto): Promise<SessionResult> {
+  /** Shared session issuer: access JWT + refresh token persistence. The
+   * optional client is the open bootstrap transaction — the token insert must
+   * see (and commit with) the not-yet-visible user row. */
+  private async issueSession(user: UserDto, client?: PoolClient): Promise<SessionResult> {
     const refreshToken = this.tokens.generateRefreshToken();
-    await this.refreshTokens.issue(user.id, refreshToken.raw);
+    await this.refreshTokens.issue(user.id, refreshToken.raw, client ?? undefined);
     return {
       user,
       accessToken: this.tokens.signAccessToken({ id: user.id, role: user.role }),

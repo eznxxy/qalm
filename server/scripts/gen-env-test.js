@@ -33,7 +33,9 @@ const jwtSecret = crypto.randomBytes(48).toString('base64');
 const contents = [
   `JWT_SECRET=${jwtSecret}`,
   `DATABASE_URL=${databaseUrl}`,
-  'PORT=0',
+  // supertest binds lazily and never listens on this port; it must simply be
+  // a VALID config value (the boot validator requires 1..65535).
+  'PORT=3999',
   // Integration tests run over plain HTTP on loopback; relax Secure like dev.
   'REFRESH_COOKIE_SECURE=true',
   '',
