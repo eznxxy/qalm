@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminUsersModule } from './users-admin/admin-users.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config.module';
 import { DbModule } from './db/db.module';
@@ -10,7 +11,13 @@ import { ProjectsModule } from './projects/projects.module';
  * stays a documented public exception to auth (api-conventions.md).
  */
 @Module({
-  imports: [ConfigModule.register(), DbModule, AuthModule, ProjectsModule],
+  imports: [
+    ConfigModule.register(),
+    DbModule,
+    AuthModule,
+    ProjectsModule,
+    AdminUsersModule,
+  ],
   controllers: [HealthController],
   providers: [],
 })
