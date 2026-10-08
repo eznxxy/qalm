@@ -360,7 +360,7 @@ function ProjectsListPage() {
           >
             Previous
           </button>
-          <span>
+          <span className="t-nums">
             Page {meta.page} of {meta.total_pages} ({meta.total} projects)
           </span>
           <button

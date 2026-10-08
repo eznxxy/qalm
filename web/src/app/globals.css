@@ -90,6 +90,15 @@ h2 {
 
 code {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* §2.4: case/project keys are ID-shaped — tabular figures (weight 500) */
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* §2.4: IDs and counts align — apply alongside .t-caption/.t-body where a
+ * value is numeric or an ID (e.g. "Page 1 of 3", case IDs). */
+.t-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 .muted {
@@ -237,9 +246,12 @@ select {
 input:focus-visible,
 select:focus-visible,
 button:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+a:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible {
+  /* §8 floor: 2px brand ring, 2px offset, on EVERY interactive element */
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 button {
@@ -286,6 +298,12 @@ button:disabled {
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* font:inherit above also resets the ring, so restate it (§8 floor) */
+.linklike:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .button-row {
@@ -443,10 +461,16 @@ a.button-link {
   text-decoration: none;
 }
 
-a.button-link:hover,
-a.button-link:focus-visible {
+a.button-link:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* the shared a:focus-visible ring applies; keep it over the hover restyle */
+a.button-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  color: var(--text);
 }
 
 textarea {
@@ -461,8 +485,9 @@ textarea {
 }
 
 textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  /* §8 floor: same ring as the shared control rule above */
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 button.danger {
@@ -534,9 +559,10 @@ button.danger:hover:not(:disabled) {
 .users-table {
   width: 100%;
   border-collapse: collapse;
-  /* §2.4 table cell role: 14/20 w400 */
+  /* §2.4 table cell role: 14/20 w400; §2.4: tabular figures on every table */
   font-size: 14px;
   line-height: 20px;
+  font-variant-numeric: tabular-nums;
 }
 
 .users-table th,
