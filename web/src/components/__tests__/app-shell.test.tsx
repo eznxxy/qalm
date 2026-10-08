@@ -250,12 +250,18 @@ describe("sidebar collapse (§3 breakpoints, card t_df4894c3)", () => {
     setViewport(true);
     await renderShell();
 
-    const toggle = screen.getByRole("button", { name: "Collapse sidebar" });
+    // t_83e34f50: the visible (accessible) name flips with the state, so a
+    // collapsed rail offers "Expand sidebar" and reports aria-expanded=false.
+    const toggle = screen.getByRole("button", { name: "Expand sidebar" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(document.documentElement).toHaveClass("sidebar-collapsed");
 
     setViewport(false);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    expect(screen.queryByRole("button", { name: "Expand sidebar" })).not.toBeInTheDocument();
     expect(document.documentElement).not.toHaveClass("sidebar-collapsed");
   });
 
@@ -279,7 +285,7 @@ describe("sidebar collapse (§3 breakpoints, card t_df4894c3)", () => {
 
     // Next visit at a wide viewport: the stored choice wins over the default.
     const second = await renderShell();
-    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute(
       "aria-expanded",
       "false"
     );
@@ -304,7 +310,7 @@ describe("sidebar collapse (§3 breakpoints, card t_df4894c3)", () => {
     await renderShell();
 
     expect(document.documentElement).toHaveClass("sidebar-collapsed");
-    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
     expect(document.documentElement).not.toHaveClass("sidebar-collapsed");
     expect(window.localStorage.getItem("qalm.sidebar.collapsed")).toBe("0");
   });
@@ -468,5 +474,90 @@ describe("not-built-yet placeholder (/wip/[slug])", () => {
     render(<NotBuiltPage />);
 
     expect(screen.getByRole("heading", { name: "somewhere-else" })).toBeInTheDocument();
+  });
+});
+
+describe("a11y sweep (§8, card t_83e34f50)", () => {
+  it("exposes exactly one main landmark, with the screen inside it", async () => {
+    await renderShell();
+
+    const mains = screen.getAllByRole("main");
+    expect(mains).toHaveLength(1);
+    expect(mains[0]).toHaveTextContent("page content");
+    expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
+    // The search landmark is named (a bare role="search" is unnamed noise).
+    expect(screen.getByRole("search", { name: "Search" })).toBeInTheDocument();
+  });
+
+  it("has the §6 saving/saved mount in the page header (empty, announced)", async () => {
+    await renderShell();
+
+    const saveSlot = document.getElementById("shell-save-indicator");
+    expect(saveSlot).not.toBeNull();
+    expect(saveSlot).toHaveAttribute("role", "status");
+    expect(saveSlot).toBeEmptyDOMElement();
+  });
+
+  it("announces the active project politely (URL scope)", async () => {
+    mockRouterState.search = "project=p-2";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    const announcement = screen
+      .getAllByRole("status")
+      .find((el) => el.textContent?.startsWith("Project:"));
+    expect(announcement).toHaveTextContent("Project: Checkout");
+  });
+
+  it("announces a switcher-driven project change after the URL updates", async () => {
+    const view = await renderShell();
+    await screen.findByRole("option", { name: "Payments" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+    expect(mockRouterState.replace).toHaveBeenCalledWith("/projects?project=p-2", {
+      scroll: false,
+    });
+
+    // The mocked router does not re-render on replace; simulate the scope
+    // landing in the URL (what the real router does) and rerender.
+    mockRouterState.search = "project=p-2";
+    const { SessionProvider } = await import("@/lib/session");
+    const { AppShell } = await import("@/components/app-shell");
+    view.rerender(
+      <SessionProvider>
+        <AppShell>
+          <p>page content</p>
+        </AppShell>
+      </SessionProvider>
+    );
+
+    const announcement = screen
+      .getAllByRole("status")
+      .find((el) => el.textContent?.startsWith("Project:"));
+    expect(announcement).toHaveTextContent("Project: Checkout");
+  });
+});
+
+describe("content-area error boundary (§6, card t_83e34f50)", () => {
+  it("renders the §6 fallback and Retry re-renders the segment", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    const { default: ErrorFallback } = await import("@/app/(app)/error");
+    const retry = jest.fn();
+    render(
+      <ErrorFallback
+        error={Object.assign(new Error("boom"), { digest: "d-123" })}
+        retry={retry}
+      />
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Couldn't load this page. Check your connection and retry."
+    );
+    expect(screen.getByText("Error reference: d-123")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
   });
 });
