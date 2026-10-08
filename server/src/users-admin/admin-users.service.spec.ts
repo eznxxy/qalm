@@ -296,6 +296,35 @@ describe('AdminUsersService + UsersStore (unit, in-memory users table)', () => {
       expect(revokedActive).toEqual([]);
     });
 
+    it('400 VALIDATION_ERROR naming the field on explicit null (never a 500)', async () => {
+      const target = await service.create(createDto());
+      // The create above hashes once; the four rejected PATCHes must not
+      // hash or revoke anything more.
+      const hashesAfterCreate = hashedPasswords.length;
+      await expect(service.update(target.id, { name: null })).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'name' }],
+      });
+      await expect(service.update(target.id, { role: null })).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'role' }],
+      });
+      await expect(service.update(target.id, { is_active: null })).rejects.toMatchObject(
+        {
+          code: 'VALIDATION_ERROR',
+          details: [{ field: 'is_active' }],
+        },
+      );
+      await expect(service.update(target.id, { password: null })).rejects.toMatchObject(
+        {
+          code: 'VALIDATION_ERROR',
+          details: [{ field: 'password' }],
+        },
+      );
+      expect(hashedPasswords).toHaveLength(hashesAfterCreate);
+      expect(revokedActive).toEqual([]);
+    });
+
     it('password reset hashes, sets must_change_password=true and revokes active refresh tokens', async () => {
       const target = await service.create(createDto());
       const updated = await service.update(target.id, { password: 'resetpw1' });

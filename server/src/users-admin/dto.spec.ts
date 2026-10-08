@@ -100,6 +100,22 @@ describe('users-admin DTOs', () => {
       );
       expect(await validateDto(AdminUpdateUserDto, { email: 'x@y.z' })).toContain('email');
     });
+
+    it('accepts an empty object at the pipe (the service no-ops it as a 200)', async () => {
+      const fields = await validateDto(AdminUpdateUserDto, {});
+      expect(fields).toEqual([]);
+    });
+
+    it('rejects explicit null for all four fields with a 400 naming the field', async () => {
+      expect(await validateDto(AdminUpdateUserDto, { name: null })).toContain('name');
+      expect(await validateDto(AdminUpdateUserDto, { role: null })).toContain('role');
+      expect(await validateDto(AdminUpdateUserDto, { is_active: null })).toContain(
+        'is_active',
+      );
+      expect(await validateDto(AdminUpdateUserDto, { password: null })).toContain(
+        'password',
+      );
+    });
   });
 
   describe('ListUsersQuery', () => {
