@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import Link from "next/link";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
-import { RequireAuth, isSessionDead } from "@/components/require-auth";
+import { isSessionDead } from "@/components/require-auth";
 import { DataTable, StatusBadge, type DataTableColumn } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { ROLES, Role, User } from "@/lib/api-types";
@@ -368,7 +368,7 @@ function buildUserColumns(
   ];
 }
 
-function UsersAdminPage() {
+export default function UsersAdminPage() {
   const { user } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [meta, setMeta] = useState<{ page: number; total_pages: number; total: number } | null>(
@@ -573,13 +573,5 @@ function UsersAdminPage() {
         />
       )}
     </main>
-  );
-}
-
-export default function UsersPage() {
-  return (
-    <RequireAuth>
-      <UsersAdminPage />
-    </RequireAuth>
   );
 }

@@ -110,12 +110,17 @@ function patchCalls(fetchMock: jest.Mock): jest.Mock["mock"]["calls"] {
 }
 
 async function openEditPanelForGrace() {
-  const { default: UsersPage } = await import("@/app/users/page");
+  const { default: UsersPage } = await import("@/app/(app)/users/page");
+  const { RequireAuth } = await import("@/components/require-auth");
   const { SessionProvider } = await import("@/lib/session");
 
+  // Production pairs the page with the RequireAuth gate (the (app) layout);
+  // reproduce it so gate behaviour (dead-session takeover) is covered too.
   render(
     <SessionProvider>
-      <UsersPage />
+      <RequireAuth>
+        <UsersPage />
+      </RequireAuth>
     </SessionProvider>
   );
 

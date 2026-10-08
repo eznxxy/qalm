@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Projects list — the default landing page after login (docs/PRD-projects.md).
  * - Active projects for everyone; name search and pagination.
@@ -8,14 +6,18 @@
  * - Role-aware write controls per the api-projects.md role matrix.
  * - Search/filter/page state lives in the URL query string so views are
  *   shareable and back/forward works.
+ *
+ * Rendered inside the (app) shell layout, which owns the auth gate. Reads
+ * useSearchParams and relies on the shell's Suspense boundary during static
+ * prerender.
  */
-import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Project, ProjectStatus } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
-import { RequireAuth, isSessionDead } from "@/components/require-auth";
+import { isSessionDead } from "@/components/require-auth";
 import { useSession } from "@/lib/session";
 import {
   canArchiveProject,
@@ -90,7 +92,7 @@ function isProjectStatus(value: unknown): value is ProjectStatus {
   return value === "active" || value === "archived";
 }
 
-function ProjectsListPage() {
+export default function ProjectsListPage() {
   const { user } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -422,18 +424,3 @@ function ProjectsListPage() {
   );
 }
 
-export default function ProjectsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="auth-loading" role="status" aria-live="polite">
-          Loading projects…
-        </div>
-      }
-    >
-      <RequireAuth>
-        <ProjectsListPage />
-      </RequireAuth>
-    </Suspense>
-  );
-}

@@ -4,10 +4,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import { ApiError } from "@/lib/api-error";
-import { RequireAuth } from "@/components/require-auth";
 
 /** Self-service name and password change (PATCH /auth/me). */
-function ChangePasswordForm() {
+export default function ChangePasswordPage() {
   const { user, setUser } = useSession();
   const router = useRouter();
 
@@ -172,10 +171,3 @@ function ChangePasswordForm() {
   );
 }
 
-export default function ChangePasswordPage() {
-  return (
-    <RequireAuth>
-      <ChangePasswordForm />
-    </RequireAuth>
-  );
-}

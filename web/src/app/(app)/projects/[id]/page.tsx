@@ -7,13 +7,13 @@
  * archived project receives the contract's 404 and sees "Project not found",
  * never a crash.
  */
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Project } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
-import { RequireAuth, isSessionDead } from "@/components/require-auth";
+import { isSessionDead } from "@/components/require-auth";
 import { useSession } from "@/lib/session";
 import { canArchiveProject, canEditProject, canRestoreProject } from "@/lib/project-permissions";
 import { EditProjectForm } from "@/components/project-forms";
@@ -40,7 +40,7 @@ function formatDateTime(iso: string): string {
   }
 }
 
-function ProjectDetailPage() {
+export default function ProjectDetailPage() {
   const { user } = useSession();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -274,18 +274,3 @@ function ProjectDetailPage() {
   );
 }
 
-export default function ProjectDetailRoute() {
-  return (
-    <Suspense
-      fallback={
-        <div className="auth-loading" role="status" aria-live="polite">
-          Loading project…
-        </div>
-      }
-    >
-      <RequireAuth>
-        <ProjectDetailPage />
-      </RequireAuth>
-    </Suspense>
-  );
-}
