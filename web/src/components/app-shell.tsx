@@ -22,6 +22,23 @@ import { Project, Role } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { isSessionDead } from "@/components/require-auth";
 import { useSession } from "@/lib/session";
+import {
+  SIDEBAR_AUTO_COLLAPSE_QUERY,
+  SIDEBAR_COLLAPSE_KEY,
+  useSidebarCollapse,
+} from "@/lib/use-sidebar-collapse";
+
+/**
+ * Runs before first paint so a stored (or breakpoint-default) collapsed rail
+ * never flashes wide: applies the .sidebar-collapsed class to <html>, which
+ * the CSS keys off. Mirrors applyStoredSidebarPreference() from the hook —
+ * kept as a literal because inline scripts cannot import.
+ */
+const SIDEBAR_PRERENDER_SCRIPT = `(function(){try{var k=${JSON.stringify(
+  SIDEBAR_COLLAPSE_KEY
+)};var raw=null;try{raw=window.localStorage.getItem(k)}catch(e){}var collapsed=raw==="1"||(raw!=="0"&&window.matchMedia(${JSON.stringify(
+  SIDEBAR_AUTO_COLLAPSE_QUERY
+)}).matches);document.documentElement.classList.toggle("sidebar-collapsed",collapsed)}catch(e){}})();`;
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin",
@@ -159,6 +176,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function AppShellInner({ children }: { children: ReactNode }) {
   const { user, logout } = useSession();
+  const { collapsed, toggle } = useSidebarCollapse();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -257,6 +275,11 @@ function AppShellInner({ children }: { children: ReactNode }) {
 
   return (
     <div className="shell">
+      {/* Pre-paint collapse (see SIDEBAR_PRERENDER_SCRIPT): before the CSS
+       * loads the class is already on <html>, so at ≤1279px (or when the
+       * user collapsed it) no 232px frame flashes before the rail. */}
+      <script dangerouslySetInnerHTML={{ __html: SIDEBAR_PRERENDER_SCRIPT }} />
+
       <a className="skip-link" href="#content">
         Skip to content
       </a>
@@ -280,7 +303,11 @@ function AppShellInner({ children }: { children: ReactNode }) {
             id="project-switcher"
             value={selectedProjectId}
             onChange={(e) => onProjectChange(e.target.value)}
-            disabled={!switcherStatus}
+            /* Disabled only while a status placeholder is showing (loading /
+             * error / no projects); enabled once real options are listed.
+             * (t_df4894c3: was `!switcherStatus` — the 2a inversion that
+             * disabled the switcher exactly when it became usable.) */
+            disabled={Boolean(switcherStatus)}
           >
             {switcherStatus ? (
               <option value="">{switcherStatus}</option>
@@ -354,6 +381,30 @@ function AppShellInner({ children }: { children: ReactNode }) {
 
       <div className="shell-body">
         <nav className="sidebar" aria-label="Main navigation">
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={toggle}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M9.5 3.5L6 8l3.5 4.5" />
+            </svg>
+            <span className="sidebar-label">Collapse sidebar</span>
+          </button>
+
           <ul className="sidebar-list" role="list">
             {navGroups(isAdmin).map((group, groupIndex) => (
               <Fragment key={groupIndex}>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import type { Project, User } from "@/lib/api-types";
 
@@ -69,6 +69,58 @@ const ADMIN = makeUser();
 const CHECKOUT = makeProject({ id: "p-2", key: "CHK", name: "Checkout" });
 
 let fetchMock: jest.Mock;
+
+/**
+ * jsdom has no matchMedia. The §3 collapse hook reads (max-width: 1279px) on
+ * every shell render — default "wide" (no collapse); the tests below flip
+ * `mockViewportNarrow` to simulate a ≤1279px window.
+ */
+let mockViewportNarrow = false;
+const mediaListeners = new Set<() => void>();
+function mediaQuery() {
+  return {
+    // Live getter: a real MediaQueryList updates .matches when the window
+    // resizes, and the hook keeps the query object across listener events.
+    get matches() {
+      return mockViewportNarrow;
+    },
+    media: "(max-width: 1279px)",
+    onchange: null,
+    addEventListener: (_: string, listener: () => void) => {
+      mediaListeners.add(listener);
+    },
+    removeEventListener: (_: string, listener: () => void) => {
+      mediaListeners.delete(listener);
+    },
+    addListener: (listener: () => void) => {
+      mediaListeners.add(listener);
+    },
+    removeListener: (listener: () => void) => {
+      mediaListeners.delete(listener);
+    },
+  };
+}
+beforeAll(() => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: jest.fn().mockImplementation(() => mediaQuery()),
+  });
+});
+
+afterEach(() => {
+  mockViewportNarrow = false;
+  mediaListeners.clear();
+  window.localStorage.clear();
+  document.documentElement.className = "";
+});
+
+/** Simulates the OS-level viewport crossing the 1280 breakpoint. */
+function setViewport(narrow: boolean): void {
+  mockViewportNarrow = narrow;
+  act(() => {
+    for (const listener of mediaListeners) listener();
+  });
+}
 
 beforeEach(() => {
   fetchMock = jest.fn();
@@ -186,6 +238,87 @@ describe("sidebar navigation", () => {
   });
 });
 
+describe("sidebar collapse (§3 breakpoints, card t_df4894c3)", () => {
+  it("renders a keyboard toggle reporting aria-expanded", async () => {
+    await renderShell();
+
+    const toggle = screen.getByRole("button", { name: "Collapse sidebar" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("auto-collapses below 1280 and restores above it", async () => {
+    setViewport(true);
+    await renderShell();
+
+    const toggle = screen.getByRole("button", { name: "Collapse sidebar" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(document.documentElement).toHaveClass("sidebar-collapsed");
+
+    setViewport(false);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(document.documentElement).not.toHaveClass("sidebar-collapsed");
+  });
+
+  it("keeps a wide default when the viewport never crosses 1280", async () => {
+    await renderShell();
+
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    expect(document.documentElement).not.toHaveClass("sidebar-collapsed");
+  });
+
+  it("persists an explicit toggle in localStorage and honours it on remount", async () => {
+    const initial = await renderShell();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(document.documentElement).toHaveClass("sidebar-collapsed");
+    expect(window.localStorage.getItem("qalm.sidebar.collapsed")).toBe("1");
+    initial.unmount();
+
+    // Next visit at a wide viewport: the stored choice wins over the default.
+    const second = await renderShell();
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "false"
+    );
+    expect(document.documentElement).toHaveClass("sidebar-collapsed");
+    second.unmount();
+  });
+
+  it("an explicit expand sticks at narrow widths too (stored 0 wins over the breakpoint)", async () => {
+    window.localStorage.setItem("qalm.sidebar.collapsed", "0");
+    setViewport(true);
+    await renderShell();
+
+    expect(document.documentElement).not.toHaveClass("sidebar-collapsed");
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+  });
+
+  it("toggling in the collapsed rail writes 0 and re-expands", async () => {
+    window.localStorage.setItem("qalm.sidebar.collapsed", "1");
+    await renderShell();
+
+    expect(document.documentElement).toHaveClass("sidebar-collapsed");
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(document.documentElement).not.toHaveClass("sidebar-collapsed");
+    expect(window.localStorage.getItem("qalm.sidebar.collapsed")).toBe("0");
+  });
+
+  it("nav stays keyboard-reachable in the icon rail (labels kept for AT)", async () => {
+    window.localStorage.setItem("qalm.sidebar.collapsed", "1");
+    await renderShell();
+
+    const cases = screen.getByRole("link", { name: "Test cases" });
+    expect(cases).toBeInTheDocument(); // accessible name survives the rail
+    expect(cases).toHaveAttribute("title", "Test cases");
+  });
+});
+
 describe("project switcher", () => {
   it("lists existing projects and preselects ?project= from the URL", async () => {
     mockRouterState.search = "project=p-2";
@@ -216,6 +349,32 @@ describe("project switcher", () => {
         scroll: false,
       })
     );
+  });
+
+  it("is enabled once projects are listed, and disabled while loading", async () => {
+    const ready = await renderShell();
+    // findByRole resolves as soon as the combobox exists — during the
+    // loading state — so wait for the real options before asserting.
+    await screen.findByRole("option", { name: "Payments" });
+    expect(screen.getByRole("combobox", { name: "Project" })).toBeEnabled();
+    // Unmount before the second mount: two shells would duplicate the
+    // switcher's element ids and break label association.
+    ready.unmount();
+
+    // Fresh mount with a pending project fetch: the placeholder option is
+    // showing and interaction is off until real options land.
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+    const { AppShell } = await import("@/components/app-shell");
+    const { SessionProvider } = await import("@/lib/session");
+    render(
+      <SessionProvider>
+        <AppShell>
+          <p>page content</p>
+        </AppShell>
+      </SessionProvider>
+    );
+    expect(screen.getByRole("combobox", { name: "Project" })).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Loading projects…" })).toBeInTheDocument();
   });
 });
 
