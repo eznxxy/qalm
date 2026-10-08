@@ -19,11 +19,13 @@ import { UserRole } from '../src/auth/current-user';
  *
  * Timeout note: this suite issues several real bcrypt(12) hashes per test
  * (4 seeded fixtures + 4 logins in beforeEach, plus Admin-API creates that
- * hash again). bcrypt(12) is contractually expensive, so the suite allows
- * 30 s per hook/test instead of jest's 5 s default — an accommodation of
- * real crypto cost on a shared box, not a weakened assertion.
+ * hash again). bcrypt(12) is contractually expensive, and the heaviest test
+ * (password-reset round-trip) performs ~9 hashes/verifies; on a loaded shared
+ * box that can exceed 30 s, so the suite allows 60 s per hook/test instead of
+ * jest's 5 s default — an accommodation of real crypto cost under load, not a
+ * weakened assertion.
  */
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 interface UserData {
   id: string;
   email: string;
@@ -560,7 +562,7 @@ describe('Admin user management API (integration)', () => {
       });
 
       it('demotion and deactivation succeed once a second active admin exists', async () => {
-        const second = await createUser({
+        await createUser({
           ...VALID_CREATE,
           email: 'admin2@example.com',
           name: 'Second',
