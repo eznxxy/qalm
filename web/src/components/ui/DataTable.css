@@ -108,7 +108,7 @@
 /* -------------------------------------------------------- body cells */
 
 .dt-table tbody td {
-  height: var(--row-height);
+  height: var(--dt-row-height, var(--row-height));
   padding: 0 12px;
   border-bottom: 1px solid var(--line);
   overflow-wrap: anywhere;
@@ -155,16 +155,20 @@ th.dt-head-number .dt-header-label {
 }
 
 .dt-checkbox {
-  display: inline-flex;
+  /* flex (not inline-flex): a block-level box adds no baseline strut, so
+     the cell content height is exactly 32px and every row density holds */
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
-  margin: 4px; /* 32px control inside the 40px cell */
+  margin: 0; /* 32px target fits every row density: 32/36/44 (§8) */
 }
 
 .dt-checkbox input {
   margin: 0;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
 }
 
@@ -178,7 +182,7 @@ th.dt-head-number .dt-header-label {
 .dt-status {
   display: table;
   width: 100%;
-  min-height: calc(3 * (var(--row-height) + 1px));
+  min-height: calc(3 * (var(--dt-row-height, var(--row-height)) + 1px));
 }
 
 .dt-status > div {
@@ -221,7 +225,7 @@ th.dt-head-number .dt-header-label {
 
 /* skeleton rows reuse real <tr>/<td> markup (keeps table geometry) */
 tr.dt-skeleton-row td {
-  height: var(--row-height);
+  height: var(--dt-row-height, var(--row-height));
   padding: 0 12px;
   border-bottom: 1px solid var(--line);
 }
