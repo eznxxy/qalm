@@ -41,7 +41,7 @@ Tailwind config. Do not hard-code hex values in components.
 |---|---|---|
 | `--ink-900` | `#17202E` | Primary text |
 | `--ink-700` | `#3A4658` | Secondary text, icons |
-| `--ink-500` | `#66748A` | Tertiary text, placeholders (verify 4.5:1 on white) |
+| `--ink-500` | `#5C6B82` | Tertiary text, placeholders. Darkened from `#66748A` (which reached only 4.38:1 on `--canvas`) so it passes 4.5:1 on both `--surface` (5.41) and `--canvas` (5.00) — t_5fa1c284. |
 | `--line` | `#DCE1E9` | Borders, dividers |
 | `--canvas` | `#F4F6F9` | App background |
 | `--surface` | `#FFFFFF` | Tables, panels, dialogs |
@@ -58,11 +58,30 @@ Tailwind config. Do not hard-code hex values in components.
 | Blocked | `#B7770D` | `#FCF1DC` | minus in square |
 | Retest | `#6B4FC2` | `#EFEAFB` | circular arrow |
 | Skipped | `#6B7686` | `#EDEFF3` | forward arrow |
-| Untested | `#9AA5B5` | `#F1F3F6` | empty ring |
+| Untested | `#9AA5B5` | `#F1F3F6` | empty ring, `--ink-700` stroke |
 
 Priority uses shape and weight, not new colours: Critical (double chevron up),
 High (chevron up), Medium (dash), Low (chevron down). Use `--ink-700`, with
 Critical in `--failed`.
+
+**Status badge (AA-compliant spec, decision t_5fa1c284, 2026-10-08).** The
+original badge — solid-coloured text on the tint — fails the §8 floor
+(4.5:1) on 4 of 6 statuses (passed 3.81, blocked 3.31, skipped 4.00, untested
+2.24), so it is replaced by:
+
+- Text: always `--ink-900`, weight 500. ≥ 13.9:1 on every tint.
+- Icon: the status solid, except untested uses `--ink-700` (the untested solid
+  is 2.24:1 on its tint; `--ink-700` is 8.60:1). Every icon ≥ 3:1 on its tint.
+  Icons are supplementary: each badge keeps a full text label, so status is
+  never colour-only (principle 3).
+- Background: the status tint, unchanged. 4px radius, 22px high, same markup
+  everywhere (unchanged from §5).
+- Failed keeps solid text as before: `#C23A3A` on its tint is 4.53:1, which
+  passes. Using `--ink-900` for it too is also compliant, but solid text on
+  failed is retained because failed is the one state that must read
+  instantly. (Retest also passes at 5.06 but stays ink-900 for uniformity.)
+- Dark theme: same rule, ink tokens flip under `[data-theme="dark"]`; pick
+  text/icon colours per §2.3 to hold 4.5:1 / 3:1 on the dark surface.
 
 ### 2.3 Colour (dark theme)
 
@@ -134,9 +153,15 @@ Case IDs use the form `C1042`, tabular figures, weight 500.
 
 ### 4.1 Projects list
 
-Table: name, open runs, pass rate (status bar), last activity, members.
-Primary action: **New project**. Empty state: "No projects yet. Create a project
-to start organising test cases."
+Table: name, key, description, last activity (from `updated_at`). **The
+`open runs`, `pass rate (status bar)` and `members` columns were cut for the
+MVP** — see "Projects list columns" in `docs/api-projects.md` (decision
+t_5fa1c284, 2026-10-08): none of the three has a backing resource in the MVP
+contract, and per-project membership is out of scope. When the runs slice is
+contracted, restore pass rate via `GET /api/v1/projects/summary?ids=...`
+(one batched call, never per-row fan-out). Primary action: **New project**.
+Empty state: "No projects yet. Create a project to start organising test
+cases."
 
 ### 4.2 Test cases (two-pane)
 
@@ -222,7 +247,7 @@ Do not add a UI library without Daedalus's approval.
 | Component | Rules |
 |---|---|
 | **Button** | Primary (`--brand`), secondary (outline), ghost, danger. One primary per view. Label is a verb: "Save case", "Add result", never "Submit". |
-| **Status badge** | Tint background, solid-coloured icon and text, 4px radius, 22px high. Same markup everywhere. |
+| **Status badge** | Tint background, `--ink-900` text, status-solid icon (untested icon uses `--ink-700`) — exact rules in §2.2. 4px radius, 22px high. Same markup everywhere. |
 | **Status bar** | Segmented horizontal bar, 8px high in tables, 16px on dashboards. Segment order: Passed, Retest, Blocked, Failed, Skipped, Untested. Hover shows counts. Include `role="img"` and an `aria-label` that spells out the numbers. |
 | **Data table** | Sticky header, sortable columns, column resize, row selection, row hover `--canvas`, selected row `--brand-tint`. Virtualise above 200 rows. Pagination or infinite scroll must keep scroll position. |
 | **Tree** | ARIA treeview, arrow-key navigation, counts right-aligned, drag handle on hover. |
@@ -286,7 +311,11 @@ Do not add a UI library without Daedalus's approval.
 - An action keeps one name through the flow: the button "Add result" leads to a
   toast "Result added".
 - Dates: relative under 7 days ("2 h ago"), absolute after ("12 Aug 2026"), with
-  the full timestamp in a tooltip. Use the user's locale.
+  the full timestamp in a tooltip. Use the user's locale. Confirmed in
+  t_5fa1c284 (2026-10-08): this spec stands — all date rendering goes through
+  one shared utility (`web/src/lib/dates.ts`), which formats in the user's
+  locale and timezone from the ISO 8601 UTC strings the API returns; it must
+  not hard-code UTC, and this is the only place `Intl` formatting may live.
 - Numbers: thousands separators, percent without decimals except in reports.
 
 ---

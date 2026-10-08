@@ -19,6 +19,19 @@ PRD: `docs/PRD-projects.md`. Auth and roles: `docs/api-auth.md`.
 ```
 `status`: `active | archived`. `created_by`: id of the Admin or Lead who created it.
 
+### Projects list columns (design decision, t_5fa1c284, 2026-10-08)
+DESIGN.md §4.1 originally showed `open runs`, `pass rate` and `members` on the
+projects list. None of these exist on the Project resource, and for the MVP
+they are **cut from the spec** — the projects list renders only
+`name`, `key`, `description` and `updated_at` (as relative/absolute time per
+DESIGN.md §9). Reasons: no runs or membership resource exists yet, and
+per-project membership is out of scope (PRD-projects.md, 2026-10-07).
+When the runs slice is contracted, add a single batched endpoint
+`GET /api/v1/projects/summary?ids=...` (any authenticated role) returning
+`{ "data": [ { "project_id", "open_runs", "total_results", "results_passed" } ] }`
+and restore the pass-rate status bar column then. Per-row fan-out calls from
+the projects list are not allowed.
+
 ### Validation
 | Field | Rules |
 |---|---|
