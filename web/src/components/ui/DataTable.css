@@ -15,6 +15,10 @@
   border: 1px solid var(--line);
   background: var(--surface);
   min-width: 0;
+  /* Native form controls (checkboxes) and scrollbars inside the table are
+   * light-chrome, matching --surface, even while the host app still runs
+   * color-scheme: dark (step 1 flips the app default). */
+  color-scheme: light;
 }
 
 @media (max-width: 767px) {
