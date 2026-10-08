@@ -44,13 +44,48 @@ a {
   color: var(--accent);
 }
 
+/* ---------- typography roles (DESIGN.md §2.4) ----------
+ * Page title 22/28 600 · Section 16/24 600 · Body/table 14/20 400 ·
+ * Table header 13/18 600 · Caption 12/16 400.
+ * Prose uses html's 16px base. Colours stay with the app's semantic text
+ * tokens (--text-muted) rather than the light-theme --ink-* values: the
+ * light-theme token flip is card t_62938355 and is not merged yet, so
+ * hard-coding --ink-500 here would drop caption contrast on the dark app.
+ */
+
+h1,
+.t-page-title {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
 h1 {
-  font-size: 1.5rem;
   margin: 0 0 1rem;
 }
+
+h2,
+.t-section-title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
 h2 {
-  font-size: 1.1rem;
   margin: 0 0 0.75rem;
+}
+
+.t-body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.t-caption {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
 code {
@@ -130,6 +165,9 @@ code {
 .banner-link {
   color: var(--accent);
   font-weight: 600;
+  /* control label size 13/18 */
+  font-size: 13px;
+  line-height: 18px;
 }
 
 /* ---------- forms ---------- */
@@ -162,8 +200,10 @@ code {
 }
 
 .field label {
-  font-weight: 600;
-  font-size: 0.9rem;
+  /* 13/18: the §2.4 header role (weight 500 — control label, not a header) */
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .field-checkbox {
@@ -262,7 +302,9 @@ button:disabled {
   border: 1px solid var(--danger);
   border-radius: 4px;
   padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
+  /* caption role 12/16 */
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .form-notice {
@@ -271,7 +313,9 @@ button:disabled {
   border: 1px solid var(--ok);
   border-radius: 4px;
   padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
+  /* caption role 12/16 */
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .panel {
@@ -316,7 +360,9 @@ button:disabled {
 .badge {
   display: inline-block;
   border-radius: 999px;
-  font-size: 0.75rem;
+  /* caption size 12/16 (§2.4); radius/height geometry is step 3's badge card */
+  font-size: 12px;
+  line-height: 16px;
   padding: 0.05rem 0.55rem;
   margin-right: 0.3rem;
 }
@@ -340,7 +386,9 @@ button:disabled {
 
 .field-error {
   color: var(--danger);
-  font-size: 0.9rem;
+  /* caption role 12/16 (field error replaces helper text, §5) */
+  font-size: 12px;
+  line-height: 16px;
   margin: 0;
 }
 
@@ -369,10 +417,15 @@ button:disabled {
 .project-key-line {
   margin-top: 0;
   color: var(--text-muted);
+  /* caption role 12/16 — secondary info under the page title */
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .project-meta {
-  font-size: 0.9rem;
+  /* caption role 12/16 */
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .breadcrumb {
@@ -481,7 +534,9 @@ button.danger:hover:not(:disabled) {
 .users-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  /* §2.4 table cell role: 14/20 w400 */
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .users-table th,
@@ -493,8 +548,11 @@ button.danger:hover:not(:disabled) {
 }
 
 .users-table th {
-  color: var(--text-muted);
+  /* §2.4 table header role: 13/18 w600 */
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 600;
+  color: var(--text-muted);
 }
 
 .row-muted td {
