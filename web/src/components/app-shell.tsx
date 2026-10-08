@@ -261,20 +261,31 @@ function AppShellInner({ children }: { children: ReactNode }) {
   }, [gotoArmed]);
 
   // `n` is context-aware: today that means the projects screen's create
-  // form, announced by the heading "Create project". When that form is not
-  // on screen, land on Projects; built screens wire their own `n` later.
+  // form. The form is found by its stable aria-label (the heading is a
+  // sibling of the fields, not their container); the heading search is the
+  // fallback for future screens that follow the same naming. When the form
+  // is not on screen, land on Projects; built screens wire their own `n`.
   function openCreateForm() {
-    const heading = Array.from(document.querySelectorAll("h1, h2")).find(
-      (h) => h.textContent === "Create project"
-    );
-    if (!heading) {
+    const target =
+      document.querySelector<HTMLElement>('[aria-label="Create project"]') ??
+      Array.from(document.querySelectorAll("h1, h2")).find(
+        (h) => h.textContent === "Create project"
+      );
+    if (!target) {
       router.push(scopedHref("/projects"));
       return;
     }
-    const focusable = heading.querySelector<HTMLElement>(
-      "button, [href], input, select, textarea"
+    const focusable = target.querySelector<HTMLElement>(
+      "input, select, textarea, button, [href]"
     );
-    (focusable ?? (heading as HTMLElement)).focus();
+    if (focusable) {
+      focusable.focus();
+      return;
+    }
+    // Non-focusable anchor (bare heading): make it a programmatic focus
+    // target so sighted keyboard users see where `n` landed.
+    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+    target.focus();
   }
 
   const shortcuts: ShortcutDefinition[] = [
