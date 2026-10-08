@@ -9,7 +9,7 @@
  * - Search/filter/page state lives in the URL query string so views are
  *   shareable and back/forward works.
  */
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Project, ProjectStatus } from "@/lib/api-types";
@@ -26,7 +26,7 @@ import {
 import { CreateProjectForm } from "@/components/project-forms";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { projectActionError } from "@/components/project-action-error";
-import { StatusBadge } from "@/components/ui";
+import { DataTable, StatusBadge, type DataTableColumn } from "@/components/ui";
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -40,6 +40,50 @@ function readStatusFilter(raw: string | null, isAdmin: boolean): StatusFilter {
 function readPage(raw: string | null): number {
   const parsed = Number(raw);
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
+}
+
+/** Column defs for the projects DataTable (t_10da9c7a rendering-layer swap).
+ * The Status column only exists in the archived view (parity), so the list
+ * is built per render from the current filter. Sort stays off for parity —
+ * the previous table had none; enabling it is a separate product decision. */
+function buildProjectColumns(
+  RowActions: (props: { project: Project }) => ReactNode,
+  showStatusColumn: boolean
+): DataTableColumn<Project>[] {
+  const cols: DataTableColumn<Project>[] = [
+    {
+      key: "key",
+      header: "Key",
+      render: (p) => <code>{p.key}</code>,
+    },
+    {
+      key: "name",
+      header: "Name",
+      render: (p) => (
+        <Link href={`/projects/${p.id}`}>{p.name}</Link>
+      ),
+    },
+    {
+      key: "description",
+      header: "Description",
+      className: "cell-description",
+      render: (p) => p.description ?? "",
+    },
+  ];
+  if (showStatusColumn) {
+    cols.push({
+      key: "status",
+      header: "Status",
+      // Every row in this view is archived — the cell is constant.
+      render: () => <StatusBadge status="skipped">Archived</StatusBadge>,
+    });
+  }
+  cols.push({
+    key: "actions",
+    header: "Actions",
+    render: (p) => <RowActions project={p} />,
+  });
+  return cols;
 }
 
 function isProjectStatus(value: unknown): value is ProjectStatus {
@@ -194,6 +238,42 @@ function ProjectsListPage() {
   const canArchive = user ? canArchiveProject(user.role) : false;
   const canRestore = user ? canRestoreProject(user.role) : false;
 
+  /** Per-row write controls (role matrix + row status), incl. the
+   * role-gated Edit/Archive/Restore buttons with their busy states. */
+  function ProjectRowActions({ project }: { project: Project }) {
+    return (
+      <div className="button-row">
+        {canEdit && (
+          <Link
+            href={`/projects/${project.id}?edit=1`}
+            className="button-link"
+            aria-label={`Edit ${project.name}`}
+          >
+            Edit
+          </Link>
+        )}
+        {canArchive && project.status === "active" && (
+          <button
+            type="button"
+            disabled={busyProjectId === project.id}
+            onClick={() => setConfirmAction({ project, kind: "archive" })}
+          >
+            Archive
+          </button>
+        )}
+        {canRestore && project.status === "archived" && (
+          <button
+            type="button"
+            disabled={busyProjectId === project.id}
+            onClick={() => setConfirmAction({ project, kind: "restore" })}
+          >
+            Restore
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <main className="page">
       <h1>Projects</h1>
@@ -269,88 +349,28 @@ function ProjectsListPage() {
         />
       )}
 
-      {loading ? (
-        <p role="status" aria-live="polite">
-          Loading projects…
-        </p>
-      ) : (
-        <table className="users-table projects-table">
-          <caption className="sr-only">
-            Projects
-            {meta ? `, page ${meta.page} of ${meta.total_pages}` : ""}
-            {urlStatus === "archived" ? " (archived)" : ""}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Key</th>
-              <th scope="col">Name</th>
-              <th scope="col">Description</th>
-              {urlStatus === "archived" && <th scope="col">Status</th>}
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.length === 0 && (
-              <tr>
-                <td colSpan={urlStatus === "archived" ? 5 : 4} className="muted">
-                  {urlQuery
-                    ? "No projects match your search."
-                    : urlStatus === "archived"
-                      ? "No archived projects."
-                      : "No projects yet."}
-                </td>
-              </tr>
-            )}
-            {projects.map((project) => (
-              <tr key={project.id}>
-                <td>
-                  <code>{project.key}</code>
-                </td>
-                <td>
-                  <Link href={`/projects/${project.id}`}>{project.name}</Link>
-                </td>
-                <td className="cell-description">{project.description ?? ""}</td>
-                {urlStatus === "archived" && (
-                  <td>
-                    <StatusBadge status="skipped">Archived</StatusBadge>
-                  </td>
-                )}
-                <td>
-                  <div className="button-row">
-                    {canEdit && (
-                      <Link
-                        href={`/projects/${project.id}?edit=1`}
-                        className="button-link"
-                        aria-label={`Edit ${project.name}`}
-                      >
-                        Edit
-                      </Link>
-                    )}
-                    {canArchive && project.status === "active" && (
-                      <button
-                        type="button"
-                        disabled={busyProjectId === project.id}
-                        onClick={() => setConfirmAction({ project, kind: "archive" })}
-                      >
-                        Archive
-                      </button>
-                    )}
-                    {canRestore && project.status === "archived" && (
-                      <button
-                        type="button"
-                        disabled={busyProjectId === project.id}
-                        onClick={() => setConfirmAction({ project, kind: "restore" })}
-                      >
-                        Restore
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        columns={buildProjectColumns(ProjectRowActions, urlStatus === "archived")}
+        rows={projects}
+        getRowId={(p) => p.id}
+        caption={`Projects${meta ? `, page ${meta.page} of ${meta.total_pages}` : ""}${
+          urlStatus === "archived" ? " (archived)" : ""
+        }`}
+        ariaLabel="Projects"
+        loading={loading}
+        error={listError}
+        onRetry={() => void load()}
+        emptyTitle={
+          urlQuery
+            ? "No projects match your search."
+            : urlStatus === "archived"
+              ? "No archived projects."
+              : "No projects yet."
+        }
+        sort={null}
+        selectable={false}
+        rowHeight="default"
+      />
 
       {meta && meta.total_pages > 1 && (
         <nav className="pagination" aria-label="Project list pages">
