@@ -175,7 +175,7 @@ describe("useGlobalShortcuts", () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
-  it("picks up definition changes between renders without resubscribing", () => {
+  it("picks up definition changes between renders (fresh handlers per subscription)", () => {
     const first = jest.fn();
     const second = jest.fn();
     const { rerender } = renderHook(

@@ -384,7 +384,9 @@ describe("top bar", () => {
 
     expect(screen.getByRole("link", { name: "Skip to content" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Qalm" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Help" })).toBeInTheDocument();
+    // §7 (t_6ce021c1): the ? affordance opens the shortcuts dialog in place.
+    const help = screen.getByRole("button", { name: "Keyboard shortcuts help" });
+    expect(help).toHaveAttribute("aria-haspopup", "dialog");
 
     fireEvent.click(screen.getByRole("button", { name: "Account menu for Ada Lovelace" }));
     expect(screen.getByRole("link", { name: "Account settings" })).toBeInTheDocument();

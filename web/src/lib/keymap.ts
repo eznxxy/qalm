@@ -17,7 +17,7 @@
  *   browser's reload, Alt+letter may be a dead key or an IME chord.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 export type ShortcutHandler = (event: KeyboardEvent) => void;
 
@@ -83,22 +83,20 @@ export function resolveShortcut(
 }
 
 /**
- * Attaches a window-level keydown listener for the given map. The map is
- * read through a ref so handlers can be closures over fresh state without
- * re-subscribing on every render.
+ * Attaches a window-level keydown listener for the given map. The map is a
+ * dependency: a new array (e.g. built inline on each render, as the shell
+ * does) resubscribes the listener with the fresh handlers, so closures over
+ * component state are always current.
  */
 export function useGlobalShortcuts(definitions: readonly ShortcutDefinition[]): void {
-  const defsRef = useRef(definitions);
-  defsRef.current = definitions;
-
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      const handler = resolveShortcut(event, defsRef.current);
+      const handler = resolveShortcut(event, definitions);
       if (!handler) return;
       event.preventDefault();
       handler(event);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [definitions]);
 }

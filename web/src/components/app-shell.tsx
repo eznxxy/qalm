@@ -269,7 +269,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
     const target =
       document.querySelector<HTMLElement>('[aria-label="Create project"]') ??
       Array.from(document.querySelectorAll("h1, h2")).find(
-        (h) => h.textContent === "Create project"
+        (h): h is HTMLElement => h.textContent === "Create project"
       );
     if (!target) {
       router.push(scopedHref("/projects"));
