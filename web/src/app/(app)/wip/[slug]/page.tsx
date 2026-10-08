@@ -25,9 +25,9 @@ export default function NotBuiltPage() {
   const title = SECTION_TITLES[slug] ?? slug;
 
   return (
-    <main className="page">
+    <div className="page">
       <h1>{title}</h1>
       <p className="empty-state">This screen is not built yet.</p>
-    </main>
+    </div>
   );
 }

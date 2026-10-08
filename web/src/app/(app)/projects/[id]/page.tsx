@@ -115,17 +115,17 @@ export default function ProjectDetailPage() {
 
   if (state.kind === "loading") {
     return (
-      <main className="page">
+      <div className="page">
         <p role="status" aria-live="polite">
           Loading project…
         </p>
-      </main>
+      </div>
     );
   }
 
   if (state.kind === "not-found") {
     return (
-      <main className="page">
+      <div className="page">
         <div className="panel panel-error" role="alert">
           <h1>Project not found</h1>
           <p>
@@ -136,13 +136,13 @@ export default function ProjectDetailPage() {
             <Link href="/projects">Back to projects</Link>
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (state.kind === "forbidden") {
     return (
-      <main className="page">
+      <div className="page">
         <div className="panel panel-error" role="alert">
           <h1>Forbidden</h1>
           <p>{state.message}</p>
@@ -150,13 +150,13 @@ export default function ProjectDetailPage() {
             <Link href="/projects">Back to projects</Link>
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (state.kind === "error") {
     return (
-      <main className="page">
+      <div className="page">
         <div className="panel panel-error" role="alert">
           <h1>Something went wrong</h1>
           <p>{state.message}</p>
@@ -166,7 +166,7 @@ export default function ProjectDetailPage() {
             </button>
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -176,7 +176,7 @@ export default function ProjectDetailPage() {
   const canRestore = user ? canRestoreProject(user.role) : false;
 
   return (
-    <main className="page">
+    <div className="page">
       <p className="breadcrumb">
         <Link href="/projects">← All projects</Link>
       </p>
@@ -270,7 +270,7 @@ export default function ProjectDetailPage() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </main>
+    </div>
   );
 }
 

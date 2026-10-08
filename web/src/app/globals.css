@@ -241,6 +241,20 @@ code {
   flex: 1;
 }
 
+/* §6 saving/saved indicator mount in the page header. Empty until a screen
+ * with save behaviour mounts its "Saving…"/"Saved" text into it (no autosave
+ * exists yet); the slot reserves no space while empty. */
+.topbar-save-slot:empty {
+  display: none;
+}
+
+.topbar-save-slot {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .topbar-search {
   flex: 0 1 320px;
   min-width: 140px;
@@ -406,6 +420,13 @@ code {
   min-width: 0;
 }
 
+/* §8 landmark: the shell owns the page's single <main>; screens render
+ * their .page inside it. No extra box model — only the landmark role. */
+.shell-main {
+  display: block;
+  min-height: 100%;
+}
+
 /* §3 breakpoints: 1280+ full layout (232px sidebar); below that the rail
  * is 56px icons (1024 explicitly collapsed per spec). The class on <html>
  * is driven by use-sidebar-collapse.ts (stored choice ?? matchMedia), so
@@ -429,6 +450,16 @@ html.sidebar-collapsed .sidebar-link {
 
 html.sidebar-collapsed .sidebar-separator {
   margin: var(--space-3) var(--space-2);
+}
+
+/* §7 motion: the rail's expand/collapse animates (it answers the toggle
+ * action) — but only when the user allows motion; otherwise it snaps. */
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar {
+    transition:
+      flex-basis 120ms ease,
+      width 120ms ease;
+  }
 }
 
 /* Collapse/expand toggle (t_df4894c3): first item of the rail. Persisted
@@ -778,6 +809,14 @@ button:disabled {
 
 .panel-error {
   border-color: var(--danger);
+}
+
+/* §6 error boundary fallback (the (app) segment error.tsx). Lives in the
+ * shell's content area; same page rhythm as .page plus top spacing so the
+ * alert is not glued to the top bar. */
+.shell-error {
+  padding-top: var(--space-6);
+  max-width: 40rem;
 }
 
 .auth-loading {

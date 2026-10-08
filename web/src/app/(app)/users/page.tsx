@@ -453,7 +453,7 @@ export default function UsersAdminPage() {
 
   if (user && user.role !== "admin") {
     return (
-      <main className="page">
+      <div className="page">
         <div className="panel panel-error" role="alert">
           <h1>Forbidden</h1>
           <p>User management is available to Admins only.</p>
@@ -461,12 +461,12 @@ export default function UsersAdminPage() {
             <Link href="/projects">Back to projects</Link>
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="page">
+    <div className="page">
       <h1>Users</h1>
 
       <div className="toolbar">
@@ -572,6 +572,6 @@ export default function UsersAdminPage() {
           }}
         />
       )}
-    </main>
+    </div>
   );
 }

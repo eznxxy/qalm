@@ -225,8 +225,18 @@ function AppShellInner({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const selectedProjectId =
-    projects.find((p) => p.id === renderedProject)?.id ?? projects[0]?.id ?? "";
+  const selectedProject =
+    projects.find((p) => p.id === renderedProject) ?? projects[0];
+  const selectedProjectId = selectedProject?.id ?? "";
+
+  /**
+   * §8: the switcher's value change is announced politely (select widgets
+   * announce differently across screen readers, and the scope can also
+   * change programmatically via ?project= — this live region covers both).
+   */
+  const switcherAnnouncement = selectedProject
+    ? `Project: ${selectedProject.name}`
+    : "";
 
   function onProjectChange(id: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -405,12 +415,12 @@ function AppShellInner({ children }: { children: ReactNode }) {
           <select
             id="project-switcher"
             value={selectedProjectId}
-            onChange={(e) => onProjectChange(e.target.value)}
             /* Disabled only while a status placeholder is showing (loading /
              * error / no projects); enabled once real options are listed.
              * (t_df4894c3: was `!switcherStatus` — the 2a inversion that
              * disabled the switcher exactly when it became usable.) */
             disabled={Boolean(switcherStatus)}
+            onChange={(e) => onProjectChange(e.target.value)}
           >
             {switcherStatus ? (
               <option value="">{switcherStatus}</option>
@@ -422,13 +432,26 @@ function AppShellInner({ children }: { children: ReactNode }) {
               ))
             )}
           </select>
+          {/* §8: announces the active scope politely — the <option> change
+           * alone is not reliably announced, and ?project= can also change
+           * without a select event (back/forward, nav links). */}
+          <span className="sr-only" role="status" aria-live="polite">
+            {switcherAnnouncement}
+          </span>
         </div>
 
         <span className="topbar-spacer" />
 
+        {/* §6 saving/saved indicator mount: screens with per-page save
+         * behaviour mount their "Saving…"/"Saved" status here so the
+         * indicator has one stable, announced home in the page header. No
+         * autosave exists yet (card note) — the slot is deliberately empty. */}
+        <span id="shell-save-indicator" className="topbar-save-slot" role="status" aria-live="polite" />
+
         <form
           className="topbar-search"
           role="search"
+          aria-label="Search"
           onSubmit={(e) => {
             e.preventDefault();
             onSearchSubmit();
@@ -517,7 +540,12 @@ function AppShellInner({ children }: { children: ReactNode }) {
             >
               <path d="M9.5 3.5L6 8l3.5 4.5" />
             </svg>
-            <span className="sidebar-label">Collapse sidebar</span>
+            {/* Visible label (not just the title): the accessible name must
+             * describe what the press does from the current state (§8) —
+             * in the icon rail this is the sr-only fallback. */}
+            <span className="sidebar-label">
+              {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            </span>
           </button>
 
           <ul className="sidebar-list" role="list">
@@ -546,7 +574,10 @@ function AppShellInner({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="shell-content" id="content">
-          {children}
+          {/* §8 landmark: one <main> for the whole app. Screens render their
+           * .page content inside it without declaring their own <main> —
+           * a page exposes exactly one main landmark. */}
+          <main className="shell-main">{children}</main>
         </div>
       </div>
 

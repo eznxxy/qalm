@@ -279,7 +279,7 @@ export default function ProjectsListPage() {
   }
 
   return (
-    <main className="page">
+    <div className="page">
       <h1>Projects</h1>
 
       <div className="toolbar">
@@ -422,7 +422,7 @@ export default function ProjectsListPage() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </main>
+    </div>
   );
 }
 

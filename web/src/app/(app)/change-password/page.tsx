@@ -94,7 +94,7 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <main className="page">
+    <div className="page">
       <h1>Account settings</h1>
       {user?.must_change_password && (
         <p className="muted">
@@ -167,7 +167,7 @@ export default function ChangePasswordPage() {
           {submitting ? "Saving…" : "Save changes"}
         </button>
       </form>
-    </main>
+    </div>
   );
 }
 
