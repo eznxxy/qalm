@@ -34,6 +34,20 @@ const rotatedOutRefresh = new Map();
 /** "email|ip" -> [timestamps] of failed logins */
 const loginFails = new Map();
 
+/**
+ * Seed projects (stub addition, card t_6e2e5c07). The auth contract this
+ * stub was written for (t_450d02f0) had no projects resource, so the list
+ * screen could not be rendered for design verification. Read-only routes
+ * for GET /projects and GET /projects/:id follow docs/api-projects.md.
+ */
+const projects = new Map([
+  ["p-pay", { id: "p-pay", key: "PAY", name: "Payments", description: "Checkout and billing flows", status: "active", created_by: "00000000-0000-0000-0000-000000000001", created_at: "2026-08-14T09:12:00Z", updated_at: "2026-10-08T01:20:00Z" }],
+  ["p-acc", { id: "p-acc", key: "ACC", name: "Accounts", description: "Sign-up, login, and profile management", status: "active", created_by: "00000000-0000-0000-0000-000000000001", created_at: "2026-08-14T09:14:00Z", updated_at: "2026-10-02T16:05:00Z" }],
+  ["p-cart", { id: "p-cart", key: "CART", name: "Cart", description: "Basket, totals and promotions", status: "active", created_by: "00000000-0000-0000-0000-000000000001", created_at: "2026-08-20T11:30:00Z", updated_at: "2026-09-29T10:00:00Z" }],
+  ["p-mob", { id: "p-mob", key: "MOB", name: "Mobile app", description: "iOS and Android client", status: "active", created_by: "00000000-0000-0000-0000-000000000001", created_at: "2026-09-01T08:45:00Z", updated_at: "2026-10-01T09:30:00Z" }],
+  ["p-legacy", { id: "p-legacy", key: "LEG", name: "Legacy checkout", description: "Deprecated v1 flow, kept for reference", status: "archived", created_by: "00000000-0000-0000-0000-000000000001", created_at: "2026-05-02T13:00:00Z", updated_at: "2026-07-11T15:20:00Z" }],
+]);
+
 const now = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
 
@@ -423,6 +437,36 @@ const server = http.createServer(async (req, res) => {
       target.updated_at = now();
       return send(res, 200, { data: publicUser(target) });
     }
+  }
+
+  // ---------- /projects (stub addition, card t_6e2e5c07: read-only) ----------
+  if (route === "/projects" && method === "GET") {
+    const actor = bearerUser(req);
+    if (!actor) return sendError(res, 401, "UNAUTHENTICATED", "Missing, invalid, or expired token.");
+    const q = (url.searchParams.get("query") ?? "").toLowerCase();
+    const status = url.searchParams.get("status");
+    const pageNum = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 25)));
+    let list = [...projects.values()].sort((a, b) => a.name.localeCompare(b.name));
+    if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
+    if (status) list = list.filter((p) => p.status === status);
+    const total = list.length;
+    const total_pages = Math.max(1, Math.ceil(total / limit));
+    const pageItems = list.slice((pageNum - 1) * limit, pageNum * limit);
+    return send(res, 200, {
+      data: pageItems,
+      meta: { page: pageNum, limit, total, total_pages },
+    });
+  }
+
+  // ---------- /projects/:id (stub addition: read-only) ----------
+  const projectMatch = /^\/projects\/([\w-]+)$/.exec(route);
+  if (projectMatch && method === "GET") {
+    const actor = bearerUser(req);
+    if (!actor) return sendError(res, 401, "UNAUTHENTICATED", "Missing, invalid, or expired token.");
+    const project = projects.get(projectMatch[1]);
+    if (!project) return sendError(res, 404, "NOT_FOUND", "Project not found.");
+    return send(res, 200, { data: project });
   }
 
   return sendError(res, 404, "NOT_FOUND", "Unknown route.");
