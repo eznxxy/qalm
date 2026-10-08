@@ -46,6 +46,10 @@ import {
   type ReactNode,
 } from "react";
 import "./DataTable.css";
+// Token stub for this card (§2 names per DESIGN.md §2.2). Card t_62938355
+// (step 1) owns the real tokens.css + app-wide import; until it merges the
+// primitive imports the stub itself so it is self-sufficient on any screen.
+import "../../styles/tokens.css";
 
 /** Direction of an active sort. */
 export type SortDir = "asc" | "desc";
