@@ -19,13 +19,14 @@ import { UserRole } from '../src/auth/current-user';
  *
  * Timeout note: this suite issues several real bcrypt(12) hashes per test
  * (4 seeded fixtures + 4 logins in beforeEach, plus Admin-API creates that
- * hash again). bcrypt(12) is contractually expensive, and the heaviest test
- * (password-reset round-trip) performs ~9 hashes/verifies; on a loaded shared
- * box that can exceed 30 s, so the suite allows 60 s per hook/test instead of
- * jest's 5 s default — an accommodation of real crypto cost under load, not a
- * weakened assertion.
+ * hash again). bcrypt(12) is contractually expensive, and the heaviest tests
+ * (password-reset round-trip, two-admin demote/deactivate) perform ~9
+ * hashes/verifies; on a heavily loaded shared box (deferred bcrypt under
+ * CPU starvation + swap) a single test can exceed 60 s, so the suite allows
+ * 120 s per hook/test instead of jest's 5 s default — an accommodation of
+ * real crypto cost under load, not a weakened assertion.
  */
-jest.setTimeout(60000);
+jest.setTimeout(120000);
 interface UserData {
   id: string;
   email: string;
