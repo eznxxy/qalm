@@ -1,0 +1,241 @@
+/*
+ * DataTable primitive — stylesheet for web/src/components/ui/DataTable.
+ *
+ * Every colour/height is a var() reference into web/src/styles/tokens.css
+ * (token names per DESIGN.md §2.1/§2.2/§2.5; no hard-coded palette here).
+ * Spec: docs/DESIGN.md §5 (Data table), §2.5 (row heights), §8 (a11y floor).
+ */
+
+/* ------------------------------------------------------------ shell */
+
+.dt-root {
+  /* Below 768px the table scrolls horizontally inside this container —
+   * never the page body (DESIGN.md §3). */
+  position: relative;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .dt-root {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.dt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dt-table:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+/* ----------------------------------------------------------- header */
+
+.dt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 40px;
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  text-align: left;
+  letter-spacing: normal;
+  border-bottom: 1px solid var(--line);
+  padding: 0;
+}
+
+/* ------------------------------------------------------ sort button */
+
+.dt-sort-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.dt-sort-button:hover:not(:disabled) {
+  background: var(--canvas);
+}
+
+.dt-sort-button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.dt-sort-button[disabled] {
+  cursor: default;
+}
+
+.dt-sort-button[aria-sort] .dt-sort-label {
+  color: var(--brand);
+}
+
+.dt-sort-indicator {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-500);
+}
+
+.dt-sort-button[aria-sort] .dt-sort-indicator {
+  color: var(--brand);
+}
+
+/* -------------------------------------------------------- body cells */
+
+.dt-table tbody td {
+  height: var(--row-height);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+/* §2.4: numbers right-aligned, tabular figures */
+.dt-cell-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* header cells with .dt-cell-number align their sort button right too */
+th.dt-head-number .dt-sort-button,
+th.dt-head-number .dt-header-label {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+/* ------------------------------------------------------------- rows */
+
+.dt-table tbody tr.dt-row {
+  background: var(--surface);
+}
+
+.dt-table tbody tr.dt-row:hover:not(.dt-row-selected) {
+  background-color: var(--canvas);
+}
+
+.dt-table tbody tr.dt-row-selected {
+  background-color: var(--brand-tint);
+}
+
+/* programmatic row focus (j/k navigation): 2px brand bar on the row edge */
+.dt-table tbody tr.dt-row-focused td:first-child {
+  box-shadow: inset 2px 0 0 var(--brand);
+}
+
+/* -------------------------------------------------------- selection */
+
+.dt-select-all {
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+}
+
+.dt-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 4px; /* 32px control inside the 40px cell */
+}
+
+.dt-checkbox input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.dt-checkbox input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------- states (§6) */
+
+.dt-status {
+  display: table;
+  width: 100%;
+  min-height: calc(3 * (var(--row-height) + 1px));
+}
+
+.dt-status > div {
+  display: table-cell;
+  vertical-align: middle;
+  padding: 16px;
+  color: var(--ink-700);
+}
+
+.dt-status p {
+  margin: 0 0 8px;
+}
+
+/* --------------------------------------------------------- skeleton */
+
+.dt-skeleton-bar {
+  display: block;
+  height: 12px;
+  width: 100%;
+  border-radius: 4px;
+  background: var(--line);
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dt-skeleton-bar {
+    animation: dt-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes dt-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* skeleton rows reuse real <tr>/<td> markup (keeps table geometry) */
+tr.dt-skeleton-row td {
+  height: var(--row-height);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* standalone TableSkeleton shell matches .dt-root */
+.dt-skeleton-table {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* ------------------------------------------------------------- print */
+
+@media print {
+  .dt-root {
+    overflow: visible;
+  }
+}
