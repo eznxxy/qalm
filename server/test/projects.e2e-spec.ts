@@ -386,6 +386,49 @@ describe('Projects API (integration)', () => {
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('NOT_FOUND');
     });
+
+    it('empty body → 400 VALIDATION_ERROR, never a 500', async () => {
+      const res = await test.req
+        .patch(`/api/v1/projects/${projectId}`)
+        .set(as('admin'))
+        .send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      const after = await test.req.get(`/api/v1/projects/${projectId}`).set(as('admin'));
+      expect(after.body.data.name).toBe('Editable');
+    });
+
+    it('explicit null name/key → 400 VALIDATION_ERROR naming the field, never a 500', async () => {
+      const nullName = await test.req
+        .patch(`/api/v1/projects/${projectId}`)
+        .set(as('admin'))
+        .send({ name: null });
+      expect(nullName.status).toBe(400);
+      expect(nullName.body.error.code).toBe('VALIDATION_ERROR');
+      expect(JSON.stringify(nullName.body.error.details)).toContain('"field":"name"');
+      const nullKey = await test.req
+        .patch(`/api/v1/projects/${projectId}`)
+        .set(as('admin'))
+        .send({ key: null });
+      expect(nullKey.status).toBe(400);
+      expect(nullKey.body.error.code).toBe('VALIDATION_ERROR');
+      expect(JSON.stringify(nullKey.body.error.details)).toContain('"field":"key"');
+      const after = await test.req.get(`/api/v1/projects/${projectId}`).set(as('admin'));
+      expect(after.body.data).toMatchObject({ name: 'Editable', key: 'EDIT' });
+    });
+
+    it('explicit null description clears the field (200, description null)', async () => {
+      await test.req
+        .patch(`/api/v1/projects/${projectId}`)
+        .set(as('admin'))
+        .send({ description: 'has text' });
+      const res = await test.req
+        .patch(`/api/v1/projects/${projectId}`)
+        .set(as('admin'))
+        .send({ description: null });
+      expect(res.status).toBe(200);
+      expect(res.body.data.description).toBeNull();
+    });
   });
 
   describe('POST /api/v1/projects/:id/archive — Admin and Lead (AC3, AC4)', () => {

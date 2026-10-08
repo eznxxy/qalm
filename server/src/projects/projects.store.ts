@@ -164,11 +164,15 @@ export class ProjectsStore {
 
   /**
    * Sets exactly the provided fields. Placeholders start at $2: $1 is the
-   * WHERE id (parameters are appended in field order below).
+   * WHERE id (parameters are appended in field order below). An explicit
+   * null description clears the column (nullable by migration design); name
+   * and key are never null here (DTO gate + service guard reject them).
+   * An empty field set is a 400 — without this the emitted
+   * `SET , updated_at` is a PG 42601 syntax error surfacing as a 500.
    */
   async update(
     id: string,
-    fields: { name?: string; key?: string; description?: string },
+    fields: { name?: string; key?: string; description?: string | null },
   ): Promise<ProjectRow | null> {
     const assignments: string[] = [];
     const values: unknown[] = [];
@@ -183,6 +187,13 @@ export class ProjectsStore {
     if (fields.description !== undefined) {
       values.push(fields.description);
       assignments.push(`description = $${values.length + 1}`);
+    }
+    if (assignments.length === 0) {
+      throw new ApiError('VALIDATION_ERROR', 'Provide at least one of name, key, or description.', [
+        { field: 'name', issue: 'at least one field must be provided' },
+        { field: 'key', issue: 'at least one field must be provided' },
+        { field: 'description', issue: 'at least one field must be provided' },
+      ]);
     }
     try {
       const result = await this.db.query<ProjectRow>(

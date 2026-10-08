@@ -343,6 +343,39 @@ describe('ProjectsService + ProjectsStore (unit, in-memory projects table)', () 
         service.update('00000000-0000-0000-0000-000000000000', { name: 'X' }),
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
+
+    it('400 VALIDATION_ERROR on an empty body (no-op PATCH never reaches the DB)', async () => {
+      const created = await service.create(USERS.admin, { name: 'Payments', key: 'PAY' });
+      await expect(service.update(created.id, {})).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'name' }, { field: 'key' }, { field: 'description' }],
+      });
+      await expect(store.update(created.id, {})).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+      });
+    });
+
+    it('400 VALIDATION_ERROR naming the field on explicit null name/key', async () => {
+      const created = await service.create(USERS.admin, { name: 'Payments', key: 'PAY' });
+      await expect(service.update(created.id, { name: null })).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'name' }],
+      });
+      await expect(service.update(created.id, { key: null })).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'key' }],
+      });
+    });
+
+    it('explicit null description clears the field to NULL', async () => {
+      const created = await service.create(USERS.admin, {
+        name: 'Payments',
+        key: 'PAY',
+      });
+      await service.update(created.id, { description: 'has text' });
+      const cleared = await service.update(created.id, { description: null });
+      expect(cleared.description).toBeNull();
+    });
   });
 
   describe('archive / restore idempotency', () => {
