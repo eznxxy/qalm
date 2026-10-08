@@ -140,7 +140,7 @@ describe("sidebar navigation", () => {
   });
 
   it("marks the active nav item with aria-current=page", async () => {
-    mockRouterState.pathname = "/cases";
+    mockRouterState.pathname = "/wip/cases";
     await renderShell();
 
     expect(screen.getByRole("link", { name: "Test cases" })).toHaveAttribute(
@@ -148,6 +148,22 @@ describe("sidebar navigation", () => {
       "page"
     );
     expect(screen.getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("points unbuilt sections at their /wip/[slug] placeholder routes", async () => {
+    await renderShell();
+
+    for (const [label, href] of [
+      ["Overview", "/wip/overview"],
+      ["Test cases", "/wip/cases"],
+      ["Test runs", "/wip/runs"],
+      ["Test plans", "/wip/plans"],
+      ["Milestones", "/wip/milestones"],
+      ["Reports", "/wip/reports"],
+      ["Settings", "/settings"],
+    ] as const) {
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", expect.stringContaining(href));
+    }
   });
 
   it("admin sees the Users item; other roles do not (both keep Settings)", async () => {
@@ -166,7 +182,7 @@ describe("sidebar navigation", () => {
     await renderShell();
 
     const cases = screen.getByRole("link", { name: "Test cases" });
-    expect(cases).toHaveAttribute("href", "/cases?project=p-2");
+    expect(cases).toHaveAttribute("href", "/wip/cases?project=p-2");
   });
 });
 

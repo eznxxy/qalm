@@ -44,12 +44,14 @@ function navGroups(isAdmin: boolean): ReadonlyArray<ReadonlyArray<{ href: string
   secondary.push({ href: "/settings", label: "Settings", icon: <NavIcon icon="settings" /> });
   return [
     [
-      { href: "/overview", label: "Overview", icon: <NavIcon icon="overview" /> },
-      { href: "/cases", label: "Test cases", icon: <NavIcon icon="cases" /> },
-      { href: "/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
-      { href: "/plans", label: "Test plans", icon: <NavIcon icon="plans" /> },
-      { href: "/milestones", label: "Milestones", icon: <NavIcon icon="milestones" /> },
-      { href: "/reports", label: "Reports", icon: <NavIcon icon="reports" /> },
+      // Screens without a real page yet route to the §6 one-sentence
+      // placeholder at /wip/[slug]; the sidebar always points somewhere real.
+      { href: "/wip/overview", label: "Overview", icon: <NavIcon icon="overview" /> },
+      { href: "/wip/cases", label: "Test cases", icon: <NavIcon icon="cases" /> },
+      { href: "/wip/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
+      { href: "/wip/plans", label: "Test plans", icon: <NavIcon icon="plans" /> },
+      { href: "/wip/milestones", label: "Milestones", icon: <NavIcon icon="milestones" /> },
+      { href: "/wip/reports", label: "Reports", icon: <NavIcon icon="reports" /> },
     ],
     secondary,
   ];
