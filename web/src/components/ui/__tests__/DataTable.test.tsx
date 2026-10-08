@@ -404,4 +404,33 @@ describe("DataTable misc", () => {
     fireEvent.click(screen.getByLabelText("Select row 1"));
     expect(onSelect).not.toHaveBeenCalled();
   });
+
+  it("rowClassName composes caller state classes onto body rows", () => {
+    const { container } = render(
+      <DataTable<Row>
+        {...baseProps()}
+        rowClassName={(row) => (row.active ? undefined : "row-muted")}
+      />
+    );
+    const rows = Array.from(container.querySelectorAll("tbody tr.dt-row"));
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveClass("dt-row");
+    expect(rows[0]).not.toHaveClass("row-muted");
+    // ROWS[1] is the inactive row
+    expect(rows[1]).toHaveClass("row-muted");
+    expect(rows[2]).not.toHaveClass("row-muted");
+    // the muted class must co-exist with the primitive's own row class so
+    // selection styling can still compose on top of it
+    expect(rows[1].className).toBe("dt-row row-muted");
+  });
+
+  it("loading renders skeleton rows in a role=status tbody", () => {
+    render(<DataTable<Row> {...baseProps()} loading />);
+    const skeletonTbody = document.querySelector("tbody.dt-skeleton-tbody");
+    expect(skeletonTbody).not.toBeNull();
+    expect(skeletonTbody).toHaveAttribute("role", "status");
+    expect(skeletonTbody).toHaveAttribute("aria-label", "Loading");
+    expect(document.querySelectorAll(".dt-skeleton-bar").length).toBeGreaterThan(0);
+    expect(document.querySelector("table")).toHaveAttribute("aria-busy", "true");
+  });
 });
