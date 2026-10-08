@@ -1,0 +1,60 @@
+/*
+ * StatusBar — stylesheet for web/src/components/ui/StatusBar.tsx.
+ *
+ * Segment colours are var() references into web/src/styles/tokens.css
+ * (status solids, §2.2 — tints stay reserved for badge backgrounds).
+ * Geometry per §5: 8px high in tables (.stb-small), 16px on dashboards
+ * (.stb-large); segments contiguous, square-ended — structure, not
+ * decoration (§1.5).
+ */
+
+.stb-root {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+  /* A bar keeps its height in any line — tables (36px rows) and
+   * dashboards alike. */
+  vertical-align: middle;
+}
+
+.stb-small {
+  height: 8px;
+}
+
+.stb-large {
+  height: 16px;
+}
+
+.stb-segment {
+  display: block;
+  flex: 0 0 auto;
+  /* 1-of-200 stays visible instead of rounding away. */
+  min-width: 2px;
+}
+
+/* ------------------------------------------------- solid per status */
+
+.stb-passed {
+  background: var(--passed);
+}
+
+.stb-retest {
+  background: var(--retest);
+}
+
+.stb-blocked {
+  background: var(--blocked);
+}
+
+.stb-failed {
+  background: var(--failed);
+}
+
+.stb-skipped {
+  background: var(--skipped);
+}
+
+.stb-untested {
+  background: var(--untested);
+}
