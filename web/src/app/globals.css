@@ -26,10 +26,6 @@
   --accent-strong: var(--brand-hover); /* pressed brand */
   --danger: var(--failed); /* destructive + errors (§2.2 semantic) */
   --danger-bg: var(--failed-tint);
-  --warn: var(--blocked);
-  --warn-bg: var(--blocked-tint);
-  --ok: var(--passed);
-  --ok-bg: var(--passed-tint);
   --info-bg: var(--brand-tint);
 }
 
@@ -44,10 +40,6 @@
   --accent-strong: var(--brand-hover);
   --danger: var(--failed);
   --danger-bg: var(--failed-tint);
-  --warn: var(--blocked);
-  --warn-bg: var(--blocked-tint);
-  --ok: var(--passed);
-  --ok-bg: var(--passed-tint);
   --info-bg: var(--brand-tint);
 }
 
@@ -361,10 +353,14 @@ button:disabled {
   font-size: 14px;
 }
 
+/* Success confirmation: deliberately neutral (§1.1 — §2.2 status colours
+ * are reserved for test status, so no green flash). Brand edge + ink text
+ * keeps it noticeable while every pairing holds AA. */
 .form-notice {
-  background: var(--ok-bg);
-  color: var(--ok);
-  border: 1px solid var(--ok);
+  background: var(--canvas);
+  color: var(--ink-900);
+  border: 1px solid var(--ink-500);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-badge);
   padding: var(--space-2) var(--space-3);
   font-size: 14px;
