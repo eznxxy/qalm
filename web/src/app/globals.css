@@ -406,7 +406,9 @@ code {
   min-width: 0;
 }
 
-@media (max-width: 1280px) {
+/* §3 breakpoints: 1280+ full layout (232px sidebar); below that the rail
+ * collapses to 56px icons (1024 explicitly collapsed per spec). */
+@media (max-width: 1279px) {
   .sidebar {
     flex-basis: 56px;
     width: 56px;
