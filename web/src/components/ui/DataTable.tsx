@@ -46,9 +46,10 @@ import {
   type ReactNode,
 } from "react";
 import "./DataTable.css";
-// Token stub for this card (§2 names per DESIGN.md §2.2). Card t_62938355
-// (step 1) owns the real tokens.css + app-wide import; until it merges the
-// primitive imports the stub itself so it is self-sufficient on any screen.
+// Design tokens (§2). Card t_62938355 owns the real tokens.css and imports
+// it app-wide in layout.tsx; the primitive also imports it directly so it
+// stays self-sufficient (demo pages, tests, future embedding) even where
+// the global import is absent.
 import "../../styles/tokens.css";
 
 /** Direction of an active sort. */
@@ -75,7 +76,7 @@ export interface DataTableColumn<T> {
   sortValue?: (row: T) => string | number | boolean | null | undefined;
   /** "number" right-aligns the cell with tabular figures. */
   align?: "left" | "number";
-  /** Extra class for every body cell in this column. */
+  /** Extra class for every body cell in this column (cell-scoped styling). */
   className?: string;
   /** Cell content. Defaults to String(row[colKey]) — provide render for JSX. */
   render?: (row: T) => ReactNode;
@@ -124,6 +125,12 @@ export interface DataTableProps<T> {
 
   /** Disable all interactions (e.g. while a bulk action is in flight). */
   disabled?: boolean;
+  /**
+   * Extra class on every body <tr> (e.g. "row-muted" for deactivated
+   * rows). Row-scoped, so it composes with .dt-row-selected — the muted
+   * colours apply to text, selection stays visible.
+   */
+  rowClassName?: (row: T) => string | undefined;
   className?: string;
 }
 
@@ -173,6 +180,7 @@ export function DataTable<T>({
   defaultSort = null,
   onSortChange,
   disabled = false,
+  rowClassName,
   className,
 }: DataTableProps<T>) {
   const [internalSort, setInternalSort] = useState<DataTableSort | null>(
@@ -407,7 +415,11 @@ export function DataTable<T>({
           onKeyDown={onTbodyKeyDown}
           className={rowFocus !== null ? "dt-row-focus-active" : undefined}
         >
-          {skeletonRows}
+          {skeletonRows && (
+            <tbody className="dt-skeleton-tbody" role="status" aria-label="Loading">
+              {skeletonRows}
+            </tbody>
+          )}
           {!loading && error && (
             <tr role="alert">
               <td colSpan={columnCount}>
@@ -443,15 +455,16 @@ export function DataTable<T>({
             sortedRows.map((row, index) => {
               const id = getRowId(row);
               const isSelected = selected.has(id);
-              const rowClassName = [
+              const rowClassNameList = [
                 "dt-row",
                 isSelected ? "dt-row-selected" : "",
+                rowClassName?.(row) ?? "",
                 rowFocus === index ? "dt-row-focused" : "",
               ]
                 .filter(Boolean)
                 .join(" ");
               return (
-                <tr key={id} className={rowClassName}>
+                <tr key={id} className={rowClassNameList}>
                   {selectable && (
                     <td>
                       <span className="dt-checkbox">

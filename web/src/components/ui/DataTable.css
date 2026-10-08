@@ -145,8 +145,21 @@ th.dt-head-number .dt-header-label {
   background-color: var(--canvas);
 }
 
+/* With both tbody shapes in play (data + skeleton), only highlight a data
+ * row when the pointer is NOT inside the sibling skeleton tbody — otherwise
+ * every data row would light up while the skeleton rows are hovered. */
+.dt-table > tbody.dt-skeleton-tbody:hover ~ tbody tr.dt-row:not(.dt-row-selected) {
+  background-color: transparent;
+}
+
 .dt-table tbody tr.dt-row-selected {
   background-color: var(--brand-tint);
+}
+
+/* Caller-supplied state classes via the rowClassName prop compose with the
+ * primitives above (selected + muted = tinted row, muted text). */
+.dt-table tr.row-muted td {
+  color: var(--text-muted);
 }
 
 /* programmatic row focus (j/k navigation): 2px brand bar on the row edge */
@@ -231,8 +244,11 @@ th.dt-head-number .dt-header-label {
   }
 }
 
-/* skeleton rows reuse real <tr>/<td> markup (keeps table geometry) */
-tr.dt-skeleton-row td {
+/* skeleton rows reuse real <tr>/<td> markup (keeps table geometry). They
+ * live in their own tbody during table-wide loading, so the selectors
+ * cover both shapes. */
+tr.dt-skeleton-row td,
+.dt-skeleton-tbody tr td {
   height: var(--dt-row-height, var(--row-height));
   padding: 0 12px;
   border-bottom: 1px solid var(--line);
