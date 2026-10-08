@@ -407,26 +407,136 @@ code {
 }
 
 /* §3 breakpoints: 1280+ full layout (232px sidebar); below that the rail
- * collapses to 56px icons (1024 explicitly collapsed per spec). */
-@media (max-width: 1279px) {
-  .sidebar {
-    flex-basis: 56px;
-    width: 56px;
-    padding: var(--space-4) var(--space-2);
+ * is 56px icons (1024 explicitly collapsed per spec). The class on <html>
+ * is driven by use-sidebar-collapse.ts (stored choice ?? matchMedia), so
+ * the JS breakpoint stays the single source of truth — no CSS media query
+ * that could disagree with it. */
+html.sidebar-collapsed .sidebar {
+  flex-basis: 56px;
+  width: 56px;
+  padding: var(--space-4) var(--space-2);
+}
+
+html.sidebar-collapsed .sidebar-label {
+  /* Icon rail: labels stay in the a11y tree but render nothing. */
+  display: none;
+}
+
+html.sidebar-collapsed .sidebar-link {
+  justify-content: center;
+  padding: 0;
+}
+
+html.sidebar-collapsed .sidebar-separator {
+  margin: var(--space-3) var(--space-2);
+}
+
+/* Collapse/expand toggle (t_df4894c3): first item of the rail. Persisted
+ * per user in localStorage; the chevron flips when the rail collapses. */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--control-height);
+  margin-bottom: var(--space-3);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.sidebar-toggle:hover {
+  background: var(--canvas);
+  color: var(--ink-900);
+}
+
+.sidebar-toggle svg {
+  flex: none;
+}
+
+html.sidebar-collapsed .sidebar-toggle {
+  justify-content: center;
+  padding: 0;
+}
+
+html.sidebar-collapsed .sidebar-toggle svg {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-toggle svg {
+    transition: transform 120ms ease;
+  }
+}
+
+/* §3 below 768 — read-only friendly. Tables scroll horizontally inside
+ * their own DataTable container (.dt-root owns overflow-x); nothing here
+ * may push the page body wider than the viewport. */
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
   }
 
-  .sidebar-label {
-    /* Icon rail: labels stay in the a11y tree but render nothing. */
+  .shell-content {
+    /* A flex item's min-width:auto would let long unbroken content push
+     * the column past the viewport; hold it at the viewport width. */
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page {
+    padding: var(--space-5) var(--space-4) var(--space-8);
+  }
+
+  .toolbar .field {
+    /* Filters stack full-width instead of forcing a two-column row. */
+    min-width: 100%;
+  }
+}
+
+/* Narrow phones: let the top bar wrap to two rows (brand / help / avatar,
+ * then switcher + full-width search) instead of overflowing — layout
+ * survival only, not a redesign. */
+@media (max-width: 575px) {
+  .topbar {
+    position: relative;
+    z-index: 50;
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .topbar-brand {
+    order: 1;
+  }
+
+  .topbar-icon-link,
+  .topbar-avatar {
+    order: 2;
+  }
+
+  .topbar-avatar {
+    margin-left: auto;
+  }
+
+  .topbar-spacer {
     display: none;
   }
 
-  .sidebar-link {
-    justify-content: center;
-    padding: 0;
+  .topbar-switcher {
+    order: 3;
   }
 
-  .sidebar-separator {
-    margin: var(--space-3) var(--space-2);
+  .topbar-search {
+    order: 4;
+    flex: 1 1 100%;
   }
 }
 
@@ -832,40 +942,6 @@ a.button-link:focus-visible {
   gap: 0 var(--space-4);
 }
 
-.users-table {
-  width: 100%;
-  border-collapse: collapse;
-  /* §2.4 table cell role: 14/20 w400; §2.4: tabular figures on every table */
-  font-size: 14px;
-  line-height: 20px;
-  font-variant-numeric: tabular-nums;
-}
-
-.users-table th,
-.users-table td {
-  text-align: left;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-
-.users-table td {
-  height: var(--row-height); /* §2.5: 36 default (32/44 via user setting) */
-}
-
-.users-table th {
-  /* §2.4 table header role: 13/18 w600 */
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-/* §5 data table: row hover reads as --canvas; content blocks get no shadow. */
-.users-table tbody tr:hover {
-  background: var(--canvas);
-}
-
 .row-muted td {
   color: var(--text-muted);
 }
@@ -877,30 +953,4 @@ a.button-link:focus-visible {
   margin: var(--space-3) 0;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 640px) {
-  .users-table thead {
-    display: none;
-  }
-  .users-table tr {
-    display: block;
-    border-bottom: 1px solid var(--border);
-    padding: var(--space-2) 0;
-  }
-  .users-table td {
-    display: block;
-    border: none;
-    padding: var(--space-1) 0;
-    height: auto;
-  }
-  .users-table td::before {
-    content: attr(data-label);
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-right: var(--space-2);
-  }
-  .toolbar .field {
-    min-width: 100%;
-  }
 }
