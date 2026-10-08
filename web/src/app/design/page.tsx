@@ -1,46 +1,58 @@
 "use client";
 
 /**
- * DataTable demo — /design (temporary, part of card t_e3495ddb).
+ * Design-system demo — /design.
  *
- * The design-system step-1 token card (t_62938355) owns the app-wide theme
- * flip; until it merges there is no integration point in existing screens
- * (explicitly ordered: do NOT refactor them yet). This page exercises the
- * primitive's sorting, selection, states, row-height densities and
- * below-768px horizontal scroll so it can be verified visually and via
- * keyboard before any screen adopts it. It is removed or repurposed when a
- * real screen ships on DataTable.
+ * Started as the DataTable demo (card t_e3495ddb); card t_328401f8 adds the
+ * status components: StatusBadge (all six §2.2 statuses), StatusBar at both
+ * sizes (8px table / 16px dashboard) and PriorityIcon. The design-system
+ * step-1 token card (t_62938355) owns the app-wide theme flip; until it
+ * merges the primitives are self-sufficient (they import the token stub).
+ * This page exists so primitives can be verified visually and via keyboard
+ * before real screens adopt them; it shrinks as screens take over.
  */
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { DataTable, TableSkeleton, type DataTableSort } from "@/components/ui";
+import {
+  DataTable,
+  PRIORITY_LABELS,
+  PriorityIcon,
+  STATUS_ORDER,
+  StatusBadge,
+  StatusBar,
+  TableSkeleton,
+  type DataTableSort,
+  type PriorityName,
+  type StatusName,
+} from "@/components/ui";
 
 interface DemoCase {
   id: string;
   key: string;
   title: string;
-  priority: "Critical" | "High" | "Medium" | "Low";
+  status: StatusName;
+  priority: PriorityName;
   automated: boolean;
   estMinutes: number;
 }
 
 const DEMO_CASES: DemoCase[] = [
-  { id: "c1", key: "C1001", title: "Pay with saved card", priority: "High", automated: true, estMinutes: 5 },
-  { id: "c2", key: "C1002", title: "Card declined message", priority: "High", automated: false, estMinutes: 8 },
-  { id: "c3", key: "C1003", title: "Expired card renewal prompt", priority: "Medium", automated: true, estMinutes: 3 },
-  { id: "c4", key: "C1004", title: "3-D Secure challenge", priority: "Critical", automated: false, estMinutes: 12 },
-  { id: "c5", key: "C1005", title: "Wallet payment (Apple Pay)", priority: "Medium", automated: true, estMinutes: 6 },
-  { id: "c6", key: "C1006", title: "Gift card partial redemption", priority: "Low", automated: false, estMinutes: 9 },
-  { id: "c7", key: "C1007", title: "Currency conversion display", priority: "Low", automated: true, estMinutes: 4 },
-  { id: "c8", key: "C1008", title: "Retry after gateway timeout", priority: "High", automated: false, estMinutes: 10 },
+  { id: "c1", key: "C1001", title: "Pay with saved card", status: "passed", priority: "high", automated: true, estMinutes: 5 },
+  { id: "c2", key: "C1002", title: "Card declined message", status: "failed", priority: "high", automated: false, estMinutes: 8 },
+  { id: "c3", key: "C1003", title: "Expired card renewal prompt", status: "retest", priority: "medium", automated: true, estMinutes: 3 },
+  { id: "c4", key: "C1004", title: "3-D Secure challenge", status: "blocked", priority: "critical", automated: false, estMinutes: 12 },
+  { id: "c5", key: "C1005", title: "Wallet payment (Apple Pay)", status: "passed", priority: "medium", automated: true, estMinutes: 6 },
+  { id: "c6", key: "C1006", title: "Gift card partial redemption", status: "skipped", priority: "low", automated: false, estMinutes: 9 },
+  { id: "c7", key: "C1007", title: "Currency conversion display", status: "untested", priority: "low", automated: true, estMinutes: 4 },
+  { id: "c8", key: "C1008", title: "Retry after gateway timeout", status: "failed", priority: "high", automated: false, estMinutes: 10 },
 ];
 
-const PRIORITY_ORDER: Record<DemoCase["priority"], number> = {
-  Low: 0,
-  Medium: 1,
-  High: 2,
-  Critical: 3,
+const PRIORITY_ORDER: Record<PriorityName, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  critical: 3,
 };
 
 type Density = "default" | "compact" | "comfortable";
@@ -82,10 +94,23 @@ export default function DesignDemoPage() {
         sortValue: (row: DemoCase) => row.title,
       },
       {
+        key: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (row: DemoCase) => STATUS_ORDER.indexOf(row.status),
+        render: (row: DemoCase) => <StatusBadge status={row.status} />,
+      },
+      {
         key: "priority",
         header: "Priority",
         sortable: true,
         sortValue: (row: DemoCase) => PRIORITY_ORDER[row.priority],
+        render: (row: DemoCase) => (
+          <>
+            <PriorityIcon priority={row.priority} />{" "}
+            {PRIORITY_LABELS[row.priority]}
+          </>
+        ),
       },
       {
         key: "automated",
@@ -187,6 +212,36 @@ export default function DesignDemoPage() {
 
       <p className="muted" role="status">
         {selectedIds.size} selected
+      </p>
+
+      <h2>Status components (card t_328401f8)</h2>
+
+      <p>
+        {STATUS_ORDER.map((status) => (
+          <StatusBadge key={status} status={status} />
+        ))}
+      </p>
+
+      <p>
+        <StatusBar
+          label="Release 2.4 smoke (table, 8px)"
+          counts={{ passed: 31, retest: 2, blocked: 2, failed: 4, untested: 13 }}
+        />
+      </p>
+      <p>
+        <StatusBar
+          size="large"
+          label="Release 2.4 smoke (dashboard, 16px)"
+          counts={{ passed: 31, retest: 2, blocked: 2, failed: 4, untested: 13 }}
+        />
+      </p>
+
+      <p>
+        {(Object.keys(PRIORITY_LABELS) as PriorityName[]).map((priority) => (
+          <span key={priority} style={{ marginRight: "12px" }}>
+            <PriorityIcon priority={priority} /> {PRIORITY_LABELS[priority]}
+          </span>
+        ))}
       </p>
 
       <p>
