@@ -78,6 +78,18 @@ The suite truncates all tables between tests — never point `.env.test` at a
 database you care about. Run the unit suite independently with `npm test`
 (no database needed).
 
+The e2e specs share ONE scratch database (`test/helpers.ts` `resetDb`
+truncates `refresh_tokens`/`projects`/`users` in every `beforeEach`), so the
+suite must run serially: `npm run test:e2e` passes `--runInBand`, and
+`test/jest-e2e.json` pins `maxWorkers: 1` so even a bare `jest --config ...`
+invocation cannot run specs in parallel workers (overlapping workers used to
+truncate/seed under each other — FK violations, duplicate-email inserts, and
+cascading hook timeouts). The e2e config also raises `testTimeout` to 30s:
+the projects `beforeEach` does four real bcrypt cost-12 hashes plus four real
+logins (~3s on a quiet box, worse under load), which flaked against jest's
+5s default hook timeout. Do not raise `maxWorkers` without first giving each
+spec file its own scratch database.
+
 ## API surface (auth core, task 2b1)
 
 - `POST /api/v1/auth/bootstrap` — first Admin only, 409 afterwards
