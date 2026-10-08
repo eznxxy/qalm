@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import type { Project, User } from "@/lib/api-types";
 
@@ -245,31 +245,55 @@ describe("§7 shortcuts", () => {
   });
 
   describe("n (context-aware new)", () => {
-    it("on projects with the form closed: opens it and moves focus into it", async () => {
+    it("on projects with the form open: focuses the form's first field", async () => {
       await renderShell();
-      fireEvent.keyDown(window, { key: "n" });
-      // scopedHref carries the fallback scope (first project) — the shell's
-      // project-scoped navigation rule.
-      await waitFor(() =>
-        expect(mockRouterState.push).toHaveBeenCalledWith("/projects?project=p-1")
-      );
-    });
-
-    it("on projects with the form open: focuses the form instead of re-navigating", async () => {
-      await renderShell();
-      // The (app) children render the real screen; emulate the projects
-      // screen's create form: aria-label on the form element, the Name
-      // field as its first control.
+      // The (app) children render the real screen; emulate the create form
+      // the toolbar renders (aria-label on the form, Name field first).
       render(
         <form aria-label="Create project">
           <h2>Create project</h2>
-          <input aria-label="Name" />
+          <input aria-label="Name" id="project-name" />
         </form>,
         { container: document.querySelector(".shell-content") as HTMLElement }
       );
+      const anchor = render(<button>anchor</button>).container;
+      document.body.appendChild(anchor);
+      (anchor.querySelector("button") as HTMLElement).focus();
+
       fireEvent.keyDown(window, { key: "n" });
       expect(mockRouterState.push).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(screen.getByLabelText("Name"));
+      anchor.remove();
+    });
+
+    it("on projects with the form closed: opens it via the toolbar toggle and focuses Name", async () => {
+      await renderShell();
+      // Emulate the projects toolbar + the form it mounts when toggled.
+      const host = document.querySelector(".shell-content") as HTMLElement;
+      host.innerHTML = `
+        <button type="button">New project</button>
+        <main class="page"><h1>Projects</h1></main>
+      `;
+      const toolbar = host.querySelector("button") as HTMLButtonElement;
+      toolbar.addEventListener("click", () => {
+        host.insertAdjacentHTML(
+          "beforeend",
+          '<form aria-label="Create project"><input id="project-name" aria-label="Name" /></form>'
+        );
+      });
+      const anchor = document.createElement("button");
+      document.body.appendChild(anchor);
+      anchor.focus();
+
+      fireEvent.keyDown(window, { key: "n" });
+      // The toggle click mounts the form; the shell then focuses its Name
+      // field on the animation frame.
+      await act(async () => {
+        await new Promise((r) => requestAnimationFrame(r));
+      });
+      expect(mockRouterState.push).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(screen.getByLabelText("Name"));
+      anchor.remove();
     });
 
     it("off projects: navigates to projects (the current context's new target)", async () => {

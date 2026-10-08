@@ -919,6 +919,13 @@ a.button-link:focus-visible {
   margin-bottom: var(--space-2);
 }
 
+/* Short viewports: the dialog scrolls instead of clipping (it is tall —
+ * three sections of shortcuts). */
+.help-dialog {
+  max-height: calc(100vh - 2 * var(--space-6));
+  overflow-y: auto;
+}
+
 .help-dialog h3 {
   font-size: 13px;
   text-transform: uppercase;

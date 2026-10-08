@@ -261,31 +261,41 @@ function AppShellInner({ children }: { children: ReactNode }) {
   }, [gotoArmed]);
 
   // `n` is context-aware: today that means the projects screen's create
-  // form. The form is found by its stable aria-label (the heading is a
-  // sibling of the fields, not their container); the heading search is the
-  // fallback for future screens that follow the same naming. When the form
-  // is not on screen, land on Projects; built screens wire their own `n`.
+  // form. Order: focus the open form's first field → click the toolbar's
+  // "New project" toggle (a same-URL router.push would be a no-op, so the
+  // button is the real opener) → anywhere else, land on Projects. Built
+  // screens wire their own `n` against their own forms later.
   function openCreateForm() {
-    const target =
-      document.querySelector<HTMLElement>('[aria-label="Create project"]') ??
-      Array.from(document.querySelectorAll("h1, h2")).find(
-        (h): h is HTMLElement => h.textContent === "Create project"
+    const form = document.querySelector<HTMLElement>('[aria-label="Create project"]');
+    if (form) {
+      const focusable = form.querySelector<HTMLElement>(
+        "input, select, textarea, button, [href]"
       );
-    if (!target) {
-      router.push(scopedHref("/projects"));
+      if (focusable) {
+        focusable.focus();
+        return;
+      }
+      if (!form.hasAttribute("tabindex")) form.setAttribute("tabindex", "-1");
+      form.focus();
       return;
     }
-    const focusable = target.querySelector<HTMLElement>(
-      "input, select, textarea, button, [href]"
+    const newButton = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "New project" && !b.disabled
     );
-    if (focusable) {
-      focusable.focus();
+    if (newButton) {
+      newButton.click();
+      // The form mounts on the next render; move focus into it so the
+      // keyboard lands where the user acts next.
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>(
+            '[aria-label="Create project"] input, [aria-label="Create project"] select, [aria-label="Create project"] textarea'
+          )
+          ?.focus();
+      });
       return;
     }
-    // Non-focusable anchor (bare heading): make it a programmatic focus
-    // target so sighted keyboard users see where `n` landed.
-    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-    target.focus();
+    router.push(scopedHref("/projects"));
   }
 
   const shortcuts: ShortcutDefinition[] = [
