@@ -35,7 +35,6 @@ export function AppNav() {
       <span className="app-nav-brand">Qalm</span>
       <Link href="/projects">Projects</Link>
       {isAdmin && <Link href="/users">Users</Link>}
-      <Link href="/design">Design</Link>
       <span className="app-nav-spacer" />
       <span className="app-nav-user">
         {user.name} · {ROLE_LABELS[user.role]}
