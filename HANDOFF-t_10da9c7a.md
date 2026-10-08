@@ -118,6 +118,37 @@ Target was none; the only non-visual-equivalent decisions:
   same pass. `projects-table` was only ever a co-selector and is already unused.
 - Do not re-add `/design`; the demo page is gone and the nav link removed.
 
+## Verification addendum (run 70, 2026-10-09)
+
+The original run (69) completed the code + committed evidence but timed out before
+its final sweep. Run 70 re-verified on a rebuilt stack (fresh stub on :3001 seeded
+via bootstrap + 3 created users incl. one deactivated; fresh prod build on :3000):
+
+- Gates re-run on tip `ec097b6`: tsc exit 0, eslint 0 findings, 182/182 unit tests
+  (13 suites).
+- Live render check (headless Chrome, viewport 1440): /users dt-table with the 5
+  parity headers, 4 rows, badges Active ×4 / "temp password" ×3 / Deactivated ×1,
+  1 `.row-muted` row, 0 sort buttons / 0 row checkboxes, caption + aria-label.
+  Search "grace": rows 4 → 1 with the debounce intact (still 4 at ~150ms, 1 after).
+  Role filter Lead → 1 row; reset → 4. /projects: 4 rows Edit+Archive (admin),
+  status filter → `?status=archived` adds the Status column + `Archived` badge +
+  Restore + caption `(archived)` suffix; `?query=zzz-nonexistent` → "No projects
+  match your search."; Archive opens the alertdialog ("Archive project?
+  Accounts will be archived…"), Escape closes it with the list unchanged.
+- Both screenshots vision-checked (light theme, legible badges, muted deactivated
+  row, no clipping/breakage).
+- Fresh after-shots per screen (one per the amended screenshot speed mode):
+  `shots/t_10da9c7a-final-users-1440.png`, `shots/t_10da9c7a-final-projects-1440.png`.
+  The 1440/1024/768 before/after sets from run 69 remain committed for width parity.
+
+### Push status (action needed)
+The branch is NOT on the remote: `git push` is gated behind an approval flag
+(`QALM_PUSH_APPROVED=1`, approver Arif) and run 69's "pushed" note was wrong.
+Every sibling design branch is on the remote. After approval:
+`git push -u origin feature/t_10da9c7a-datatable-refactor` (tip `ec097b6`).
+No commits after `416a17d` change code — `416a17d` (residue), the screenshot +
+handoff-amendment commit, and `ec097b6` (run 69) are docs/shots/tests only.
+
 ## Verify it yourself
 ```
 cd /home/ubuntu/qalm && git checkout feature/t_10da9c7a-datatable-refactor
