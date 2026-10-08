@@ -28,7 +28,8 @@ const noop = () => {};
 describe("isTypingTarget", () => {
   it("treats input, textarea, select and contentEditable as typing targets", () => {
     const editable = document.createElement("div");
-    editable.contentEditable = "true";
+    // Attribute form: jest's jsdom does not implement the IDL mapping.
+    editable.setAttribute("contenteditable", "true");
     expect(
       [document.createElement("input"), document.createElement("textarea"), document.createElement("select"), editable].map(
         isTypingTarget
@@ -87,8 +88,12 @@ describe("resolveShortcut", () => {
   });
 
   it("guards contentEditable targets", () => {
+    // jest's jsdom does not implement the contentEditable IDL mapping
+    // (isContentEditable is undefined, the setter does not reflect), so the
+    // tests exercise the attribute — which the util reads directly and real
+    // browsers set from the same markup.
     const el = document.createElement("div");
-    el.contentEditable = "true";
+    el.setAttribute("contenteditable", "true");
     expect(resolveShortcut(targetEvent("n", el), [{ key: "n", handler: noop }])).toBeNull();
   });
 
@@ -116,8 +121,8 @@ describe("resolveShortcut", () => {
   });
 
   it("scoped definitions fire only inside their data-shortcut-scope subtree", () => {
-    document.body.innerHTML = `<div data-shortcut-scope="result-form"><input /></div><button id="outside"></button>`;
-    const inside = document.querySelector("input") as HTMLElement;
+    document.body.innerHTML = `<div data-shortcut-scope="result-form"><p id="inside"></p></div><button id="outside"></button>`;
+    const inside = document.getElementById("inside") as HTMLElement;
     const outside = document.getElementById("outside") as HTMLElement;
     const handler = jest.fn();
     const def: ShortcutDefinition = { key: "p", handler, scope: "result-form" };
@@ -134,13 +139,13 @@ describe("resolveShortcut", () => {
   });
 
   it("the innermost scope wins when scopes nest", () => {
-    document.body.innerHTML = `<div data-shortcut-scope="shell"><div data-shortcut-scope="form"><input id="q" /></div></div>`;
-    const box = document.getElementById("q") as HTMLElement;
+    document.body.innerHTML = `<div data-shortcut-scope="shell"><div data-shortcut-scope="form"><p id="q"></p></div></div>`;
+    const el = document.getElementById("q") as HTMLElement;
     expect(
-      resolveShortcut(targetEvent("p", box), [{ key: "p", handler: noop, scope: "form" }])
+      resolveShortcut(targetEvent("p", el), [{ key: "p", handler: noop, scope: "form" }])
     ).not.toBeNull();
     expect(
-      resolveShortcut(targetEvent("p", box), [{ key: "p", handler: noop, scope: "shell" }])
+      resolveShortcut(targetEvent("p", el), [{ key: "p", handler: noop, scope: "shell" }])
     ).toBeNull();
     document.body.innerHTML = "";
   });

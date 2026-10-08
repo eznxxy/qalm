@@ -40,6 +40,11 @@ export interface ShortcutDefinition {
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
+  // Attribute check too: isContentEditable is not derived from the
+  // attribute in every environment (jsdom), and "true"/""/"plaintext-only"
+  // all make the element editable in browsers.
+  const editableAttr = target.getAttribute("contenteditable");
+  if (editableAttr !== null && editableAttr !== "false") return true;
   const tag = target.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
@@ -47,9 +52,8 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 /** True when the modifier set is exactly none / exactly mod per the definition. */
 function modifiersMatch(event: KeyboardEvent, def: ShortcutDefinition): boolean {
   const mod = event.ctrlKey || event.metaKey;
-  if (def.mod !== mod) return false;
-  // Shift only participates in sequences that arrive as shifted keys
-  // ("?" is shift+/) — the map authors declare the key they receive.
+  if (Boolean(def.mod) !== mod) return false;
+  // Alt participates in no map (dead keys / IME chords).
   return !event.altKey;
 }
 
