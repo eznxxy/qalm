@@ -7,7 +7,7 @@ the table refactors are deferred** until step 1 (tokens, t_62938355) merges — 
 run delivers the primitive, unit tests, and browser verification only. No existing
 screen changed (verified: users/projects pages byte-identical to master on this branch).
 
-## Files changed (branch feature/t_e3495ddb-datatable, 4 commits, pushed)
+## Files changed (branch feature/t_e3495ddb-datatable, 7 commits, pushed — tip ebe6d55)
 - `web/src/components/ui/DataTable.tsx` — the primitive (see API below)
 - `web/src/components/ui/DataTable.css` — component styles, token vars only
 - `web/src/components/ui/index.ts` — barrel export
@@ -79,9 +79,11 @@ only seeds the uncontrolled variant.
    select-all/indeterminate, j/k in the table body, State select = loading/empty/error,
    Row height select = compact/default/comfortable, narrow window < 768 → table
    scrolls inside its frame.
-4. Screenshots attached: data / compact / comfortable / loading / empty / error /
-   375px-scroll, plus before-users (users screen unchanged; projects before-shot shows
-   the stub's error state — see above).
+4. Screenshots: this file rides on the completion as an artifact, together with
+   data / compact / comfortable / loading / empty / error / 375px-scroll shots and
+   before-users (users screen unchanged; projects before-shot shows the stub's error
+   state — see above). On this shared box the files also remain under
+   ~/.hermes/profiles/frontendengineer/cache/scratch/datatable-*.png.
 
 ## Open risks / notes for next cards
 - tokens.css is a STUB: t_62938355 must replace it and add the app-wide import; the
