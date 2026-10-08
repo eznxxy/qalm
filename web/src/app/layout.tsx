@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
+import "@/styles/tokens.css";
 import "./globals.css";
-// Design tokens (§2) app-wide. This is the STUB file — card t_62938355
-// (step 1) owns its final form and the theme flip; importing it here only
-// makes the token NAMES resolve on every screen (the §8 focus ring uses
-// --brand, which previously existed solely inside the DataTable primitive).
-import "../styles/tokens.css";
 import { plexSans } from "./fonts";
 import { SessionProvider } from "@/lib/session";
 import { AppNav } from "@/components/app-nav";
