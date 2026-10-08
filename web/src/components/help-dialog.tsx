@@ -6,8 +6,11 @@
  * is the single Close button and Esc — the same focus discipline as
  * ConfirmDialog minus the alertdialog semantics (nothing is being decided).
  *
- * The shell unmounts the dialog when closed, so the previous-focus restore in
- * the unmount effect returns focus to the `?` affordance in the top bar.
+ * The capture-phase keydown listener swallows every key (except Tab, which
+ * the trap handles) while the dialog is open, so page-level §7 shortcuts
+ * never fire underneath a modal; Esc still closes. The shell unmounts the
+ * dialog on close, so the previous-focus restore returns focus to the `?`
+ * affordance in the top bar.
  */
 import { useEffect, useRef } from "react";
 
@@ -15,7 +18,7 @@ export interface HelpDialogProps {
   onClose: () => void;
 }
 
-/** Rendered in a <dl> — shortcut keys as <kbd>, descriptions as <dd>. */
+/** Rendered as definition lists — shortcut keys as <kbd>, descriptions as <dd>. */
 const SHORTCUT_SECTIONS: ReadonlyArray<{
   heading: string;
   entries: ReadonlyArray<{ keys: string[]; description: string }>;
@@ -56,8 +59,11 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
     dialog?.querySelector<HTMLElement>("button")?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
+      // Modal: swallow every key before it reaches the page's shortcut maps
+      // (capture phase fires before window-level listeners). Tab is left to
+      // the focus trap below; Esc closes; everything else does nothing.
+      event.stopPropagation();
       if (event.key === "Escape") {
-        event.stopPropagation();
         onClose();
         return;
       }
@@ -90,6 +96,7 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
         aria-modal="true"
         aria-labelledby="help-dialog-title"
         className="dialog help-dialog"
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 id="help-dialog-title">Keyboard shortcuts</h2>
 

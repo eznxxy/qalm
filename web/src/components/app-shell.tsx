@@ -27,6 +27,22 @@ import {
   SIDEBAR_COLLAPSE_KEY,
   useSidebarCollapse,
 } from "@/lib/use-sidebar-collapse";
+import { HelpDialog } from "@/components/help-dialog";
+import {
+  isTypingTarget,
+  useGlobalShortcuts,
+  type ShortcutDefinition,
+} from "@/lib/keymap";
+
+/** §7 go-to sequences: `g` then the section's initial (g then c/r/p). */
+const GOTO_ROUTES: Record<string, string> = {
+  c: "/wip/cases",
+  r: "/wip/runs",
+  p: "/wip/plans",
+};
+
+/** How long the armed `g` chord waits for its second key. */
+const GOTO_CHORD_WINDOW_MS = 1000;
 
 /**
  * Runs before first paint so a stored (or breakpoint-default) collapsed rail
@@ -232,6 +248,72 @@ function AppShellInner({ children }: { children: ReactNode }) {
     router.push(q ? `/projects?query=${encodeURIComponent(q)}` : "/projects");
   }
 
+  // ---- §7 shortcuts (card t_6ce021c1) ----
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // `g` chord state: "g" arms the sequence; the next key completes it if it
+  // maps to a §7 route, otherwise the arm expires.
+  const [gotoArmed, setGotoArmed] = useState(false);
+  useEffect(() => {
+    if (!gotoArmed) return;
+    const timer = setTimeout(() => setGotoArmed(false), GOTO_CHORD_WINDOW_MS);
+    return () => clearTimeout(timer);
+  }, [gotoArmed]);
+
+  // `n` is context-aware: today that means the projects screen's create
+  // form, announced by the heading "Create project". When that form is not
+  // on screen, land on Projects; built screens wire their own `n` later.
+  function openCreateForm() {
+    const heading = Array.from(document.querySelectorAll("h1, h2")).find(
+      (h) => h.textContent === "Create project"
+    );
+    if (!heading) {
+      router.push(scopedHref("/projects"));
+      return;
+    }
+    const focusable = heading.querySelector<HTMLElement>(
+      "button, [href], input, select, textarea"
+    );
+    (focusable ?? (heading as HTMLElement)).focus();
+  }
+
+  const shortcuts: ShortcutDefinition[] = [
+    {
+      key: "/",
+      handler: () => document.getElementById("topbar-search-input")?.focus(),
+      allowInInputs: true,
+    },
+    { key: "n", handler: openCreateForm },
+    { key: "?", handler: () => setHelpOpen(true) },
+    ...Object.entries(GOTO_ROUTES).map(
+      ([suffix, route]): ShortcutDefinition => ({
+        key: suffix,
+        // Only completes while the `g` chord is armed; the arm is consumed.
+        handler: () => {
+          if (!gotoArmed) return;
+          setGotoArmed(false);
+          router.push(scopedHref(route));
+        },
+      })
+    ),
+  ];
+  useGlobalShortcuts(shortcuts);
+
+  // The `g` chord opener holds state the definitions above read, so it is
+  // wired separately. Typing targets never arm it; repeat/modifier `g`
+  // (Ctrl+G browser find, held key) is ignored.
+  useEffect(() => {
+    function onGotoKeyDown(event: KeyboardEvent) {
+      if (event.key !== "g" || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isTypingTarget(event.target)) return;
+      if (event.defaultPrevented || event.repeat) return;
+      event.preventDefault();
+      setGotoArmed(true);
+    }
+    window.addEventListener("keydown", onGotoKeyDown);
+    return () => window.removeEventListener("keydown", onGotoKeyDown);
+  }, []);
+
   // ---- account menu ----
   const [menuOpen, setMenuOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -340,12 +422,24 @@ function AppShellInner({ children }: { children: ReactNode }) {
             placeholder="Search cases, runs…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
+            /* §7: '/' from anywhere lands here. Marked out of the shell's
+             * keymap scope so typing in it (a form field) can't re-fire the
+             * other shortcuts while the caret is in the box. */
+            data-shortcut-scope="shell"
           />
         </form>
 
-        <Link href="/help" className="topbar-icon-link" aria-label="Help">
+        <button
+          type="button"
+          className="topbar-icon-link"
+          aria-label="Keyboard shortcuts help"
+          aria-haspopup="dialog"
+          aria-expanded={helpOpen}
+          title="Keyboard shortcuts (?)"
+          onClick={() => setHelpOpen(true)}
+        >
           ?
-        </Link>
+        </button>
 
         <div className="topbar-avatar" ref={avatarRef}>
           <button
@@ -434,6 +528,8 @@ function AppShellInner({ children }: { children: ReactNode }) {
           {children}
         </div>
       </div>
+
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }

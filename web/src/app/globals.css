@@ -913,6 +913,55 @@ a.button-link:focus-visible {
   margin-top: var(--space-5);
 }
 
+/* ---------- §7 shortcuts help dialog (card t_6ce021c1) ---------- */
+
+.help-dialog h2 {
+  margin-bottom: var(--space-2);
+}
+
+.help-dialog h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-700);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.help-shortcuts {
+  margin: 0;
+}
+
+.help-shortcut-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+}
+
+.help-shortcut-row dt {
+  flex: none;
+  min-width: 5.5em;
+  display: flex;
+  gap: var(--space-1);
+}
+
+.help-shortcut-row dd {
+  margin: 0;
+}
+
+/* §7 shortcut keys render as keys, never as plain prose. */
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-badge);
+  background: var(--bg-raised);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* ---------- page + tables ---------- */
 
 /* §3: page content uses the full width of the shell content area —

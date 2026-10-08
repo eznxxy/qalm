@@ -9,6 +9,10 @@
  * Rules encoded here (§8 keyboard floor):
  * - No shortcut fires while the user types in a form field (input / textarea /
  *   select / contentEditable) unless the map opts in with `allowInInputs`.
+ * - Maps can be scoped with `data-shortcut-scope`: definitions carrying
+ *   `scope` only fire for targets inside the matching subtree. This keeps
+ *   e.g. a result-form `P`/`F` radio map from firing while the caret sits in
+ *   the shell's top-bar search.
  * - Plain-letter keys must not fire with modifiers held — Ctrl/Cmd+R is the
  *   browser's reload, Alt+letter may be a dead key or an IME chord.
  */
@@ -25,6 +29,11 @@ export interface ShortcutDefinition {
   allowInInputs?: boolean;
   /** Require Ctrl on Windows/Linux or Cmd on macOS. */
   mod?: boolean;
+  /**
+   * Only fire when the event target is inside an element with this
+   * `data-shortcut-scope` value (undefined = anywhere on the page).
+   */
+  scope?: string;
 }
 
 /** Elements in which typed characters belong to the field, not shortcuts. */
@@ -47,20 +56,23 @@ function modifiersMatch(event: KeyboardEvent, def: ShortcutDefinition): boolean 
 /**
  * Returns the handler whose definition matches the event, or null when the
  * event must not trigger a shortcut (typing target without opt-in, mismatched
- * modifiers, or no definition for the key).
+ * modifiers, wrong scope, or no definition for the key).
  */
 export function resolveShortcut(
   event: KeyboardEvent,
   definitions: readonly ShortcutDefinition[]
 ): ShortcutHandler | null {
   if (event.altKey) return null;
-  if (isTypingTarget(event.target) && !definitions.some((d) => d.allowInInputs)) {
-    return null;
-  }
+  const typing = isTypingTarget(event.target);
+  if (typing && !definitions.some((d) => d.allowInInputs)) return null;
+  const scopeRoot = event.target instanceof Element
+    ? event.target.closest<HTMLElement>("[data-shortcut-scope]")?.dataset.shortcutScope
+    : undefined;
   for (const def of definitions) {
     if (def.key !== event.key) continue;
     if (!modifiersMatch(event, def)) continue;
-    if (isTypingTarget(event.target) && !def.allowInInputs) continue;
+    if (def.scope !== scopeRoot) continue;
+    if (typing && !def.allowInInputs) continue;
     return def.handler;
   }
   return null;
