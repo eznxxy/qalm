@@ -375,30 +375,9 @@ button:disabled {
   letter-spacing: 0.05em;
 }
 
-.badge {
-  display: inline-block;
-  border-radius: 999px;
-  /* caption size 12/16 (§2.4); radius/height geometry is step 3's badge card */
-  font-size: 12px;
-  line-height: 16px;
-  padding: 0.05rem 0.55rem;
-  margin-right: 0.3rem;
-}
-
-.badge-ok {
-  background: var(--ok-bg);
-  color: var(--ok);
-}
-
-.badge-muted {
-  background: var(--bg-input);
-  color: var(--text-muted);
-}
-
-.badge-warn {
-  background: var(--warn-bg);
-  color: var(--warn);
-}
+/* Status rendering went through the shared StatusBadge primitive
+ * (components/ui/StatusBadge.tsx, card t_328401f8); the previous ad-hoc
+ * rounded status pills were removed with it — see git history. */
 
 /* ---------- projects ---------- */
 

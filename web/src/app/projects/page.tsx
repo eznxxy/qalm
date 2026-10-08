@@ -26,6 +26,7 @@ import {
 import { CreateProjectForm } from "@/components/project-forms";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { projectActionError } from "@/components/project-action-error";
+import { StatusBadge } from "@/components/ui";
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -311,7 +312,7 @@ function ProjectsListPage() {
                 <td className="cell-description">{project.description ?? ""}</td>
                 {urlStatus === "archived" && (
                   <td>
-                    <span className="badge badge-muted">Archived</span>
+                    <StatusBadge status="skipped">Archived</StatusBadge>
                   </td>
                 )}
                 <td>

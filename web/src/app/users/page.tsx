@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
 import { RequireAuth, isSessionDead } from "@/components/require-auth";
+import { StatusBadge } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { ROLES, Role, User } from "@/lib/api-types";
 
@@ -259,7 +260,7 @@ function EditUserPanel({
     <form onSubmit={handleSave} noValidate className="panel" aria-label={`Edit ${user.email}`}>
       <h2>
         Edit {user.email}
-        {!user.is_active && <span className="badge badge-muted"> deactivated</span>}
+        {!user.is_active && <StatusBadge status="skipped"> deactivated</StatusBadge>}
       </h2>
       <div className="form-grid">
         <div className="field">
@@ -475,14 +476,17 @@ function UsersAdminPage() {
                 <td>{ROLE_LABELS[u.role]}</td>
                 <td>
                   {u.is_active ? (
-                    <span className="badge badge-ok">Active</span>
+                    <StatusBadge status="passed">Active</StatusBadge>
                   ) : (
-                    <span className="badge badge-muted">Deactivated</span>
+                    <StatusBadge status="skipped">Deactivated</StatusBadge>
                   )}
                   {u.must_change_password && (
-                    <span className="badge badge-warn" title="Must change password at next login">
+                    <StatusBadge
+                      status="retest"
+                      title="Must change password at next login"
+                    >
                       temp password
-                    </span>
+                    </StatusBadge>
                   )}
                 </td>
                 <td>
