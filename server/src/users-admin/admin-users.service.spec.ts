@@ -174,6 +174,17 @@ describe('AdminUsersService + UsersStore (unit, in-memory users table)', () => {
     const db = {
       query: (text: string, values: unknown[] = []): Promise<{ rows: unknown[] }> =>
         Promise.resolve(respond(text, values)),
+      // The guarded PATCH path takes pg_advisory_xact_lock inside one
+      // transaction; the in-memory fake runs single-threaded, so the shim
+      // executes the tx body directly against the same fake query handler
+      // (no real locking needed — JS runs the body to completion).
+      transaction: <T>(fn: (client: unknown) => Promise<T>): Promise<T> =>
+        fn({
+          query: (text: string, values: unknown[] = []): Promise<{ rows: unknown[] }> => {
+            if (text.includes('pg_advisory_xact_lock')) return Promise.resolve({ rows: [] });
+            return Promise.resolve(respond(text, values));
+          },
+        }),
     } as unknown as DbService;
     const passwords = {
       hash: (plain: string): Promise<string> => {

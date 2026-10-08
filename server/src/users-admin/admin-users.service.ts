@@ -8,7 +8,6 @@ import {
   AdminUserRow,
   UsersStore,
   emailConflict,
-  lastAdminConflict,
 } from './users.store';
 import { PasswordService } from '../auth/password.service';
 import { RefreshTokenStore } from '../auth/refresh-token.store';
@@ -98,6 +97,16 @@ export class AdminUsersService {
    * gate, so non-HTTP callers get the same contract error instead of a
    * PG 23502 (NOT NULL) 500. The null checks run before the last-admin
    * invariant: `role: null` must 400, never 409.
+   *
+   * Race safety (qalm-2b2-followup t_f7e96056): the invariant check AND the
+   * write run inside UsersStore.updateGuarded — one transaction serialized
+   * by pg_advisory_xact_lock. The service keeps a cheap pre-lock read only
+   * to map "unknown id" to 404 without taking the lock; the guarded tx
+   * re-reads and re-decides, so a concurrent demote/deactivate interleaved
+   * here still serializes inside the lock (the loser gets a 409, never a
+   * silent double-demote). bcrypt hashing happens BEFORE the tx so the
+   * expensive hash never holds the lock; refresh-token revocation happens
+   * AFTER a successful write (different table, no lock needed).
    */
   async update(id: string, dto: AdminUpdateUserDto): Promise<AdminUserDto> {
     const target = await this.store.findById(id);
@@ -126,29 +135,6 @@ export class AdminUsersService {
       ]);
     }
 
-    // Last-admin invariant FIRST, against the target's CURRENT state:
-    // demotion or deactivation must leave >= 1 OTHER active admin (or the
-    // target keeps its current role/activity — see guard conditions below).
-    const roleWillLeaveAdmin =
-      dto.role !== undefined &&
-      dto.role !== 'admin' &&
-      target.role === 'admin' &&
-      target.is_active;
-    const deactivateWillKillLastAdmin =
-      dto.is_active === false &&
-      target.is_active &&
-      target.role === 'admin';
-    if (roleWillLeaveAdmin || deactivateWillKillLastAdmin) {
-      const others = await this.store.countActiveAdmins(id);
-      if (others === 0) {
-        throw lastAdminConflict(
-          deactivateWillKillLastAdmin && !roleWillLeaveAdmin
-            ? 'deactivate'
-            : 'demote',
-        );
-      }
-    }
-
     const fields: {
       name?: string;
       role?: UserRole;
@@ -165,7 +151,7 @@ export class AdminUsersService {
       fields.mustChangePassword = true;
     }
 
-    const updated = await this.store.update(id, fields);
+    const { row: updated } = await this.store.updateGuarded(id, fields);
     if (!updated) {
       throw new ApiError('NOT_FOUND', 'User not found.');
     }

@@ -639,6 +639,62 @@ describe('Admin user management API (integration)', () => {
         expect(dataOf(reset).must_change_password).toBe(true);
       });
 
+      it('concurrent cross-demotes leave >= 1 active admin (last-admin race)', async () => {
+        // Regression test for qalm-2b2-followup t_f7e96056: two admins
+        // demoting each other simultaneously used to both pass the
+        // countActiveAdmins check (separate pool statements, no lock) and
+        // both commit, leaving ZERO active admins. The guarded path
+        // serializes check+write behind pg_advisory_xact_lock, so exactly
+        // one demote wins (200) and the loser gets a 409.
+        //
+        // Each demote authenticates as a DIFFERENT admin: sharing one token
+        // would let the loser's AuthGuard 403 (its own admin row is gone
+        // once the winner commits) before ever reaching the invariant.
+        await createUser({
+          ...VALID_CREATE,
+          email: 'admin2@example.com',
+          name: 'Second',
+          role: 'admin',
+        });
+        const admins = listOf(
+          await test.req.get('/api/v1/users').query({ role: 'admin' }).set(as('admin')),
+        );
+        expect(admins).toHaveLength(2);
+        const first = admins.find((u) => u.email === 'admin@example.com')!;
+        const second = admins.find((u) => u.email === 'admin2@example.com')!;
+        const login2 = await test.req.post('/api/v1/auth/login').send({
+          email: 'admin2@example.com',
+          password: VALID_CREATE_PASSWORD,
+        });
+        expect(login2.status).toBe(200);
+        const admin2Token = login2.body.data.access_token as string;
+
+        const [demoteFirst, demoteSecond] = await Promise.all([
+          test.req
+            .patch(`/api/v1/users/${first.id}`)
+            .set(as('admin'))
+            .send({ role: 'lead' }),
+          test.req
+            .patch(`/api/v1/users/${second.id}`)
+            .set('Authorization', `Bearer ${admin2Token}`)
+            .send({ role: 'lead' }),
+        ]);
+        const statuses = [demoteFirst.status, demoteSecond.status].sort();
+        expect(statuses).toEqual([200, 409]);
+        const winner = demoteFirst.status === 200 ? demoteFirst : demoteSecond;
+        const loser = demoteFirst.status === 409 ? demoteFirst : demoteSecond;
+        expect(winner.body?.data?.role).toBe('lead');
+        expect(loser.body?.error?.code).toBe('CONFLICT');
+
+        // The invariant holds: exactly one active admin remains (asserted
+        // straight from the DB — neither pre-race token is guaranteed to
+        // still be an admin at this point).
+        const remaining = await test.db.query<{ count: string }>(
+          `SELECT count(*) AS count FROM users WHERE role = 'admin' AND is_active = true`,
+        );
+        expect(Number(remaining.rows[0]?.count ?? '0')).toBe(1);
+      });
+
       it('403 for every non-Admin role (no writes at all)', async () => {
         const created = await createUser(VALID_CREATE);
         const id = dataOf(created).id;
