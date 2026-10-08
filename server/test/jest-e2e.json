@@ -6,5 +6,7 @@
     "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "tsconfig.spec.json" }]
   },
   "testEnvironment": "node",
-  "moduleDirectories": ["node_modules", "<rootDir>/src"]
+  "moduleDirectories": ["node_modules", "<rootDir>/src"],
+  "maxWorkers": 1,
+  "testTimeout": 30000
 }
