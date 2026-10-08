@@ -92,11 +92,38 @@ export class AdminUsersService {
    * PATCH with any subset of name/role/is_active/password. Password reset
    * keeps must_change_password=true and revokes the target's active refresh
    * tokens (only when a password is actually written).
+   *
+   * `{}` is a 200 no-op (returns the current row, revokes nothing).
+   * Explicit null for any field is a 400 — belt-and-braces behind the DTO
+   * gate, so non-HTTP callers get the same contract error instead of a
+   * PG 23502 (NOT NULL) 500. The null checks run before the last-admin
+   * invariant: `role: null` must 400, never 409.
    */
   async update(id: string, dto: AdminUpdateUserDto): Promise<AdminUserDto> {
     const target = await this.store.findById(id);
     if (!target) {
       throw new ApiError('NOT_FOUND', 'User not found.');
+    }
+
+    if (dto.name === null) {
+      throw new ApiError('VALIDATION_ERROR', 'Request validation failed.', [
+        { field: 'name', issue: 'must be a string' },
+      ]);
+    }
+    if (dto.role === null) {
+      throw new ApiError('VALIDATION_ERROR', 'Request validation failed.', [
+        { field: 'role', issue: 'must be one of: admin, lead, tester, viewer' },
+      ]);
+    }
+    if (dto.is_active === null) {
+      throw new ApiError('VALIDATION_ERROR', 'Request validation failed.', [
+        { field: 'is_active', issue: 'must be a boolean value' },
+      ]);
+    }
+    if (dto.password === null) {
+      throw new ApiError('VALIDATION_ERROR', 'Request validation failed.', [
+        { field: 'password', issue: 'must be a string' },
+      ]);
     }
 
     // Last-admin invariant FIRST, against the target's CURRENT state:

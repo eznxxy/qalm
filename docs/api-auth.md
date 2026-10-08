@@ -118,6 +118,8 @@ filter), `page`, `limit`. Sorted by `email` ascending.
 - `200` → `{ "data": { ...user } }`
 - `409` `CONFLICT` — setting `role != admin` or `is_active: false` would leave
   zero active Admins (last-admin rule).
+- Empty body (`{}`) → `200` no-op returning the current row; revokes nothing.
+- Explicit `null` for any field → `400` `VALIDATION_ERROR` naming the field.
 - `404` `NOT_FOUND` | `403` for non-Admin.
 - No `DELETE /users/:id` in MVP: users are deactivated, never hard-deleted.
 

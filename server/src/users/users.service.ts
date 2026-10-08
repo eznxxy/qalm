@@ -48,9 +48,14 @@ export interface UserRowWithHash extends UserRow {
 }
 
 /**
- * User queries shared by auth (bootstrap/login/me) and the later user
- * management module. Email comparison is case-insensitive (CITEXT-like via
- * lower()) — matching the unique-index semantics of migration 1.
+ * User queries shared by auth (bootstrap/login/me). Email comparison is
+ * case-insensitive (CITEXT-like via lower()) — matching the unique-index
+ * semantics of migration 1.
+ *
+ * NOTE (qalm-2b2-followup t_835b54ef): the legacy `create` once here was
+ * deleted — it had no callers (only AdminUsersService.create is routed) and
+ * no unique-violation catch path, so it could only ever 500 on a race.
+ * User creation lives in users-admin (UsersStore.insert + AdminUsersService).
  */
 @Injectable()
 export class UsersService {
@@ -88,40 +93,6 @@ export class UsersService {
       [id],
     );
     return result.rows[0] ?? null;
-  }
-
-  /**
-   * Creates a user. Throws 409 CONFLICT on duplicate email. Caller supplies
-   * the already-hashed password.
-   */
-  async create(params: {
-    email: string;
-    name: string;
-    role: UserRole;
-    passwordHash: string;
-    mustChangePassword?: boolean;
-  }): Promise<UserRow> {
-    const existing = await this.findByEmail(params.email);
-    if (existing) {
-      throw new ApiError('CONFLICT', 'A user with this email already exists.');
-    }
-    const result = await this.db.query<UserRow>(
-      `INSERT INTO users (email, name, role, password_hash, must_change_password)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING ${USER_COLUMNS}`,
-      [
-        params.email,
-        params.name,
-        params.role,
-        params.passwordHash,
-        params.mustChangePassword ?? false,
-      ],
-    );
-    const row = result.rows[0];
-    if (!row) {
-      throw new ApiError('INTERNAL', 'User creation failed.');
-    }
-    return row;
   }
 
   async updateName(userId: string, name: string): Promise<UserRow> {

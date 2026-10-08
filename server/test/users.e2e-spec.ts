@@ -391,6 +391,28 @@ describe('Admin user management API (integration)', () => {
       expect(dataOf(res).name).toBe('Grace Hopper');
     });
 
+    it('explicit null for any field → 400 VALIDATION_ERROR naming the field, never a 500', async () => {
+      const created = await createUser(VALID_CREATE);
+      const id = dataOf(created).id;
+      for (const field of ['name', 'role', 'is_active', 'password'] as const) {
+        const res = await test.req
+          .patch(`/api/v1/users/${id}`)
+          .set(as('admin'))
+          .send({ [field]: null });
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        expect(JSON.stringify(res.body.error.details)).toContain(
+          `"field":"${field}"`,
+        );
+      }
+      const after = await test.req.get(`/api/v1/users/${id}`).set(as('admin'));
+      expect(dataOf(after)).toMatchObject({
+        name: 'Grace Hopper',
+        role: 'tester',
+        is_active: true,
+      });
+    });
+
     it('400 for an unknown role; 404 for an unknown id', async () => {
       const created = await createUser(VALID_CREATE);
       const id = dataOf(created).id;
