@@ -134,11 +134,12 @@ export default function DesignDemoPage() {
 
   return (
     <main className="page">
-      <h1>Design: data table</h1>
+      <h1>Design system demo</h1>
       <p className="muted project-meta">
-        Demo page for the DataTable primitive (card t_e3495ddb). Keyboard:
-        Tab to a column header and press Enter/Space to sort, Tab into the
-        table body and use j/k or arrow keys to move between rows.
+        Demo page for the shared primitives (cards t_e3495ddb, t_328401f8):
+        the DataTable and the status components below it. Keyboard: Tab to a
+        column header and press Enter/Space to sort, Tab into the table body
+        and use j/k or arrow keys to move between rows.
       </p>
 
       <div className="toolbar" role="group" aria-label="Demo settings">
