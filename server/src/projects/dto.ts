@@ -6,12 +6,25 @@ import {
   Max,
   Min,
   registerDecorator,
+  ValidateIf,
   ValidationArguments,
 } from 'class-validator';
 import { Transform, TransformFnParams } from 'class-transformer';
+import { MAX_LIMIT } from './projects.constants';
 
 /** Contract regex, docs/api-projects.md § Validation (letter first). */
 export const PROJECT_KEY_PATTERN = /^[A-Z][A-Z0-9]*$/;
+
+/**
+ * Presence gate for PATCH fields. `@IsOptional()` skips validation on null as
+ * well as undefined, which would let explicit nulls through to NOT NULL
+ * columns (the store would 500). This gate skips only absent (undefined)
+ * fields; a present null runs the validators below and fails `@IsString`
+ * with a 400 naming the field.
+ */
+function isPresent(_object: unknown, value: unknown): boolean {
+  return value !== undefined;
+}
 
 /** Normalizes the project key: trims, then uppercases case-insensitive input. */
 export function normalizeProjectKey(raw: string): string {
@@ -101,24 +114,27 @@ export class CreateProjectDto {
 }
 
 export class UpdateProjectDto {
-  @IsOptional()
+  // name/key: explicit null is a 400 (NOT NULL columns) — the @ValidateIf
+  // gate runs validators on null while still skipping absent fields.
+  // description stays @IsOptional: explicit null clears it (§ PATCH below).
+  @ValidateIf(isPresent)
   @IsString()
   @Trimmed()
   @Length(1, 100)
-  name?: string;
+  name?: string | null;
 
-  @IsOptional()
+  @ValidateIf(isPresent)
   @IsString()
   @Trimmed()
   @transformString(normalizeProjectKey)
   @IsProjectKey()
-  key?: string;
+  key?: string | null;
 
   @IsOptional()
   @IsString()
   @Trimmed()
   @Length(0, 500)
-  description?: string;
+  description?: string | null;
 }
 
 /** GET /projects query — page/limit per api-conventions.md § Pagination. */
@@ -142,7 +158,7 @@ export class ListProjectsQuery {
   @transformToNumber()
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(MAX_LIMIT)
   limit?: number;
 }
 

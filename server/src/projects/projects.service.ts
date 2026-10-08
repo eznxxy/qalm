@@ -1,11 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ApiError } from '../errors';
 import { conflictFor, ProjectRow, ProjectsStore } from './projects.store';
-import {
-  CreateProjectDto,
-  ListProjectsQuery,
-  UpdateProjectDto,
-} from './dto';
+import { CreateProjectDto, ListProjectsQuery, UpdateProjectDto } from './dto';
+import { DEFAULT_LIMIT, DEFAULT_PAGE } from './projects.constants';
 import { AuthUser } from '../auth/current-user';
 
 /** API projection of a project — exactly docs/api-projects.md § Resource. */
@@ -94,9 +91,40 @@ export class ProjectsService {
    * Admin-only (guard). PATCH must not change status: only the three body
    * fields are ever written, and `status` is a non-whitelisted property in
    * UpdateProjectDto (the global pipe rejects it with 400).
+   *
+   * Empty bodies are a 400 here (not at the pipe: `{}` is well-shaped, just
+   * a no-op, and the DTO-level test pins that the pipe accepts it). Explicit
+   * null name/key is also a 400 — belt-and-braces behind the DTO gate, so
+   * non-HTTP callers get the same contract error instead of a PG 23502 500.
+   * Explicit null description clears the field (nullable column by design).
    */
   async update(id: string, dto: UpdateProjectDto): Promise<ProjectDto> {
-    const fields: { name?: string; key?: string; description?: string } = {};
+    if (
+      dto === null ||
+      dto === undefined ||
+      (dto.name === undefined && dto.key === undefined && dto.description === undefined)
+    ) {
+      throw new ApiError(
+        'VALIDATION_ERROR',
+        'Provide at least one of name, key, or description to update.',
+        [
+          { field: 'name', issue: 'at least one field must be provided' },
+          { field: 'key', issue: 'at least one field must be provided' },
+          { field: 'description', issue: 'at least one field must be provided' },
+        ],
+      );
+    }
+    if (dto.name === null) {
+      throw new ApiError('VALIDATION_ERROR', 'Request validation failed.', [
+        { field: 'name', issue: 'must be a string' },
+      ]);
+    }
+    if (dto.key === null) {
+      throw new ApiError('VALIDATION_ERROR', 'Request validation failed.', [
+        { field: 'key', issue: 'must be a string' },
+      ]);
+    }
+    const fields: { name?: string; key?: string; description?: string | null } = {};
     if (dto.name !== undefined) fields.name = dto.name;
     if (dto.key !== undefined) fields.key = dto.key;
     if (dto.description !== undefined) fields.description = dto.description;
@@ -153,8 +181,8 @@ export class ProjectsService {
     // Default view is active-only for everyone; archived rows are reachable
     // ONLY via the explicit status filter (Admin-gated above).
     const statusFilter: 'active' | 'archived' | null = q.status ?? null;
-    const page = q.page ?? 1;
-    const limit = q.limit ?? 25;
+    const page = q.page ?? DEFAULT_PAGE;
+    const limit = q.limit ?? DEFAULT_LIMIT;
     // Meta counts the exact same filtered view `data` renders, so pagination
     // stays consistent (notably for the Admin-only archived filter).
     const total = await this.store.countForList({
@@ -171,14 +199,6 @@ export class ProjectsService {
       data: rows.map(toProjectDto),
       meta: buildListMeta(total, page, limit),
     };
-  }
-
-  private async requireRow(id: string): Promise<ProjectRow> {
-    const row = await this.store.findById(id);
-    if (!row) {
-      throw new ApiError('NOT_FOUND', 'Project not found.');
-    }
-    return row;
   }
 }
 

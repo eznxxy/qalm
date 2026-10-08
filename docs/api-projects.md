@@ -53,13 +53,18 @@ Query: `query` (substring match on `name`, optional), `status`
 
 ### `PATCH /api/v1/projects/:id` — Admin
 ```json
-// request — any subset
+// request — any non-empty subset
 { "name": "Payments v2", "key": "PAY2", "description": "..." }
 ```
 - `200` → `{ "data": { ...project } }`
 - `400` `VALIDATION_ERROR` | `409` `CONFLICT` (duplicate `name`/`key`) |
   `404` `NOT_FOUND` | `403` for non-Admin.
 - Status is **not** settable here; use archive/restore below.
+- Empty body (`{}`) → `400` `VALIDATION_ERROR` (a PATCH must change something).
+- Explicit `null` for `name`/`key` → `400` `VALIDATION_ERROR` naming the
+  field (both columns are `NOT NULL`).
+- Explicit `null` for `description` **clears** the field (`200` with
+  `description: null`); omitting it leaves the value untouched.
 
 ### `POST /api/v1/projects/:id/archive` — Admin, Lead
 Sets `status = "archived"`. Idempotent (archiving an archived project → `200`).

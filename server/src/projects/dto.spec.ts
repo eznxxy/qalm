@@ -157,8 +157,24 @@ describe('projects DTOs', () => {
   });
 
   describe('UpdateProjectDto', () => {
-    it('accepts an empty object (no-op PATCH is valid)', async () => {
+    it('accepts an empty object at the pipe (the service rejects it as a 400 no-op guard)', async () => {
       const fields = await validateDto(UpdateProjectDto, {});
+      expect(fields).toEqual([]);
+    });
+
+    it('rejects explicit null name/key with 400 naming the field (NOT NULL columns)', async () => {
+      expect(await validateDto(UpdateProjectDto, { name: null })).toContain('name');
+      expect(await validateDto(UpdateProjectDto, { key: null })).toContain('key');
+      const nameIssues = await issuesFor(UpdateProjectDto, { name: null });
+      expect(nameIssues.length).toBeGreaterThan(0);
+      expect(nameIssues.every((d) => d.field === 'name')).toBe(true);
+      const keyIssues = await issuesFor(UpdateProjectDto, { key: null });
+      expect(keyIssues.length).toBeGreaterThan(0);
+      expect(keyIssues.every((d) => d.field === 'key')).toBe(true);
+    });
+
+    it('accepts explicit null description (PATCH clears the field)', async () => {
+      const fields = await validateDto(UpdateProjectDto, { description: null });
       expect(fields).toEqual([]);
     });
 
