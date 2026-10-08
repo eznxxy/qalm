@@ -16,6 +16,7 @@ const CONFIG: AppConfig = {
   databaseUrl: 'postgres://test@localhost/test',
   jwtSecret: 'unit-test-secret-that-is-definitely-32b',
   refreshCookieSecure: false,
+  corsOrigins: [],
 };
 
 interface FakeUser {

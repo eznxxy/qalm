@@ -49,9 +49,23 @@ npm run start:dev
 | `DATABASE_URL` | yes | `postgres://user:pass@host:5432/db` for migrations and the app |
 | `PORT` | no | Dev API port, fixed at 3001 (web app assumption) |
 | `REFRESH_COOKIE_SECURE` | no | Set to exactly `true` only to relax the cookie `Secure` flag on plain-HTTP dev |
+| `CORS_DEV_ORIGINS` | no | Comma-separated exact browser origins for dev CORS (default `http://localhost:3000` via gen-env) |
 
 Config is validated before the server listens; a missing or invalid variable
 kills the process with a single aggregated `ConfigError` listing every problem.
+
+## Browser-to-API access in dev (CORS decision)
+
+The web app calls this API cross-origin (`next dev` on `:3000` →
+`localhost:3001`, `fetch` with `credentials: "include"`), so the server —
+not a Next.js rewrite proxy — answers preflight: `CORS_DEV_ORIGINS`
+allowlist-echoes exact origins with `credentials: true`, which is also what
+lets the `SameSite=Lax` `HttpOnly` refresh cookie ride along (different
+localhost ports are still same-site). A same-origin proxy was rejected
+because it would only mask the cross-origin shape production browsers will
+actually use, while touching `/web` (outside backend ownership) for zero
+auth benefit. Empty/unset disables CORS entirely; wildcards and non-bare
+origins fail fast at boot.
 
 ## Integration tests (test/*.e2e-spec.ts)
 

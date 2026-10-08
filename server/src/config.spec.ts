@@ -27,6 +27,7 @@ describe('loadConfig', () => {
       databaseUrl: 'postgres://qalm:qalm@localhost:5432/qalm',
       jwtSecret: 'x'.repeat(32),
       refreshCookieSecure: false,
+      corsOrigins: [],
     });
   });
 
@@ -89,5 +90,36 @@ describe('loadConfig', () => {
     expect(() => loadConfig(envWith({ JWT_SECRET: undefined, DATABASE_URL: undefined }))).toThrow(
       /DATABASE_URL is required; JWT_SECRET is required/,
     );
+  });
+
+  it('defaults CORS_DEV_ORIGINS to an empty allowlist (CORS disabled)', () => {
+    expect(loadConfig(envWith({})).corsOrigins).toEqual([]);
+  });
+
+  it('parses CORS_DEV_ORIGINS as a comma-separated exact-origin allowlist', () => {
+    const config = loadConfig(
+      envWith({ CORS_DEV_ORIGINS: 'http://localhost:3000, https://app.example.com' }),
+    );
+    expect(config.corsOrigins).toEqual(['http://localhost:3000', 'https://app.example.com']);
+  });
+
+  it('deduplicates and trims CORS_DEV_ORIGINS entries', () => {
+    const config = loadConfig(
+      envWith({ CORS_DEV_ORIGINS: ' http://localhost:3000 ,http://localhost:3000,' }),
+    );
+    expect(config.corsOrigins).toEqual(['http://localhost:3000']);
+  });
+
+  it('rejects CORS_DEV_ORIGINS entries that are not bare http(s) origins', () => {
+    expect(() => loadConfig(envWith({ CORS_DEV_ORIGINS: '*' }))).toThrow(ConfigError);
+    expect(() => loadConfig(envWith({ CORS_DEV_ORIGINS: 'not-a-url' }))).toThrow(
+      /CORS_DEV_ORIGINS entry "not-a-url" is not a valid URL/,
+    );
+    expect(() => loadConfig(envWith({ CORS_DEV_ORIGINS: 'ftp://files.example.com' }))).toThrow(
+      /must use http:\/\/ or https:\/\//,
+    );
+    expect(() =>
+      loadConfig(envWith({ CORS_DEV_ORIGINS: 'http://localhost:3000/app' })),
+    ).toThrow(/must be a bare origin/);
   });
 });

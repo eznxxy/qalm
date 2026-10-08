@@ -24,6 +24,7 @@ const contents = [
   'DATABASE_URL=postgres://qalm:qalm@localhost:5432/qalm',
   'PORT=3001',
   'REFRESH_COOKIE_SECURE=',
+  'CORS_DEV_ORIGINS=http://localhost:3000',
   '',
 ].join('\n');
 

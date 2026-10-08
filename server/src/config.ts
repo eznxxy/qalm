@@ -14,6 +14,11 @@ export interface AppConfig {
   jwtSecret: string;
   /** Refresh cookies are Secure unless this dev-relax flag is exactly "true". */
   refreshCookieSecure: boolean;
+  /**
+   * Browser origins allowed cross-origin access (exact `Origin` echo +
+   * credentials). Empty = CORS disabled (no ACAO headers). Dev-only.
+   */
+  corsOrigins: string[];
 }
 
 export class ConfigError extends Error {
@@ -51,6 +56,43 @@ export function redact(connectionString: string): string {
   } catch {
     return '***';
   }
+}
+
+/**
+ * Parses CORS_DEV_ORIGINS: a comma-separated list of exact browser origins
+ * (scheme + host + optional port, e.g. "http://localhost:3000"). Empty/unset
+ * disables CORS. Each entry MUST parse as an http(s) URL with no path,
+ * query, or fragment (wildcard "*" is rejected — credentials:true forbids
+ * it), otherwise the entry is reported as a ConfigError problem.
+ */
+export function parseCorsOrigins(raw: string, problems: string[]): string[] {
+  const origins: string[] = [];
+  if (raw.trim() === '') return origins;
+  for (const entry of raw.split(',')) {
+    const origin = entry.trim();
+    if (origin === '') continue;
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      problems.push(`CORS_DEV_ORIGINS entry "${origin}" is not a valid URL`);
+      continue;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      problems.push(
+        `CORS_DEV_ORIGINS entry "${origin}" must use http:// or https://`,
+      );
+      continue;
+    }
+    if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '') {
+      problems.push(
+        `CORS_DEV_ORIGINS entry "${origin}" must be a bare origin (no path, query, or fragment)`,
+      );
+      continue;
+    }
+    origins.push(parsed.origin);
+  }
+  return [...new Set(origins)];
 }
 
 /**
@@ -94,6 +136,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     problems.push('REFRESH_COOKIE_SECURE must be empty or exactly "true"');
   }
 
+  const corsOrigins = parseCorsOrigins(env['CORS_DEV_ORIGINS'] ?? '', problems);
+
   if (problems.length > 0) {
     throw new ConfigError(problems);
   }
@@ -106,6 +150,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     databaseUrl: validDbUrl,
     jwtSecret,
     refreshCookieSecure: secureRaw === 'true',
+    corsOrigins,
   };
 }
 
