@@ -31,6 +31,10 @@
   font-size: 14px;
   line-height: 20px;
   font-variant-numeric: tabular-nums;
+  /* The primitive owns its foreground so cells stay readable on --surface
+   * and --brand-tint regardless of the host page's theme (verified: on the
+   * current dark-chrome app the inherited light text vanished on tint). */
+  color: var(--ink-900);
 }
 
 .dt-table:focus-visible {
