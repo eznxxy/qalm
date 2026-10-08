@@ -8,16 +8,16 @@ import { MustChangePasswordBanner } from "@/components/must-change-password-bann
 /**
  * (app) route-group layout: everything authenticated renders inside the
  * DESIGN.md §3 shell. RequireAuth wraps the shell's CHILDREN (not the shell)
- * so the chrome is stable while the session restores — the shell's own
- * render reads the user only after the gate has authenticated.
+ * so the chrome prerenders and is stable while the session restores — no
+ * layout shift when the page content arrives.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <RequireAuth>
-      <AppShell>
+    <AppShell>
+      <RequireAuth>
         <MustChangePasswordBanner />
         {children}
-      </AppShell>
-    </RequireAuth>
+      </RequireAuth>
+    </AppShell>
   );
 }

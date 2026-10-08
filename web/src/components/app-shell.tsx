@@ -233,11 +233,13 @@ function AppShellInner({ children }: { children: ReactNode }) {
     };
   }, [menuOpen]);
 
-  // SessionProvider still restores on hard loads; the RequireAuth gate in the
-  // layout renders the loading state, so an absent user is never visible here.
-  if (!user) return null;
+  // The gate in the (app) layout owns session state; while it restores, the
+  // shell chrome still renders (stable frame, no layout shift when content
+  // arrives). The account affordances degrade gracefully until `user` lands.
+  const isAdmin = user?.role === "admin";
 
   async function handleLogout() {
+    if (!user) return;
     await logout();
     router.replace("/login");
   }
@@ -320,14 +322,14 @@ function AppShellInner({ children }: { children: ReactNode }) {
           <button
             type="button"
             className="avatar-button"
-            aria-label={`Account menu for ${user.name}`}
+            aria-label={user ? `Account menu for ${user.name}` : "Account menu"}
             aria-haspopup="true"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
           >
-            {initialsOf(user.name)}
+            {user ? initialsOf(user.name) : "…"}
           </button>
-          {menuOpen && (
+          {menuOpen && user && (
             <div className="avatar-menu" role="group" aria-label="Account">
               <p className="avatar-menu-id" role="status">
                 Signed in as {user.name} ({ROLE_LABELS[user.role]})
@@ -351,7 +353,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
       <div className="shell-body">
         <nav className="sidebar" aria-label="Main navigation">
           <ul className="sidebar-list" role="list">
-            {navGroups(user.role === "admin").map((group, groupIndex) => (
+            {navGroups(isAdmin).map((group, groupIndex) => (
               <Fragment key={groupIndex}>
                 {groupIndex > 0 && <li className="sidebar-separator" role="presentation" />}
                 {group.map((item) => {

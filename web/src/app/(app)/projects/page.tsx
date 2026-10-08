@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Projects list — the default landing page after login (docs/PRD-projects.md).
  * - Active projects for everyone; name search and pagination.
@@ -7,9 +9,9 @@
  * - Search/filter/page state lives in the URL query string so views are
  *   shareable and back/forward works.
  *
- * Rendered inside the (app) shell layout, which owns the auth gate. Reads
- * useSearchParams and relies on the shell's Suspense boundary during static
- * prerender.
+ * Rendered inside the (app) shell layout, which owns the auth gate. Reading
+ * useSearchParams here is fine for the static shell prerender: the AppShell
+ * that renders it suspends inside its own Suspense boundary.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
