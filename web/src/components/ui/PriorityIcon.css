@@ -1,0 +1,29 @@
+/*
+ * PriorityIcon — stylesheet for web/src/components/ui/PriorityIcon.tsx.
+ *
+ * Colour per DESIGN.md §2.2: --ink-700 for all priorities except Critical,
+ * which uses --failed (the spec's only sanctioned non-status use of a
+ * status colour). Token names only, no hard-coded palette.
+ */
+
+.pi-icon {
+  flex: none;
+  vertical-align: middle;
+  color: var(--ink-700);
+}
+
+svg.pi-critical {
+  color: var(--failed);
+}
+
+/* Opt-in visual suppression for cells that already carry the word
+ * (sort keys, filter chips): screen readers skip it via aria-hidden too. */
+.pi-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
