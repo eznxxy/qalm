@@ -170,7 +170,7 @@ describe("projects list: role matrix rendering", () => {
     await renderAs(ADMIN, [ARCHIVED]);
 
     expect(await screen.findByText("Legacy")).toBeInTheDocument();
-    expect(screen.getByText("Archived", { selector: ".badge" })).toBeInTheDocument();
+    expect(screen.getByText("Archived", { selector: ".sb-badge" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
     expect(listCalls()[0]).toContain("status=archived");
@@ -416,7 +416,7 @@ describe("project detail: states and role gating", () => {
       await screen.findByRole("alertdialog")
     ).querySelectorAll("button")[0];
     fireEvent.click(confirmButton);
-    await screen.findByText("Archived", { selector: ".badge" });
+    await screen.findByText("Archived", { selector: ".sb-badge" });
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 

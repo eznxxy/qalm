@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
 import { RequireAuth, isSessionDead } from "@/components/require-auth";
+import { DataTable, StatusBadge, type DataTableColumn } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { ROLES, Role, User } from "@/lib/api-types";
 
@@ -259,7 +260,7 @@ function EditUserPanel({
     <form onSubmit={handleSave} noValidate className="panel" aria-label={`Edit ${user.email}`}>
       <h2>
         Edit {user.email}
-        {!user.is_active && <span className="badge badge-muted"> deactivated</span>}
+        {!user.is_active && <StatusBadge status="skipped"> deactivated</StatusBadge>}
       </h2>
       <div className="form-grid">
         <div className="field">
@@ -319,6 +320,54 @@ function EditUserPanel({
   );
 }
 
+/** Column defs for the users DataTable (t_10da9c7a rendering-layer swap).
+ * Sort stays off for parity — the previous table had no sorting; enabling
+ * it is a separate product decision (see the card's decisions list). */
+function buildUserColumns(
+  RowActions: (props: { user: User }) => ReactNode
+): DataTableColumn<User>[] {
+  return [
+    {
+      key: "email",
+      header: "Email",
+      render: (u) => u.email,
+    },
+    {
+      key: "name",
+      header: "Name",
+      render: (u) => u.name,
+    },
+    {
+      key: "role",
+      header: "Role",
+      render: (u) => ROLE_LABELS[u.role],
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (u) => (
+        <>
+          {u.is_active ? (
+            <StatusBadge status="passed">Active</StatusBadge>
+          ) : (
+            <StatusBadge status="skipped">Deactivated</StatusBadge>
+          )}
+          {u.must_change_password && (
+            <StatusBadge status="retest" title="Must change password at next login">
+              temp password
+            </StatusBadge>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (u) => <RowActions user={u} />,
+    },
+  ];
+}
+
 function UsersAdminPage() {
   const { user } = useSession();
   const [users, setUsers] = useState<User[]>([]);
@@ -334,6 +383,21 @@ function UsersAdminPage() {
   const [editing, setEditing] = useState<User | null>(null);
   const [oneTime, setOneTime] = useState<{ email: string; password: string } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** The Edit action of one row (setEditing/setOneTime are page-scoped). */
+  function ListRowActions({ user: rowUser }: { user: User }) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setEditing(rowUser);
+          setOneTime(null);
+        }}
+      >
+        Edit
+      </button>
+    );
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -442,65 +506,21 @@ function UsersAdminPage() {
         </p>
       )}
 
-      {loading ? (
-        <p role="status" aria-live="polite">
-          Loading users…
-        </p>
-      ) : (
-        <table className="users-table">
-          <caption className="sr-only">
-            Users {meta ? `, page ${meta.page} of ${meta.total_pages}` : ""}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Email</th>
-              <th scope="col">Name</th>
-              <th scope="col">Role</th>
-              <th scope="col">Status</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.length === 0 && (
-              <tr>
-                <td colSpan={5} className="muted">
-                  No users match.
-                </td>
-              </tr>
-            )}
-            {users.map((u) => (
-              <tr key={u.id} className={u.is_active ? "" : "row-muted"}>
-                <td>{u.email}</td>
-                <td>{u.name}</td>
-                <td>{ROLE_LABELS[u.role]}</td>
-                <td>
-                  {u.is_active ? (
-                    <span className="badge badge-ok">Active</span>
-                  ) : (
-                    <span className="badge badge-muted">Deactivated</span>
-                  )}
-                  {u.must_change_password && (
-                    <span className="badge badge-warn" title="Must change password at next login">
-                      temp password
-                    </span>
-                  )}
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing(u);
-                      setOneTime(null);
-                    }}
-                  >
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        columns={buildUserColumns(ListRowActions)}
+        rows={users}
+        getRowId={(u) => u.id}
+        caption={`Users${meta ? `, page ${meta.page} of ${meta.total_pages}` : ""}`}
+        ariaLabel="Users"
+        loading={loading}
+        error={listError}
+        onRetry={() => void load()}
+        emptyTitle="No users match."
+        sort={null}
+        selectable={false}
+        rowHeight="default"
+        rowClassName={(u) => (u.is_active ? undefined : "row-muted")}
+      />
 
       {meta && meta.total_pages > 1 && (
         <nav className="pagination" aria-label="User list pages">
@@ -511,7 +531,7 @@ function UsersAdminPage() {
           >
             Previous
           </button>
-          <span>
+          <span className="t-nums">
             Page {meta.page} of {meta.total_pages} ({meta.total} users)
           </span>
           <button

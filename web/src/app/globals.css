@@ -1,20 +1,46 @@
+/*
+ * App-wide styles (card t_62938355 — token foundation + light theme).
+ *
+ * Colour: every rule consumes the design tokens from styles/tokens.css
+ * (DESIGN.md §2) — either directly (--ink-900, --brand, --passed-tint, …)
+ * or through the semantic aliases in the first block. No hard-coded hex.
+ * Light theme is the MVP default; dark theme flips the same aliases under
+ * [data-theme="dark"] (§2.3, phase 2 — no UI switch ships, §11).
+ *
+ * Shapes follow §2.5: inputs/buttons radius 6, badges 4, dialogs/drawers 10;
+ * shadows only on overlays; control heights 32/28/40, table rows 36/32/44.
+ */
+
+/* ---------- theme aliases (semantic roles over §2 tokens) ---------- */
+
 :root {
-  color-scheme: dark;
-  --bg: #10151d;
-  --bg-raised: #1a2230;
-  --bg-input: #0c1118;
-  --border: #2c3646;
-  --text: #e8edf4;
-  --text-muted: #9aa7b8;
-  --accent: #4f8fe6;
-  --accent-strong: #2f6fd0;
-  --danger: #e66a6a;
-  --danger-bg: #3a1f24;
-  --warn: #e6b34f;
-  --warn-bg: #3a3220;
-  --ok: #63c78a;
-  --ok-bg: #1e3327;
-  --info-bg: #1d2c42;
+  color-scheme: light;
+
+  --bg: var(--canvas); /* app background */
+  --bg-raised: var(--surface); /* panels, cards, dialogs */
+  --bg-input: var(--surface); /* inputs */
+  --border: var(--line); /* borders, dividers */
+  --text: var(--ink-900); /* primary text */
+  --text-muted: var(--ink-500); /* captions, placeholders */
+  --accent: var(--brand); /* links, selected, focus ring */
+  --accent-strong: var(--brand-hover); /* pressed brand */
+  --danger: var(--failed); /* destructive + errors (§2.2 semantic) */
+  --danger-bg: var(--failed-tint);
+  --info-bg: var(--brand-tint);
+}
+
+[data-theme="dark"] {
+  --bg: var(--canvas);
+  --bg-raised: var(--surface);
+  --bg-input: var(--surface);
+  --border: var(--line);
+  --text: var(--ink-900);
+  --text-muted: var(--ink-500);
+  --accent: var(--brand);
+  --accent-strong: var(--brand-hover);
+  --danger: var(--failed);
+  --danger-bg: var(--failed-tint);
+  --info-bg: var(--brand-tint);
 }
 
 * {
@@ -27,32 +53,93 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
+  /* One family, IBM Plex Sans (DESIGN.md §2.4), with the spec fallback
+   * stack. --font-plex-sans is set by next/font on <html> (src/app/fonts.ts)
+   * and includes a metric-adjusted fallback face for the pre-font flash. */
   font-family:
+    var(--font-plex-sans),
     system-ui,
     -apple-system,
     "Segoe UI",
-    Roboto,
-    "Helvetica Neue",
     sans-serif;
   font-size: 16px;
   line-height: 1.5;
+}
+
+/* §8: visible focus ring on every interactive element — 2px --brand,
+ * 2px offset. Colour flips with the theme via --accent. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 a {
   color: var(--accent);
 }
 
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 1rem;
+a:hover {
+  color: var(--accent-strong);
 }
+
+/* ---------- typography roles (DESIGN.md §2.4) ----------
+ * Page title 22/28 600 · Section 16/24 600 · Body/table 14/20 400 ·
+ * Table header 13/18 600 · Caption 12/16 400.
+ * Prose uses html's 16px base. Colours stay with the app's semantic text
+ * tokens (--text-muted) so captions keep contrast when the theme flips.
+ */
+
+h1,
+.t-page-title {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+h1 {
+  margin: 0 0 var(--space-5); /* 16px */
+}
+h2,
+.t-section-title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
 h2 {
-  font-size: 1.1rem;
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--space-4); /* 12px */
+}
+
+.t-body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.t-caption {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
 code {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* §2.4: case/project keys are ID-shaped — tabular figures (weight 500) */
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* §2.4: IDs and counts align — apply alongside .t-caption/.t-body where a
+ * value is numeric or an ID (e.g. "Page 1 of 3", case IDs). */
+.t-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 .muted {
@@ -76,8 +163,9 @@ code {
 .app-nav {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.6rem 1rem;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  min-height: var(--control-height);
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
@@ -85,19 +173,17 @@ code {
 
 .app-nav-brand {
   font-weight: 700;
-  letter-spacing: 0.02em;
 }
 
 .app-nav a {
-  color: var(--text);
+  color: var(--ink-700);
   text-decoration: none;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-badge);
 }
 
-.app-nav a:hover,
-.app-nav a:focus-visible {
-  background: var(--bg-input);
+.app-nav a:hover {
+  background: var(--canvas);
   color: var(--accent);
 }
 
@@ -113,21 +199,27 @@ code {
 
 .banner {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
-  padding: 0.6rem 1rem;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-raised);
   border-bottom: 1px solid var(--border);
 }
 
+/* Attention without borrowing status colours (§2.2 is reserved for test
+ * status): a 3px brand edge, ink text, brand links. */
 .banner-warning {
-  background: var(--warn-bg);
-  color: var(--warn);
+  border-left: 3px solid var(--accent);
+  color: var(--text);
 }
 
 .banner-link {
   color: var(--accent);
   font-weight: 600;
+  /* control label size 13/18 */
+  font-size: 13px;
+  line-height: 18px;
 }
 
 /* ---------- forms ---------- */
@@ -135,51 +227,54 @@ code {
 .auth-page {
   display: flex;
   justify-content: center;
-  padding: 3rem 1rem;
+  padding: var(--space-8) var(--space-4);
 }
 
+/* The auth card is a centred dialog-like surface: radius 10 per §2.5. */
 .auth-card {
   width: 100%;
   max-width: 26rem;
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.5rem;
+  border-radius: var(--radius-dialog);
+  padding: var(--space-6);
 }
 
 .auth-switch {
-  margin-top: 1rem;
+  margin-top: var(--space-4);
   color: var(--text-muted);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 0.9rem;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
 }
 
 .field label {
-  font-weight: 600;
-  font-size: 0.9rem;
+  /* 13/18: the §2.4 header role (weight 500 — control label, not a header) */
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .field-checkbox {
   flex-direction: row;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .fieldset {
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.75rem 1rem 0.25rem;
-  margin: 0 0 0.9rem;
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  margin: 0 0 var(--space-4);
 }
 
 .fieldset legend {
   font-weight: 600;
-  padding: 0 0.4rem;
+  padding: 0 var(--space-1);
 }
 
 input,
@@ -187,48 +282,69 @@ select {
   background: var(--bg-input);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.45rem 0.6rem;
-  font-size: 1rem;
+  border-radius: var(--radius-control);
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  font-size: 14px;
 }
 
-input:focus-visible,
-select:focus-visible,
-button:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+textarea {
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
 }
 
 button {
   background: var(--bg-raised);
-  color: var(--text);
+  color: var(--ink-700);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.95rem;
+  border-radius: var(--radius-control);
+  height: var(--control-height);
+  padding: 0 var(--space-4);
+  font-size: 14px;
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--ink-500);
+  color: var(--ink-900);
 }
 
 button.primary {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-brand);
   font-weight: 600;
 }
 
 button.primary:hover:not(:disabled) {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 button.secondary {
   background: transparent;
+}
+
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-on-brand);
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) {
+  filter: brightness(0.92);
 }
 
 button:disabled {
@@ -240,15 +356,22 @@ button:disabled {
   background: none;
   border: none;
   color: var(--accent);
+  height: auto;
   padding: 0;
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
 }
 
+/* font:inherit above also resets the ring, so restate it (§8 floor) */
+.linklike:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 .button-row {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -258,26 +381,33 @@ button:disabled {
   background: var(--danger-bg);
   color: var(--danger);
   border: 1px solid var(--danger);
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
+  border-radius: var(--radius-badge);
+  padding: var(--space-3) var(--space-4); /* 8/12 per HEAD's rem values */
+  /* caption role 12/16 */
+  font-size: 12px;
+  line-height: 16px;
 }
 
+/* Success confirmation: deliberately neutral (§1.1 — §2.2 status colours
+ * are reserved for test status, so no green flash). Brand edge + ink text
+ * keeps it noticeable while every pairing holds AA. */
 .form-notice {
-  background: var(--ok-bg);
-  color: var(--ok);
-  border: 1px solid var(--ok);
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
+  background: var(--canvas);
+  color: var(--ink-900);
+  border: 1px solid var(--ink-500);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-badge);
+  padding: var(--space-3) var(--space-4); /* 8/12, matches .form-error */
+  /* caption role 12/16 — matches .form-error */
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .panel {
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.25rem;
-  margin: 1rem 0;
+  padding: var(--space-5);
+  margin: var(--space-4) 0;
 }
 
 .panel-info {
@@ -290,7 +420,7 @@ button:disabled {
 }
 
 .auth-loading {
-  padding: 3rem 1rem;
+  padding: var(--space-8) var(--space-4);
   text-align: center;
   color: var(--text-muted);
 }
@@ -298,47 +428,32 @@ button:disabled {
 .secret-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .secret-value {
-  background: var(--bg-input);
+  background: var(--canvas);
   border: 1px dashed var(--border);
-  border-radius: 4px;
-  padding: 0.35rem 0.6rem;
-  font-size: 1.05rem;
+  border-radius: var(--radius-badge);
+  padding: var(--space-1) var(--space-2);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 1rem;
   letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
 }
 
-.badge {
-  display: inline-block;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  padding: 0.05rem 0.55rem;
-  margin-right: 0.3rem;
-}
-
-.badge-ok {
-  background: var(--ok-bg);
-  color: var(--ok);
-}
-
-.badge-muted {
-  background: var(--bg-input);
-  color: var(--text-muted);
-}
-
-.badge-warn {
-  background: var(--warn-bg);
-  color: var(--warn);
-}
+/* Status rendering went through the shared StatusBadge primitive
+ * (components/ui/StatusBadge.tsx, card t_328401f8); the previous ad-hoc
+ * rounded status pills were removed with it — see git history. */
 
 /* ---------- projects ---------- */
 
 .field-error {
   color: var(--danger);
-  font-size: 0.9rem;
+  /* caption role 12/16 (field error replaces helper text, §5) */
+  font-size: 12px;
+  line-height: 16px;
   margin: 0;
 }
 
@@ -352,6 +467,7 @@ button:disabled {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   max-width: 10rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .cell-description {
@@ -361,16 +477,21 @@ button:disabled {
 }
 
 .project-header h1 {
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .project-key-line {
   margin-top: 0;
   color: var(--text-muted);
+  /* caption role 12/16 — secondary info under the page title */
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .project-meta {
-  font-size: 0.9rem;
+  /* caption role 12/16 */
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .breadcrumb {
@@ -378,49 +499,22 @@ button:disabled {
 }
 
 a.button-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   background: var(--bg-raised);
-  color: var(--text);
+  color: var(--ink-700);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.95rem;
+  border-radius: var(--radius-control);
+  height: var(--control-height);
+  padding: 0 var(--space-4);
+  font-size: 14px;
   text-decoration: none;
 }
 
 a.button-link:hover,
 a.button-link:focus-visible {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-textarea {
-  background: var(--bg-input);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.45rem 0.6rem;
-  font-size: 1rem;
-  font-family: inherit;
-  resize: vertical;
-}
-
-textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-button.danger {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: #fff;
-  font-weight: 600;
-}
-
-button.danger:hover:not(:disabled) {
-  background: var(--danger);
-  color: #fff;
-  filter: brightness(1.1);
+  border-color: var(--ink-500);
+  color: var(--ink-900);
 }
 
 /* ---------- confirm dialog ---------- */
@@ -428,25 +522,28 @@ button.danger:hover:not(:disabled) {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 12, 0.7);
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: var(--space-4);
   z-index: 50;
 }
 
+/* §2.5: dialogs get radius 10 and — with drawers/popovers — the only
+ * shadows in the app. */
 .dialog {
   width: 100%;
   max-width: 26rem;
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.25rem;
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-overlay);
+  padding: var(--space-5);
 }
 
 .dialog-actions {
-  margin-top: 1rem;
+  margin-top: var(--space-5);
 }
 
 /* ---------- page + tables ---------- */
@@ -454,15 +551,15 @@ button.danger:hover:not(:disabled) {
 .page {
   max-width: 60rem;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: var(--space-6) var(--space-4) var(--space-8);
 }
 
 .toolbar {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: flex-end;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .toolbar .field {
@@ -473,26 +570,41 @@ button.danger:hover:not(:disabled) {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0 1rem;
+  gap: 0 var(--space-4);
 }
 
 .users-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  /* §2.4 table cell role: 14/20 w400; §2.4: tabular figures on every table */
+  font-size: 14px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
 }
 
 .users-table th,
 .users-table td {
   text-align: left;
-  padding: 0.5rem 0.6rem;
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 
+.users-table td {
+  height: var(--row-height); /* §2.5: 36 default (32/44 via user setting) */
+}
+
 .users-table th {
-  color: var(--text-muted);
+  /* §2.4 table header role: 13/18 w600 */
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* §5 data table: row hover reads as --canvas; content blocks get no shadow. */
+.users-table tbody tr:hover {
+  background: var(--canvas);
 }
 
 .row-muted td {
@@ -502,9 +614,10 @@ button.danger:hover:not(:disabled) {
 .pagination {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin: 0.75rem 0;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 640px) {
@@ -514,18 +627,19 @@ button.danger:hover:not(:disabled) {
   .users-table tr {
     display: block;
     border-bottom: 1px solid var(--border);
-    padding: 0.5rem 0;
+    padding: var(--space-2) 0;
   }
   .users-table td {
     display: block;
     border: none;
-    padding: 0.15rem 0;
+    padding: var(--space-1) 0;
+    height: auto;
   }
   .users-table td::before {
     content: attr(data-label);
     font-weight: 600;
     color: var(--text-muted);
-    margin-right: 0.5rem;
+    margin-right: var(--space-2);
   }
   .toolbar .field {
     min-width: 100%;

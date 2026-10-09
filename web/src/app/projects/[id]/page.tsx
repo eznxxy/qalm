@@ -18,6 +18,7 @@ import { useSession } from "@/lib/session";
 import { canArchiveProject, canEditProject, canRestoreProject } from "@/lib/project-permissions";
 import { EditProjectForm } from "@/components/project-forms";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { StatusBadge } from "@/components/ui";
 import { projectActionError } from "@/components/project-action-error";
 
 type LoadState =
@@ -194,7 +195,7 @@ function ProjectDetailPage() {
             <h1>
               {project.name}{" "}
               {project.status === "archived" && (
-                <span className="badge badge-muted">Archived</span>
+                <StatusBadge status="skipped">Archived</StatusBadge>
               )}
             </h1>
             <p className="project-key-line">

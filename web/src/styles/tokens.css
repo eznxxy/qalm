@@ -1,0 +1,115 @@
+/*
+ * Design tokens — DESIGN.md §2 (card t_62938355, step 1).
+ *
+ * Single source of truth for every colour, radius, spacing step and control
+ * height. Components never hard-code hex values; they consume these custom
+ * properties (directly in plain CSS — the app has no Tailwind build, see the
+ * handoff note — or via the semantic aliases in app/globals.css).
+ *
+ * Light theme is the MVP default (:root). Dark theme is phase 2: the token
+ * NAMES below all flip under [data-theme="dark"]; per §2.3 the dark values
+ * are placeholders to be tuned to the §8 floor (4.5:1 text / 3:1 UI) when
+ * the dark UI ships. Status colours are semantic (§2.2) — never decorative.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* §2.1 colour — light theme (ink-500 per amendment t_5fa1c284) */
+  --ink-900: #17202e; /* primary text */
+  --ink-700: #3a4658; /* secondary text, icons */
+  --ink-500: #5c6b82; /* tertiary text, placeholders */
+  --line: #dce1e9; /* borders, dividers */
+  --canvas: #f4f6f9; /* app background */
+  --surface: #ffffff; /* tables, panels, dialogs */
+  --brand: #263fa0; /* primary buttons, links, selected, focus ring */
+  --brand-hover: #1d3282; /* hover/pressed brand */
+  --brand-tint: #e9edfa; /* selected row, active nav */
+
+  /* Derived pair (not in §2.1): label colour on --brand fills. White on
+   * --brand is 9.1:1; tokenised so components stay hex-free. */
+  --text-on-brand: #ffffff;
+
+  /* §2.2 status colours — solid + tint pairs, semantic only */
+  --passed: #1f8a5b;
+  --passed-tint: #e4f4ec;
+  --failed: #c23a3a;
+  --failed-tint: #fbe9e9;
+  --blocked: #b7770d;
+  --blocked-tint: #fcf1dc;
+  --retest: #6b4fc2;
+  --retest-tint: #efeafb;
+  --skipped: #6b7686;
+  --skipped-tint: #edeff3;
+  --untested: #9aa5b5;
+  --untested-tint: #f1f3f6;
+
+  /* §2.5 spacing scale (px) — base unit 4. Named by step, not by px. */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+
+  /* §2.5 radius — per element, not one global radius. Inner table/panel
+   * edges stay 0 (no token needed; absence of radius is the default). */
+  --radius-control: 6px; /* inputs and buttons */
+  --radius-badge: 4px; /* badges */
+  --radius-dialog: 10px; /* dialogs and drawers */
+
+  /* §2.5 elevation — only dialogs, popovers and drawers. */
+  --shadow-overlay: 0 8px 24px rgba(23, 32, 46, 0.16);
+  /* Scrim behind dialogs (derived from --ink-900). */
+  --overlay-scrim: rgba(23, 32, 46, 0.4);
+
+  /* §2.5 row heights — default / compact / comfortable (user setting). */
+  --row-height: 36px;
+  --row-height-compact: 32px;
+  --row-height-comfortable: 44px;
+
+  /* §2.5 control heights — default / small / large (auth screens only). */
+  --control-height: 32px;
+  --control-height-small: 28px;
+  --control-height-large: 40px;
+}
+
+/* §2.3 dark theme — phase 2. Token names flip; values are placeholders to
+ * tune against the §8 floor. No UI switch ships with the MVP (§11). */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink-900: #e8edf5;
+  --ink-700: #b7c1d1; /* placeholder — hold ≥ 4.5:1 on --surface */
+  --ink-500: #8a97ab; /* placeholder — hold ≥ 4.5:1 on --surface/--canvas */
+  --line: #2a3342;
+  --canvas: #0f141c;
+  --surface: #161d28;
+  --brand: #7c93f0;
+  --brand-hover: #93a7f3; /* placeholder */
+  --brand-tint: #232e52; /* placeholder */
+
+  /* Label on --brand fills: dark-brand #7C93F0 is light, so the fill label
+   * flips to ink (≈ 8.9:1). */
+  --text-on-brand: #0f141c;
+
+  /* §2.2 solids lightened toward 4.5:1 on --surface (§2.3); tints become
+   * low-luminance washes. All placeholder until the phase-2 pass. */
+  --passed: #4fbf8f;
+  --passed-tint: #16301f;
+  --failed: #e58181;
+  --failed-tint: #38191c;
+  --blocked: #e2a84f;
+  --blocked-tint: #332711;
+  --retest: #a691e8;
+  --retest-tint: #241d3d;
+  --skipped: #97a2b4;
+  --skipped-tint: #1d2430;
+  --untested: #6f7b8e;
+  --untested-tint: #1a212c;
+
+  --overlay-scrim: rgba(5, 8, 12, 0.6);
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.5);
+}

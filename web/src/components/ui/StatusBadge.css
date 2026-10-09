@@ -1,0 +1,98 @@
+/*
+ * StatusBadge — stylesheet for web/src/components/ui/StatusBadge.tsx.
+ *
+ * Colours are var() references into web/src/styles/tokens.css only
+ * (DESIGN.md §2.2 amended spec: tint background, ink-900 text — solid
+ * text for failed — status-solid icon, ink-700 icon for untested).
+ * Geometry per §5: 4px radius, 22px high; caption type per §2.4 (12/16).
+ * The app is still dark-chrome until the tokens card (t_62938355) merges:
+ * like DataTable, the badge references token NAMES, not values, so it
+ * converges with the real light theme without further edits.
+ */
+
+.sb-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--untested-tint);
+  color: var(--ink-900);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  /* Same caption size regardless of the host page's font sizing. */
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Two badges in one cell (e.g. Active + "temp password") keep a 4px gap
+ * without consumers adding wrapper styles. */
+.sb-badge + .sb-badge {
+  margin-left: 4px;
+}
+
+.sb-badge svg {
+  flex: none;
+}
+
+/* ------------------------------------------------- tint per status */
+
+.sb-passed {
+  background: var(--passed-tint);
+}
+
+.sb-failed {
+  background: var(--failed-tint);
+}
+
+.sb-blocked {
+  background: var(--blocked-tint);
+}
+
+.sb-retest {
+  background: var(--retest-tint);
+}
+
+.sb-skipped {
+  background: var(--skipped-tint);
+}
+
+.sb-untested {
+  background: var(--untested-tint);
+}
+
+/* ------------------------------------- icon colour per §2.2 amendment */
+
+.sb-passed svg {
+  color: var(--passed);
+}
+
+.sb-failed svg {
+  color: var(--failed);
+}
+
+.sb-blocked svg {
+  color: var(--blocked);
+}
+
+.sb-retest svg {
+  color: var(--retest);
+}
+
+.sb-skipped svg {
+  color: var(--skipped);
+}
+
+/* Untested solid is 2.24:1 on its tint — the icon uses ink-700 (8.60:1). */
+.sb-untested svg {
+  color: var(--ink-700);
+}
+
+/* Failed keeps solid text (4.53:1, the instant-read state, §2.2). */
+.sb-failed {
+  color: var(--failed);
+}
