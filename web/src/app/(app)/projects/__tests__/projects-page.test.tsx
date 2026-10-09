@@ -131,11 +131,17 @@ function listCalls(): string[] {
 
 async function renderAs(user: User, list?: Project[]) {
   mockApiFor(user, list);
-  const { default: ProjectsPage } = await import("@/app/projects/page");
+  // Production pairs every (app) page with the RequireAuth gate (the route
+  // group layout); reproduce it so the page first renders authenticated, as
+  // in the real app.
+  const { default: ProjectsPage } = await import("@/app/(app)/projects/page");
+  const { RequireAuth } = await import("@/components/require-auth");
   const { SessionProvider } = await import("@/lib/session");
   render(
     <SessionProvider>
-      <ProjectsPage />
+      <RequireAuth>
+        <ProjectsPage />
+      </RequireAuth>
     </SessionProvider>
   );
   await screen.findByRole("heading", { name: "Projects" });
@@ -350,11 +356,14 @@ describe("projects list: search + pagination state in the URL", () => {
       }
       return Promise.reject(new Error(`unexpected ${method} ${url}`));
     });
-    const { default: ProjectsPage } = await import("@/app/projects/page");
+    const { default: ProjectsPage } = await import("@/app/(app)/projects/page");
+    const { RequireAuth } = await import("@/components/require-auth");
     const { SessionProvider } = await import("@/lib/session");
     render(
       <SessionProvider>
-        <ProjectsPage />
+        <RequireAuth>
+          <ProjectsPage />
+        </RequireAuth>
       </SessionProvider>
     );
 
@@ -371,11 +380,14 @@ describe("project detail: states and role gating", () => {
   async function renderDetailAs(user: User, project: Project = ACTIVE) {
     mockApiFor(user, [project]);
     mockRouterState.params = { id: project.id };
-    const { default: DetailPage } = await import("@/app/projects/[id]/page");
+    const { default: DetailPage } = await import("@/app/(app)/projects/[id]/page");
+    const { RequireAuth } = await import("@/components/require-auth");
     const { SessionProvider } = await import("@/lib/session");
     render(
       <SessionProvider>
-        <DetailPage />
+        <RequireAuth>
+          <DetailPage />
+        </RequireAuth>
       </SessionProvider>
     );
   }
@@ -453,7 +465,7 @@ describe("project detail: states and role gating", () => {
       }
       return Promise.reject(new Error(`unexpected ${url}`));
     });
-    const { default: DetailPage } = await import("@/app/projects/[id]/page");
+    const { default: DetailPage } = await import("@/app/(app)/projects/[id]/page");
     const { SessionProvider } = await import("@/lib/session");
     render(
       <SessionProvider>

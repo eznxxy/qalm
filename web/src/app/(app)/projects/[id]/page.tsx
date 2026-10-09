@@ -7,13 +7,13 @@
  * archived project receives the contract's 404 and sees "Project not found",
  * never a crash.
  */
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Project } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
-import { RequireAuth, isSessionDead } from "@/components/require-auth";
+import { isSessionDead } from "@/components/require-auth";
 import { useSession } from "@/lib/session";
 import { canArchiveProject, canEditProject, canRestoreProject } from "@/lib/project-permissions";
 import { EditProjectForm } from "@/components/project-forms";
@@ -40,7 +40,7 @@ function formatDateTime(iso: string): string {
   }
 }
 
-function ProjectDetailPage() {
+export default function ProjectDetailPage() {
   const { user } = useSession();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -115,17 +115,17 @@ function ProjectDetailPage() {
 
   if (state.kind === "loading") {
     return (
-      <main className="page">
+      <div className="page">
         <p role="status" aria-live="polite">
           Loading project…
         </p>
-      </main>
+      </div>
     );
   }
 
   if (state.kind === "not-found") {
     return (
-      <main className="page">
+      <div className="page">
         <div className="panel panel-error" role="alert">
           <h1>Project not found</h1>
           <p>
@@ -136,13 +136,13 @@ function ProjectDetailPage() {
             <Link href="/projects">Back to projects</Link>
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (state.kind === "forbidden") {
     return (
-      <main className="page">
+      <div className="page">
         <div className="panel panel-error" role="alert">
           <h1>Forbidden</h1>
           <p>{state.message}</p>
@@ -150,13 +150,13 @@ function ProjectDetailPage() {
             <Link href="/projects">Back to projects</Link>
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (state.kind === "error") {
     return (
-      <main className="page">
+      <div className="page">
         <div className="panel panel-error" role="alert">
           <h1>Something went wrong</h1>
           <p>{state.message}</p>
@@ -166,7 +166,7 @@ function ProjectDetailPage() {
             </button>
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -176,7 +176,7 @@ function ProjectDetailPage() {
   const canRestore = user ? canRestoreProject(user.role) : false;
 
   return (
-    <main className="page">
+    <div className="page">
       <p className="breadcrumb">
         <Link href="/projects">← All projects</Link>
       </p>
@@ -270,22 +270,7 @@ function ProjectDetailPage() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </main>
+    </div>
   );
 }
 
-export default function ProjectDetailRoute() {
-  return (
-    <Suspense
-      fallback={
-        <div className="auth-loading" role="status" aria-live="polite">
-          Loading project…
-        </div>
-      }
-    >
-      <RequireAuth>
-        <ProjectDetailPage />
-      </RequireAuth>
-    </Suspense>
-  );
-}

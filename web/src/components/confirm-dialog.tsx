@@ -38,6 +38,13 @@ export function ConfirmDialog({
     dialog?.querySelector<HTMLElement>("button, input")?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
+      // Modal shield: swallow every key before it reaches the page's §7
+      // shortcut maps (t_6ce021c1). Escape still closes; Tab is handled by
+      // the trap below.
+      if (event.key !== "Escape" && event.key !== "Tab") {
+        event.stopPropagation();
+        return;
+      }
       if (event.key === "Escape") {
         event.stopPropagation();
         onCancel();

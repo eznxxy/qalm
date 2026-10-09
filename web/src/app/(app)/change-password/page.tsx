@@ -4,10 +4,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import { ApiError } from "@/lib/api-error";
-import { RequireAuth } from "@/components/require-auth";
 
 /** Self-service name and password change (PATCH /auth/me). */
-function ChangePasswordForm() {
+export default function ChangePasswordPage() {
   const { user, setUser } = useSession();
   const router = useRouter();
 
@@ -95,7 +94,7 @@ function ChangePasswordForm() {
   }
 
   return (
-    <main className="page">
+    <div className="page">
       <h1>Account settings</h1>
       {user?.must_change_password && (
         <p className="muted">
@@ -168,14 +167,7 @@ function ChangePasswordForm() {
           {submitting ? "Saving…" : "Save changes"}
         </button>
       </form>
-    </main>
+    </div>
   );
 }
 
-export default function ChangePasswordPage() {
-  return (
-    <RequireAuth>
-      <ChangePasswordForm />
-    </RequireAuth>
-  );
-}

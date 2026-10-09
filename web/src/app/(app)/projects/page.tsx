@@ -8,14 +8,18 @@
  * - Role-aware write controls per the api-projects.md role matrix.
  * - Search/filter/page state lives in the URL query string so views are
  *   shareable and back/forward works.
+ *
+ * Rendered inside the (app) shell layout, which owns the auth gate. Reading
+ * useSearchParams here is fine for the static shell prerender: the AppShell
+ * that renders it suspends inside its own Suspense boundary.
  */
-import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Project, ProjectStatus } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
-import { RequireAuth, isSessionDead } from "@/components/require-auth";
+import { isSessionDead } from "@/components/require-auth";
 import { useSession } from "@/lib/session";
 import {
   canArchiveProject,
@@ -90,7 +94,7 @@ function isProjectStatus(value: unknown): value is ProjectStatus {
   return value === "active" || value === "archived";
 }
 
-function ProjectsListPage() {
+export default function ProjectsListPage() {
   const { user } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -275,7 +279,7 @@ function ProjectsListPage() {
   }
 
   return (
-    <main className="page">
+    <div className="page">
       <h1>Projects</h1>
 
       <div className="toolbar">
@@ -418,22 +422,7 @@ function ProjectsListPage() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </main>
+    </div>
   );
 }
 
-export default function ProjectsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="auth-loading" role="status" aria-live="polite">
-          Loading projects…
-        </div>
-      }
-    >
-      <RequireAuth>
-        <ProjectsListPage />
-      </RequireAuth>
-    </Suspense>
-  );
-}

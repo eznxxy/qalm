@@ -41,7 +41,11 @@ describe("role gating", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
   });
 
-  /** Installs the API mock for a logged-in session as `user`. */
+  /**
+   * Installs the API mock for a logged-in session as `user`. Covers every
+   * endpoint the rendered tree touches: the session bootstrap (/auth/refresh,
+   * /auth/me), the users list, and the app shell's project-switcher list.
+   */
   function mockApiFor(user: User) {
     fetchMock.mockImplementation((url: string) => {
       if (url.includes("/auth/refresh")) {
@@ -62,23 +66,25 @@ describe("role gating", () => {
           })
         );
       }
+      if (url.includes("/projects")) {
+        return Promise.resolve(
+          jsonResponse(200, { data: [], meta: { page: 1, limit: 200, total: 0, total_pages: 0 } })
+        );
+      }
       return Promise.reject(new Error(`unexpected ${url}`));
     });
   }
 
-  it("admin sees the Users nav item and the users table loads", async () => {
+  it("admin loads the users table", async () => {
     mockApiFor(USER_ADA);
-    const { default: UsersPage } = await import("@/app/users/page");
-    const { AppNav } = await import("@/components/app-nav");
+    const { default: UsersPage } = await import("@/app/(app)/users/page");
     const { SessionProvider } = await import("@/lib/session");
 
     render(
       <SessionProvider>
-        <AppNav />
         <UsersPage />
       </SessionProvider>
     );
-    await screen.findByRole("link", { name: "Users" });
     await screen.findByText("grace@example.com");
     expect(screen.getByRole("button", { name: "Create user" })).toBeInTheDocument();
 
@@ -88,71 +94,62 @@ describe("role gating", () => {
   });
 
   it.each(["lead", "tester", "viewer"] as const)(
-    "%s never sees user management: no nav item, page says Forbidden, no /users call",
+    "%s never reaches user management: page says Forbidden, no /users call",
     async (role) => {
       mockApiFor(makeUser({ role }));
-      const { default: UsersPage } = await import("@/app/users/page");
-      const { AppNav } = await import("@/components/app-nav");
+      const { default: UsersPage } = await import("@/app/(app)/users/page");
       const { SessionProvider } = await import("@/lib/session");
 
       render(
         <SessionProvider>
-          <AppNav />
           <UsersPage />
         </SessionProvider>
       );
-      await screen.findByText(/Ada Lovelace/);
-      expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
       expect(await screen.findByText("Forbidden")).toBeInTheDocument();
       expect(fetchMock.mock.calls.some((c) => c[0].includes("/users"))).toBe(false);
     }
   );
 
-  it("nav shows the temp-password link when must_change_password is set", async () => {
-    const { AppNav } = await import("@/components/app-nav");
+  it("shell avatar menu shows the temp-password hint and account link when must_change_password is set", async () => {
+    mockApiFor(makeUser({ must_change_password: true }));
+    const { AppShell } = await import("@/components/app-shell");
     const { SessionProvider } = await import("@/lib/session");
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/auth/refresh")) {
-        return Promise.resolve(
-          jsonResponse(200, {
-            data: { access_token: "tok-r", token_type: "Bearer", expires_in: 900 },
-          })
-        );
-      }
-      return Promise.resolve(
-        jsonResponse(200, { data: makeUser({ must_change_password: true }) })
-      );
-    });
+    const { fireEvent } = await import("@testing-library/react");
 
     render(
       <SessionProvider>
-        <AppNav />
+        <AppShell>
+          <p>content</p>
+        </AppShell>
       </SessionProvider>
     );
-    expect(await screen.findByRole("link", { name: "Change password" })).toBeInTheDocument();
+    await screen.findByRole("button", { name: "Account menu for Ada Lovelace" });
+    fireEvent.click(screen.getByRole("button", { name: "Account menu for Ada Lovelace" }));
+
+    expect(
+      screen.getByRole("link", { name: "Account settings" })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Your password is temporary/)).toBeInTheDocument();
   });
 
-  it("nav hides the temp-password link once the password is changed", async () => {
-    const { AppNav } = await import("@/components/app-nav");
+  it("shell avatar menu hides the temp-password hint once the password is changed", async () => {
+    mockApiFor(makeUser());
+    const { AppShell } = await import("@/components/app-shell");
     const { SessionProvider } = await import("@/lib/session");
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/auth/refresh")) {
-        return Promise.resolve(
-          jsonResponse(200, {
-            data: { access_token: "tok-r", token_type: "Bearer", expires_in: 900 },
-          })
-        );
-      }
-      return Promise.resolve(jsonResponse(200, { data: makeUser() }));
-    });
+    const { fireEvent } = await import("@testing-library/react");
 
     render(
       <SessionProvider>
-        <AppNav />
+        <AppShell>
+          <p>content</p>
+        </AppShell>
       </SessionProvider>
     );
-    await screen.findByText(/Ada Lovelace/);
-    expect(screen.queryByRole("link", { name: "Change password" })).not.toBeInTheDocument();
+    const avatar = await screen.findByRole("button", { name: "Account menu for Ada Lovelace" });
+    fireEvent.click(avatar);
+
+    expect(screen.getByRole("link", { name: "Account settings" })).toBeInTheDocument();
+    expect(screen.queryByText(/Your password is temporary/)).not.toBeInTheDocument();
   });
 });
 
@@ -165,11 +162,15 @@ describe("route protection", () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const { default: UsersPage } = await import("@/app/users/page");
+    // The (app) layout pairs the gate with every page; reproduce that here.
+    const { default: UsersPage } = await import("@/app/(app)/users/page");
+    const { RequireAuth } = await import("@/components/require-auth");
     const { SessionProvider } = await import("@/lib/session");
     render(
       <SessionProvider>
-        <UsersPage />
+        <RequireAuth>
+          <UsersPage />
+        </RequireAuth>
       </SessionProvider>
     );
 
