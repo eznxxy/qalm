@@ -18,6 +18,10 @@ screens build on it.
 | tsc --noEmit | clean |
 | next build | green (10 routes, PPR) |
 
+Follow-up cards: F1 → t_5c2b7488, F2 → t_c0da9abe,
+N1+N3 (decisions amended into DESIGN.md) → t_f427c73d,
+N2+N6 (+N7/N8 rule) → t_d54d04db.
+
 Runtime: API :3002 + web dev + scratch DB `qalm_design_review`
 (migrations applied, bootstrapped admin, 9 projects, 3 users seeded).
 All findings below reproduced against that live stack.
@@ -77,6 +81,7 @@ cap", but the contract cap is `limit ≤ 100` (api-conventions.md:34).
 GET /projects?limit=200 returns 400 VALIDATION_ERROR, so the top-bar
 switcher shows "Projects unavailable" forever while the page table
 works. Reproduced: curl 400 + live switcher. Fix: limit 100.
+Card: t_5c2b7488.
 
 F2 (SPEC VIOLATION, small) — amended §9 (t_5fa1c284) requires all
 dates through `web/src/lib/dates.ts` (locale + user timezone; the
@@ -84,13 +89,15 @@ only allowed Intl site). The file does not exist, and
 `projects/[id]/page.tsx` has a local `formatDateTime` hard-coding
 `timeZone: "UTC"` (renders "4:26 PM" when the user's local time is
 00:26). Create `lib/dates.ts` and route the detail page through it.
+Card: t_c0da9abe.
 
 N1 — §2.4 "sentence case everywhere, no all-caps labels, no
 letter-spacing tricks" violated twice in globals.css:
 `.help-dialog h3` (uppercase + 0.04em) and `.project-key-input`
-(uppercase + 0.05em). Project keys are ID-like data (§2.4 allows
-ID styling for case IDs — keycap mono is fine; decide and write it
-down). Either amend §2.4 or restyle.
+(uppercase + 0.05em). Decision (amended into §2.4): the rule covers
+labels and prose; identifiers typed/read as a code (case IDs,
+project keys) may be uppercase mono — `.project-key-input` stays,
+`.help-dialog h3` reverts to sentence case. Card: t_f427c73d.
 
 N2 — DataTable.tsx:418: skeleton `<tbody role=status>` renders
 nested INSIDE the data `<tbody>` (invalid HTML; browsers/serializers
@@ -98,13 +105,16 @@ may re-parent it). The guard CSS `.dt-table >
 tbody.dt-skeleton-tbody:hover ~ tbody …` in DataTable.css can never
 match the actual DOM. Unwrap the nested tbody (conditional sibling,
 or render skeleton rows inside the single tbody with role=status on
-the tbody).
+the tbody). Card: t_d54d04db.
 
 N3 — Row height: §2.5 defines 36/32/44 row heights; td height
 behaves as min-height, so any wrapping cell (2-line description =
 40px content) yields 41px rows. At 1440 with the current copy every
-projects row renders 41px. Decide: fixed clipped heights, or
-line-clamp long cells (test with 25-row tables at 36px).
+projects row renders 41px. Decision (amended into §2.5): row height
+is a floor, not a clip — rows grow with wrapped content; tables that
+must hold the line clamp long cells (descriptions) to one line with
+ellipsis + title. Card: t_f427c73d (also fixes the live 41px rows in
+the projects table via the description clamp).
 
 N4 — StatusBar aria-label speaks in severity order
 (passed, failed, blocked, retest, skipped, untested) while segments
@@ -113,22 +123,24 @@ slice: the §4.4 headline copy must match this spoken order.
 
 N5 — PriorityIcon has no consumer yet. When cases land, wire it in
 the cases table + filter chips; keep the icon visible next to the
-word in tables (§1.3).
+word in tables (§1.3). No card — for the future cases slice.
 
 N6 — Top-bar search is wired to /projects?query=… (fine for now);
 its placeholder says "Search cases, runs…" while it searches
 projects — re-wire when cases search lands or copy "Search projects"
-until then.
+until then. Copy fix: card t_d54d04db.
 
 N7 — No sidebar item highlights on /projects (nav has no Projects
 entry; §3's sidebar list is project-feature-scoped). Consider a
 Projects/Overview entry or an agreed rule that non-sidebar screens
 have no active item.
-
 N8 — `/` root forwards to /projects dropping `?project=` (per-screen
 scope re-applies after the switcher loads; cosmetic).
 Projects also aren't yet reachable from the sidebar (Users is) —
 fold into N7's decision.
+N7/N8 decision (no code change): non-sidebar screens carry no active
+nav item; no Projects sidebar entry for MVP; the dropped `?project=`
+on the root forward is accepted. Recorded in card t_d54d04db.
 
 ## Not reviewed (out of scope per card)
 Dark theme values (placeholders by design, §2.3/§11), virtualisation

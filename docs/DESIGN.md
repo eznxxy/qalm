@@ -106,6 +106,11 @@ numbers align.
 | Caption, helper | 12 / 16 | 400, `--ink-500` |
 
 Rules: sentence case everywhere, no all-caps labels, no letter-spacing tricks.
+Exception (design review t_7bfabcd7, 2026-10-16): identifiers — case IDs and
+project keys — may render in mono with uppercase transform when they are data
+the user types or reads as a code (`.project-key-input`), because the rule
+covers labels and prose, not ID values. Dialog section headings are labels:
+they stay sentence case.
 Line length for prose (case descriptions, comments) is capped at 72 characters.
 Case IDs use the form `C1042`, tabular figures, weight 500.
 
@@ -117,6 +122,10 @@ Case IDs use the form `C1042`, tabular figures, weight 500.
 - Elevation: none for content. Only dialogs, popovers and drawers have a shadow
   (`0 8px 24px rgba(23,32,46,.16)`).
 - Row heights: table row 36 (compact 32, comfortable 44, user setting).
+  Row height is a floor, not a clip (design review t_7bfabcd7, 2026-10-16):
+  a cell whose content wraps keeps its text readable and the row grows.
+  Tables that must hold the 36px line clamp long cells (e.g. descriptions)
+  to a single line with an ellipsis plus `title`, so density stays honest.
   Control height 32 (default), 28 (small), 40 (large, auth screens only).
 
 ---
