@@ -145,12 +145,9 @@ th.dt-head-number .dt-header-label {
   background-color: var(--canvas);
 }
 
-/* With both tbody shapes in play (data + skeleton), only highlight a data
- * row when the pointer is NOT inside the sibling skeleton tbody — otherwise
- * every data row would light up while the skeleton rows are hovered. */
-.dt-table > tbody.dt-skeleton-tbody:hover ~ tbody tr.dt-row:not(.dt-row-selected) {
-  background-color: transparent;
-}
+/* N2 (t_d54d04db): there is one tbody — skeleton rows live inside it — so the
+ * old sibling-tbody hover guard is gone. Data rows and skeleton rows never
+ * coexist, and the hover rule above is already scoped to tr.dt-row. */
 
 .dt-table tbody tr.dt-row-selected {
   background-color: var(--brand-tint);

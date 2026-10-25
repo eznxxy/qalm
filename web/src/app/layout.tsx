@@ -16,7 +16,11 @@ export const metadata: Metadata = {
  */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={plexSans.variable}>
+    // suppressHydrationWarning: the shell's pre-paint script adds
+    // `sidebar-collapsed` to <html> before React hydrates (no rail flash), so
+    // the server/client class attribute differs by design. Attributes only —
+    // children still hydrate normally.
+    <html lang="en" className={plexSans.variable} suppressHydrationWarning>
       <body>
         <SessionProvider>{children}</SessionProvider>
       </body>

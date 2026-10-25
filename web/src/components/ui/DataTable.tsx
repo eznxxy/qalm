@@ -409,17 +409,24 @@ export function DataTable<T>({
             })}
           </tr>
         </thead>
+        {/* One tbody only: skeleton rows render inside it. A nested tbody is
+            invalid HTML and broke hydration (design review N2, t_d54d04db). */}
         <tbody
           ref={tbodyRef}
           tabIndex={sortedRows.length > 0 ? 0 : undefined}
           onKeyDown={onTbodyKeyDown}
-          className={rowFocus !== null ? "dt-row-focus-active" : undefined}
+          className={
+            [
+              rowFocus !== null ? "dt-row-focus-active" : "",
+              skeletonRows ? "dt-skeleton-tbody" : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
+          role={skeletonRows ? "status" : undefined}
+          aria-label={skeletonRows ? "Loading" : undefined}
         >
-          {skeletonRows && (
-            <tbody className="dt-skeleton-tbody" role="status" aria-label="Loading">
-              {skeletonRows}
-            </tbody>
-          )}
+          {skeletonRows}
           {!loading && error && (
             <tr role="alert">
               <td colSpan={columnCount}>

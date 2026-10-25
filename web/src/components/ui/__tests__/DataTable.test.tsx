@@ -432,5 +432,9 @@ describe("DataTable misc", () => {
     expect(skeletonTbody).toHaveAttribute("aria-label", "Loading");
     expect(document.querySelectorAll(".dt-skeleton-bar").length).toBeGreaterThan(0);
     expect(document.querySelector("table")).toHaveAttribute("aria-busy", "true");
+    // N2 (t_d54d04db): exactly one tbody. A nested tbody is invalid HTML and
+    // broke hydration; the skeleton rows live inside the data tbody.
+    expect(document.querySelectorAll("table > tbody")).toHaveLength(1);
+    expect(document.querySelector("tbody tbody")).toBeNull();
   });
 });
