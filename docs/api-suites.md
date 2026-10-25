@@ -165,6 +165,9 @@ Atomic reorder after drag-and-drop. Sends only the sibling groups that changed.
   a recursive CTE; re-densify `position` in the source and target groups.
 - Delete: re-check emptiness inside the transaction
   (`select count(*) from cases where suite_id = $1 and deleted_at is null` +
-  child-suite count) so a concurrent create cannot slip through.
+  child-suite count) so a concurrent create cannot slip through. Soft-deleted
+  cases do not block the delete: `cases.suite_id` is `on delete set null`
+  (see `api-cases.md`), so their rows, numbers and history survive while the
+  suite row goes away.
 - `PATCH …/suites/order` must be a single transaction with a deterministic
   lock order (order by `id`) to avoid deadlocks.

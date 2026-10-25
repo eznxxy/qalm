@@ -188,7 +188,7 @@ not this endpoint.
   1. `project_case_counters` — `project_id uuid pk fk → projects`,
      `last_number int not null default 0`.
   2. `cases` — `id uuid pk`, `project_id uuid not null fk → projects`,
-     `suite_id uuid not null fk → suites (on delete restrict)`,
+     `suite_id uuid null fk → suites (on delete set null)`,
      `case_number int not null`, `title text not null`,
      `preconditions text null`, `priority text not null`,
      `type text not null`, `tags text[] not null default '{}'`,
@@ -197,6 +197,11 @@ not this endpoint.
      `deleted_at timestamptz null`, `created_at`/`updated_at timestamptz`.
      Uniqueness: unique index on `(project_id, case_number)` (covers deleted
      rows too — numbers are never reused).
+     `suite_id` is nullable in the schema only so a suite delete can unlink its
+     soft-deleted cases (§ PRD delete semantics: deleted cases do not block a
+     suite delete, and their rows/numbers/history must survive). A check
+     constraint, `deleted_at is not null or suite_id is not null`, keeps every
+     live case attached to a suite.
   3. `case_steps` — `case_id uuid fk → cases (on delete cascade)`,
      `position int not null`, `text text not null`,
      `expected_result text null`, pk `(case_id, position)`.

@@ -3,7 +3,9 @@
 Status: APPROVED for planning (Arif answered the open questions, 2026-10-25).
 Phase 0 (F1, F2) is done and merged. Phase 1 contracts are **approved**
 (Arif, 2026-10-25): `docs/PRD-suites-cases.md`, `docs/api-suites.md`,
-`docs/api-cases.md`. Next: Phase 2 backend (2.1 suites, 2.2 cases), then
+`docs/api-cases.md`. Phase 2.1 (suites backend) implemented on 2026-10-25 —
+the cases schema migration landed with it because `case_count` and the
+non-empty delete guard need the `cases` table. Next: 2.2 cases API, then
 Phase 3 frontend.
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus (QA).
 Spec source: docs/DESIGN.md §4.2 (two-pane cases screen), MVP scope in AGENTS.md.
@@ -68,17 +70,24 @@ Decide and write down (docs only):
 
 ## Phase 2 — backend (Hephaestus)
 
-### Card 2.1 — Suites: DB migration + API (small/medium)
-- Migration: `suites` table (self-referencing parent_id, project_id FK,
-  ordering), indexes for tree queries.
-- Endpoints per contract 1.2: CRUD + tree listing.
-- Unit + e2e tests per module; migrations up/down clean.
+### Card 2.1 — Suites: DB migration + API (small/medium) — DONE 2026-10-25
+- Migration `20261025000001_suites.js`: `suites` table (self-referencing
+  parent_id, project_id FK, depth 1..3 check, position), sibling-name unique
+  expression index, `(project_id, parent_id, position)` read index.
+- Migration `20261025000002_cases_schema.js`: `project_case_counters`,
+  `cases`, `case_steps`, `case_history` tables/indexes only (endpoints in 2.2).
+  Landed here because the suite tree's `case_count` and the suite delete guard
+  read `cases`; `cases.suite_id` is `on delete set null` so a suite delete
+  unlinks soft-deleted cases instead of destroying their numbers/history.
+- Endpoints per contract 1.2: tree, create, detail+breadcrumb, patch
+  (rename/move/reorder), atomic `suites/order`, delete with emptiness guard.
+- Tests: `suite-tree.spec.ts` (pure tree rules), `suites.service.spec.ts`
+  (depth/conflict/move/delete/reorder decisions), `dto.spec.ts`,
+  `test/suites.e2e-spec.ts` (34 integration cases).
 
 ### Card 2.2 — Cases: DB migration + API (medium)
-- Migration: `cases` table + `case_steps` (ordered), project-scoped case
-  counter for `C####` IDs, tags (jsonb or join table — per contract).
-- Endpoints: CRUD, list w/ pagination + filters, bulk move.
-- Case history table (who changed what, when — minimal audit per PRD).
+- Schema already landed in 2.1 (`20261025000002_cases_schema.js`).
+- Endpoints: CRUD, list w/ pagination + filters, bulk move, history.
 - Unit + e2e tests; lint/tsc clean.
 
 ---
