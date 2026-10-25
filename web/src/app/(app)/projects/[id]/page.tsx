@@ -20,6 +20,7 @@ import { EditProjectForm } from "@/components/project-forms";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { StatusBadge } from "@/components/ui";
 import { projectActionError } from "@/components/project-action-error";
+import { describeTimestamp } from "@/lib/dates";
 
 type LoadState =
   | { kind: "loading" }
@@ -27,18 +28,6 @@ type LoadState =
   | { kind: "not-found" }
   | { kind: "forbidden"; message: string }
   | { kind: "error"; message: string };
-
-function formatDateTime(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "UTC",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
 
 export default function ProjectDetailPage() {
   const { user } = useSession();
@@ -171,6 +160,8 @@ export default function ProjectDetailPage() {
   }
 
   const { project } = state;
+  const created = describeTimestamp(project.created_at);
+  const updated = describeTimestamp(project.updated_at);
   const canEdit = user ? canEditProject(user.role) : false;
   const canArchive = user ? canArchiveProject(user.role) : false;
   const canRestore = user ? canRestoreProject(user.role) : false;
@@ -217,8 +208,14 @@ export default function ProjectDetailPage() {
               <p className="muted">No description.</p>
             )}
             <p className="muted project-meta">
-              Created {formatDateTime(project.created_at)} · Last updated{" "}
-              {formatDateTime(project.updated_at)}
+              Created{" "}
+              <time dateTime={project.created_at} title={created.title}>
+                {created.label}
+              </time>{" "}
+              · Last updated{" "}
+              <time dateTime={project.updated_at} title={updated.title}>
+                {updated.label}
+              </time>
             </p>
             <p className="muted">
               Test suites, cases, runs and reports for this project arrive in
