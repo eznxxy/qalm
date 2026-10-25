@@ -1,6 +1,7 @@
 # Qalm — Slice 2 Backlog: Test Suites & Cases
 
-Status: PROPOSED — not started. Waits on Arif's go + design-review follow-ups (F1, F2).
+Status: APPROVED for planning (Arif answered the open questions, 2026-10-25).
+Not started. Phase 0 (F1, F2) unblocks Phase 1 contracts.
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus (QA).
 Spec source: docs/DESIGN.md §4.2 (two-pane cases screen), MVP scope in AGENTS.md.
 
@@ -38,23 +39,26 @@ Decide and write down (docs only):
 ## Phase 1 — contracts (Daedalus)
 
 ### Card 1.1 — PRD: suites & cases (docs/PRD-suites-cases.md)
-- Suite: name, description, parent suite (nesting), project-scoped; ordering.
+- Suite: name, description, parent suite (nesting, **capped at 3 levels**),
+  project-scoped; ordering.
 - Case: title, preconditions, steps (ordered: step + expected result),
-  priority (Critical/High/Medium/Low), type (Functional/Regression/Smoke/…),
-  tags, estimate; belongs to a suite; case IDs `C1042` (project-scoped counter).
+  priority (Critical/High/Medium/Low), type (**fixed list for MVP: Functional,
+  Regression, Smoke, Exploratory, Other — revisit as project-configurable
+  post-MVP**), tags, estimate (**numeric, in minutes**); belongs to a suite;
+  case IDs `C1042` (project-scoped counter).
 - Roles: who can create/edit/delete suites and cases (proposal: Admin+Lead
   write, Tester+Viewer read — matches projects pattern).
-- Delete semantics: deleting a suite with cases — block? cascade? move cases?
-  (proposal: block if non-empty; delete case = confirm dialog, results history
-  kept per DESIGN.md §6).
+- Delete semantics: deleting a suite with cases **is blocked** (must be empty;
+  cases moved or deleted first). Deleting a case = confirm dialog, results
+  history kept per DESIGN.md §6.
 - Acceptance criteria per feature.
 
 ### Card 1.2 — API contract: suites & cases (docs/api-suites.md, docs/api-cases.md)
 - Endpoints: suites CRUD + tree listing (project-scoped), cases CRUD + list
   within suite, bulk move cases between suites, case history (read-only).
 - Pagination for cases list (large suites), filters (priority/type/tag).
-- Key shapes: tree payload (nesting depth limit?), step array validation,
-  ID allocation scheme, error codes.
+- Key shapes: tree payload (**max depth 3**), step array validation,
+  ID allocation scheme, error codes; estimate is integer minutes.
 - Consistency with api-conventions.md (envelopes, errors, pagination, roles).
 
 ---
@@ -122,11 +126,15 @@ while Hephaestus finishes cases API — same pattern as slice 1).
 
 ---
 
-## Open questions for Arif (answer with the go)
+## Decisions (Arif, 2026-10-25)
 
-1. Suite nesting: unlimited depth or cap (proposal: cap at 3 for MVP)?
-2. Deleting a non-empty suite: block (proposal) or move cases to a fallback?
-3. Case types: fixed list (Functional/Regression/Smoke/Exploratory/Other)
-   or project-configurable later? (proposal: fixed list MVP)
-4. Estimate field: free text, or hours-minutes numeric? (proposal: numeric
-   minutes MVP)
+1. **Suite nesting** — capped at 3 levels for MVP. Server rejects a create/move
+   that would exceed depth 3 (contract error, e.g. 400 `DEPTH_LIMIT_EXCEEDED`);
+   the tree UI disables "Add suite" at depth 3.
+2. **Deleting a non-empty suite** — blocked. DELETE returns 409/400 with a
+   "move or delete its cases first" message; no cascade, no fallback suite.
+3. **Case types** — fixed list for MVP: Functional, Regression, Smoke,
+   Exploratory, Other. Stored as an enum-less string so a per-project list can
+   replace it post-MVP without a migration.
+4. **Estimate** — numeric, in minutes (integer ≥ 0). UI accepts `90` or `1h 30m`
+   and normalises to minutes on save.
