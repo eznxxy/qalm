@@ -3,10 +3,10 @@
 Status: APPROVED for planning (Arif answered the open questions, 2026-10-25).
 Phase 0 (F1, F2) is done and merged. Phase 1 contracts are **approved**
 (Arif, 2026-10-25): `docs/PRD-suites-cases.md`, `docs/api-suites.md`,
-`docs/api-cases.md`. Phase 2.1 (suites backend) implemented on 2026-10-25 —
-the cases schema migration landed with it because `case_count` and the
-non-empty delete guard need the `cases` table. Next: 2.2 cases API, then
-Phase 3 frontend.
+`docs/api-cases.md`. Phase 2.1 (suites backend) was implemented on 2026-10-25
+and phase 2.2 (cases API) on 2026-10-26 — the cases schema migration landed
+with 2.1 because `case_count` and the non-empty delete guard need the `cases`
+table. Next: Phase 3 frontend.
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus (QA).
 Spec source: docs/DESIGN.md §4.2 (two-pane cases screen), MVP scope in AGENTS.md.
 
@@ -85,10 +85,25 @@ Decide and write down (docs only):
   (depth/conflict/move/delete/reorder decisions), `dto.spec.ts`,
   `test/suites.e2e-spec.ts` (34 integration cases).
 
-### Card 2.2 — Cases: DB migration + API (medium)
-- Schema already landed in 2.1 (`20261025000002_cases_schema.js`).
+### Card 2.2 — Cases: DB migration + API (medium) — DONE 2026-10-26
+- Schema already landed in 2.1 (`20261025000002_cases_schema.js`); no new
+  migration.
 - Endpoints: CRUD, list w/ pagination + filters, bulk move, history.
-- Unit + e2e tests; lint/tsc clean.
+  - list: suite subtree by default (`include_descendants=false` for direct),
+    title substring, repeatable priority/type (OR) and tag (AND), sort
+    (`case_number`, `updated_at`, `title`, `-` for descending), pagination.
+  - create allocates from `project_case_counters` in the insert transaction;
+    numbers are never reused (soft delete keeps them reserved).
+  - patch writes one `updated` row with from → to values (steps summarised by
+    count), plus a `moved` row when the suite changes.
+  - bulk move is atomic and writes one `moved` row per re-assigned case.
+- Tests: `case-diff.spec.ts`, `dto.spec.ts`, `cases.service.spec.ts`
+  (in-memory store, including bulk-move rollback), `test/cases.e2e-spec.ts`
+  (36 integration cases). 318 unit / 178 e2e green, lint/tsc/build clean.
+- Notes: a suite filter that resolves to no ids returns an empty page (the
+  contract only 400s malformed ids); `updated` + `moved` rows written by one
+  PATCH share a transaction timestamp, so their relative order falls to the
+  contract's `id` tiebreaker (e2e asserts content, not order).
 
 ---
 

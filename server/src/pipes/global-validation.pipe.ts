@@ -58,7 +58,12 @@ export class GlobalValidationPipe implements PipeTransform {
       }
     }
     for (const child of error.children ?? []) {
-      this.collectDetails(child, `${fieldPath}.${child.property}`, details);
+      // Arrays name the index in brackets — the contract spelling for nested
+      // list items, e.g. `steps[1].text` (docs/api-cases.md § POST).
+      const childPath = Array.isArray(error.value)
+        ? `${fieldPath}[${child.property}]`
+        : `${fieldPath}.${child.property}`;
+      this.collectDetails(child, childPath, details);
     }
   }
 

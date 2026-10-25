@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AdminUsersModule } from './users-admin/admin-users.module';
 import { AuthModule } from './auth/auth.module';
+import { CasesModule } from './cases/cases.module';
 import { ConfigModule } from './config.module';
 import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
@@ -18,6 +19,7 @@ import { SuitesModule } from './suites/suites.module';
     AuthModule,
     ProjectsModule,
     SuitesModule,
+    CasesModule,
     AdminUsersModule,
   ],
   controllers: [HealthController],

@@ -105,8 +105,8 @@ describe('suites DTOs', () => {
         ],
       });
       const fields = issues.map((detail) => detail.field);
-      expect(fields).toContain('items.0.id');
-      expect(fields).toContain('items.0.position');
+      expect(fields).toContain('items[0].id');
+      expect(fields).toContain('items[0].position');
     });
 
     it('accepts a root item (parent_id null)', async () => {

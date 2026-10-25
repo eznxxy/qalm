@@ -1,7 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { QueryResult, QueryResultRow } from 'pg';
 import { ApiError } from '../errors';
 import { DbService } from '../db/db.service';
+import { Queryable } from '../db/queryable';
+
+export type { Queryable };
 
 /**
  * DB row shape of `suites` (migration 20261025000001). snake_case columns;
@@ -32,11 +34,9 @@ export interface SuiteProjectRef {
 /**
  * Store methods take an optional queryable so a whole operation can run on
  * one transaction client (PoolClient) instead of the pool. DbService satisfies
- * it; so does PoolClient.
+ * it; so does PoolClient. The interface itself lives in db/queryable.ts so
+ * suites and cases share one contract.
  */
-export interface Queryable {
-  query<T extends QueryResultRow>(text: string, values?: unknown[]): Promise<QueryResult<T>>;
-}
 
 /** Postgres SQLSTATE for unique_index / unique_constraint violations. */
 const UNIQUE_VIOLATION = '23505';

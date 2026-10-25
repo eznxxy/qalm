@@ -1,5 +1,14 @@
 import { ArgumentMetadata } from '@nestjs/common';
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Length,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 import { ValidationErrorDetail } from '../errors';
 import { GlobalValidationPipe } from './global-validation.pipe';
 
@@ -14,6 +23,19 @@ class SampleDto {
   @IsString()
   @MaxLength(10)
   note!: string;
+}
+
+class NestedStepDto {
+  @IsString()
+  @Length(1, 5)
+  text!: string;
+}
+
+class NestedListDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NestedStepDto)
+  steps!: NestedStepDto[];
 }
 
 const metadata: ArgumentMetadata = {
@@ -69,6 +91,21 @@ describe('GlobalValidationPipe', () => {
     const response = failure.response as { code: string; details: ValidationErrorDetail[] };
     expect(response.code).toBe('VALIDATION_ERROR');
     expect(response.details.some((d) => d.field === 'is_admin')).toBe(true);
+  });
+
+  it('names list items with a bracketed index (steps[1].text)', async () => {
+    const failure = await failureOf(
+      pipe.transform({ steps: [{ text: 'open' }, { text: '' }] }, {
+        type: 'body',
+        metatype: NestedListDto,
+        data: '',
+      }),
+    );
+    const response = failure.response as { details: ValidationErrorDetail[] };
+    expect(response.details).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'steps[1].text' })]),
+    );
+    expect(response.details.some((d) => d.field === 'steps.1.text')).toBe(false);
   });
 
   it('leaves primitive metatypes untouched', async () => {
