@@ -382,6 +382,57 @@ describe("project switcher", () => {
     expect(screen.getByRole("combobox", { name: "Project" })).toBeDisabled();
     expect(screen.getByRole("option", { name: "Loading projects…" })).toBeInTheDocument();
   });
+
+  it("requests the contract's maximum page size, limit 100 (card t_5c2b7488)", async () => {
+    await renderShell();
+    await screen.findByRole("option", { name: "Payments" });
+
+    const projectCalls = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes("/projects"));
+    expect(projectCalls).toHaveLength(1);
+    expect(
+      new URL(projectCalls[0], "http://localhost").searchParams.get("limit")
+    ).toBe("100");
+  });
+
+  it("resolves a ?project= beyond the first page instead of mislabelling the scope", async () => {
+    // >100 projects (card t_5c2b7488): the page only holds the first 100, so
+    // the scoped project is fetched by id and joins the list.
+    mockRouterState.search = "project=p-150";
+    stubSession(makeUser());
+    const base = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith("/projects/p-150")) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            data: makeProject({ id: "p-150", key: "LATE", name: "Late project" }),
+          })
+        );
+      }
+      return base(url, init);
+    });
+
+    const { AppShell } = await import("@/components/app-shell");
+    const { SessionProvider } = await import("@/lib/session");
+    render(
+      <SessionProvider>
+        <AppShell>
+          <p>page content</p>
+        </AppShell>
+      </SessionProvider>
+    );
+
+    const switcher = (await screen.findByRole("combobox", {
+      name: "Project",
+    })) as HTMLSelectElement;
+    await waitFor(() => expect(switcher.value).toBe("p-150"));
+    expect(screen.getByRole("option", { name: "Late project" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Test cases" })).toHaveAttribute(
+      "href",
+      "/wip/cases?project=p-150"
+    );
+  });
 });
 
 describe("top bar", () => {

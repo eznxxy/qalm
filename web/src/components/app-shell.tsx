@@ -90,8 +90,13 @@ function navGroups(isAdmin: boolean): ReadonlyArray<ReadonlyArray<{ href: string
   ];
 }
 
-/** api-conventions.md hard cap on list limits — one fetch covers the switcher. */
-const PROJECT_SWITCHER_LIMIT = 200;
+/**
+ * Contract cap on list limits (api-conventions.md: limit ≤ 100 — card
+ * t_5c2b7488). The switcher lists the first page; a scope that points past it
+ * is resolved by fetching that one project, so the label and scoped links stay
+ * honest beyond 100 projects.
+ */
+const PROJECT_SWITCHER_LIMIT = 100;
 
 /** Minimal 16px stroke glyphs (§8: decorative — the text label carries meaning). */
 function NavIcon({ icon }: { icon: "overview" | "cases" | "runs" | "plans" | "milestones" | "reports" | "settings" | "users" }) {
@@ -228,6 +233,30 @@ function AppShellInner({ children }: { children: ReactNode }) {
   const selectedProject =
     projects.find((p) => p.id === renderedProject) ?? projects[0];
   const selectedProjectId = selectedProject?.id ?? "";
+
+  // A ?project= scope beyond the fetched page still has to resolve, or the
+  // switcher would silently show the first project instead (§3 scope bug with
+  // >100 projects; card t_5c2b7488). Fetch just that project and keep it.
+  useEffect(() => {
+    if (projectsState === "loading" || !renderedProject) return;
+    if (projects.some((p) => p.id === renderedProject)) return;
+
+    let active = true;
+    api
+      .getProject(renderedProject)
+      .then((project) => {
+        if (!active) return;
+        setProjects((current) =>
+          current.some((p) => p.id === project.id) ? current : [...current, project]
+        );
+      })
+      .catch(() => {
+        // Unknown/archived scope: the switcher keeps listing what it has.
+      });
+    return () => {
+      active = false;
+    };
+  }, [renderedProject, projectsState, projects]);
 
   /**
    * §8: the switcher's value change is announced politely (select widgets
