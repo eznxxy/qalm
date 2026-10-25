@@ -1,7 +1,9 @@
 # Qalm — Slice 2 Backlog: Test Suites & Cases
 
 Status: APPROVED for planning (Arif answered the open questions, 2026-10-25).
-Not started. Phase 0 (F1, F2) unblocks Phase 1 contracts.
+Phase 0 (F1, F2) is done and merged. Phase 1 contracts were drafted on
+2026-10-25 (`docs/PRD-suites-cases.md`, `docs/api-suites.md`,
+`docs/api-cases.md`) and await Arif's approval before Phase 2 starts.
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus (QA).
 Spec source: docs/DESIGN.md §4.2 (two-pane cases screen), MVP scope in AGENTS.md.
 
