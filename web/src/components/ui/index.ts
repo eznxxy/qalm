@@ -11,3 +11,5 @@ export type {
   DataTableSort,
   SortDir,
 } from "./DataTable";
+export { Drawer } from "./Drawer";
+export type { DrawerProps } from "./Drawer";

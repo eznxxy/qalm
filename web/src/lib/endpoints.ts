@@ -2,14 +2,28 @@ import { createApiClient, ApiClient, RequestOptions } from "./api-client";
 import {
   AuthSession,
   BootstrapInput,
+  BulkMoveCasesInput,
+  BulkMoveCasesResult,
+  CaseDetail,
+  CaseHistoryEntry,
+  CaseHistoryQuery,
+  CaseListQuery,
+  CaseListItem,
   CreateProjectInput,
+  CreateSuiteInput,
   CreateUserInput,
+  CreateCaseInput,
   LoginInput,
   PatchMeInput,
   Project,
   ProjectListQuery,
   RefreshResult,
+  ReorderSuitesInput,
+  SuiteDetail,
+  SuiteNode,
+  UpdateCaseInput,
   UpdateProjectInput,
+  UpdateSuiteInput,
   UpdateUserInput,
   User,
   UserListQuery,
@@ -120,4 +134,85 @@ export const api = {
   /** Admin only per the role matrix; idempotent. */
   restoreProject: (id: string) =>
     client.apiFetch<Project>(`/projects/${encodeURIComponent(id)}/restore`, opts("POST")),
+
+  // ---- suites (docs/api-suites.md) ----
+  /** Whole project tree, nested; not paginated. */
+  listSuites: (projectId: string) =>
+    client.apiFetch<SuiteNode[]>(
+      `/projects/${encodeURIComponent(projectId)}/suites`
+    ),
+
+  getSuite: (id: string) =>
+    client.apiFetch<SuiteDetail>(`/suites/${encodeURIComponent(id)}`),
+
+  createSuite: (projectId: string, input: CreateSuiteInput) =>
+    client.apiFetch<SuiteNode>(
+      `/projects/${encodeURIComponent(projectId)}/suites`,
+      opts("POST", input)
+    ),
+
+  updateSuite: (id: string, input: UpdateSuiteInput) =>
+    client.apiFetch<SuiteNode>(
+      `/suites/${encodeURIComponent(id)}`,
+      opts("PATCH", input)
+    ),
+
+  /** Atomic reorder; returns the reconciled tree per the contract. */
+  reorderSuites: (projectId: string, input: ReorderSuitesInput) =>
+    client.apiFetch<SuiteNode[]>(
+      `/projects/${encodeURIComponent(projectId)}/suites/order`,
+      opts("PATCH", input)
+    ),
+
+  deleteSuite: (id: string) =>
+    client.apiFetch<void>(`/suites/${encodeURIComponent(id)}`, opts("DELETE")),
+
+  // ---- cases (docs/api-cases.md) ----
+  listCases: (projectId: string, query: CaseListQuery = {}) =>
+    client.apiFetchPage<CaseListItem>(
+      `/projects/${encodeURIComponent(projectId)}/cases`,
+      {
+        query: {
+          suite_id: query.suite_id,
+          include_descendants: query.include_descendants,
+          query: query.query,
+          priority: query.priority?.length ? query.priority : undefined,
+          type: query.type?.length ? query.type : undefined,
+          tag: query.tag?.length ? query.tag : undefined,
+          sort: query.sort,
+          page: query.page,
+          limit: query.limit,
+        },
+      }
+    ),
+
+  createCase: (projectId: string, input: CreateCaseInput) =>
+    client.apiFetch<CaseDetail>(
+      `/projects/${encodeURIComponent(projectId)}/cases`,
+      opts("POST", input)
+    ),
+
+  getCase: (id: string) =>
+    client.apiFetch<CaseDetail>(`/cases/${encodeURIComponent(id)}`),
+
+  updateCase: (id: string, input: UpdateCaseInput) =>
+    client.apiFetch<CaseDetail>(
+      `/cases/${encodeURIComponent(id)}`,
+      opts("PATCH", input)
+    ),
+
+  deleteCase: (id: string) =>
+    client.apiFetch<void>(`/cases/${encodeURIComponent(id)}`, opts("DELETE")),
+
+  bulkMoveCases: (projectId: string, input: BulkMoveCasesInput) =>
+    client.apiFetch<BulkMoveCasesResult>(
+      `/projects/${encodeURIComponent(projectId)}/cases/bulk-move`,
+      opts("POST", input)
+    ),
+
+  listCaseHistory: (id: string, query: CaseHistoryQuery = {}) =>
+    client.apiFetchPage<CaseHistoryEntry>(
+      `/cases/${encodeURIComponent(id)}/history`,
+      { query: { page: query.page, limit: query.limit } }
+    ),
 };

@@ -125,3 +125,211 @@ export interface ProjectListQuery {
   page?: number;
   limit?: number;
 }
+
+// ---- suites (docs/api-suites.md) ----
+
+/** docs/api-suites.md § Resource: Suite */
+export interface Suite {
+  id: string;
+  project_id: string;
+  parent_id: string | null;
+  name: string;
+  description: string | null;
+  depth: number;
+  position: number;
+  /** Subtree count, live cases only. */
+  case_count: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GET /projects/:projectId/suites node — the Suite shape plus children. */
+export interface SuiteNode extends Suite {
+  children: SuiteNode[];
+}
+
+export interface SuitePathEntry {
+  id: string;
+  name: string;
+}
+
+/** GET /suites/:id — Suite plus its root → self ancestor trail. */
+export interface SuiteDetail extends Suite {
+  path: SuitePathEntry[];
+}
+
+export interface CreateSuiteInput {
+  name: string;
+  description?: string;
+  parent_id?: string | null;
+}
+
+/** Any non-empty subset per PATCH /suites/:id. */
+export interface UpdateSuiteInput {
+  name?: string;
+  description?: string | null;
+  parent_id?: string | null;
+  position?: number;
+}
+
+export interface SuiteOrderItem {
+  id: string;
+  parent_id: string | null;
+  position: number;
+}
+
+export interface ReorderSuitesInput {
+  /** Only the sibling groups that changed, per the contract. */
+  items: SuiteOrderItem[];
+}
+
+// ---- cases (docs/api-cases.md) ----
+
+export type Priority = "critical" | "high" | "medium" | "low";
+
+export const PRIORITIES: readonly Priority[] = [
+  "critical",
+  "high",
+  "medium",
+  "low",
+] as const;
+
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+export type CaseType =
+  | "functional"
+  | "regression"
+  | "smoke"
+  | "exploratory"
+  | "other";
+
+export const CASE_TYPES: readonly CaseType[] = [
+  "functional",
+  "regression",
+  "smoke",
+  "exploratory",
+  "other",
+] as const;
+
+export const CASE_TYPE_LABELS: Record<CaseType, string> = {
+  functional: "Functional",
+  regression: "Regression",
+  smoke: "Smoke",
+  exploratory: "Exploratory",
+  other: "Other",
+};
+
+export interface CaseStep {
+  position: number;
+  text: string;
+  expected_result: string | null;
+}
+
+/** docs/api-cases.md § Resource: Case (detail) */
+export interface CaseDetail {
+  id: string;
+  project_id: string;
+  suite_id: string | null;
+  case_number: number;
+  display_id: string;
+  title: string;
+  preconditions: string | null;
+  steps: CaseStep[];
+  priority: Priority;
+  type: CaseType;
+  tags: string[];
+  estimate_minutes: number | null;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** List item — no step bodies or preconditions, plus step_count. */
+export interface CaseListItem
+  extends Omit<CaseDetail, "steps" | "preconditions"> {
+  step_count: number;
+}
+
+export type CaseHistoryAction = "created" | "updated" | "moved" | "deleted";
+
+export interface CaseHistoryEntry {
+  id: string;
+  case_id: string;
+  actor_id: string;
+  action: CaseHistoryAction;
+  changes: Record<string, unknown>;
+  created_at: string;
+}
+
+export type CaseSort =
+  | "case_number"
+  | "-case_number"
+  | "updated_at"
+  | "-updated_at"
+  | "title"
+  | "-title";
+
+export interface CaseListQuery {
+  suite_id?: string;
+  /** Defaults to true server-side; pass false for direct cases only. */
+  include_descendants?: boolean;
+  query?: string;
+  priority?: readonly Priority[];
+  type?: readonly CaseType[];
+  /** Repeatable; AND across values. */
+  tag?: readonly string[];
+  sort?: CaseSort;
+  page?: number;
+  limit?: number;
+}
+
+/** A step as submitted; `position` is derived from array order. */
+export interface CaseStepInput {
+  text: string;
+  expected_result?: string | null;
+}
+
+export interface CreateCaseInput {
+  suite_id: string;
+  title: string;
+  preconditions?: string;
+  steps?: CaseStepInput[];
+  priority: Priority;
+  type: CaseType;
+  tags?: string[];
+  estimate_minutes?: number;
+}
+
+/** Any non-empty subset per PATCH /cases/:id; null clears optional fields. */
+export interface UpdateCaseInput {
+  suite_id?: string;
+  title?: string;
+  preconditions?: string | null;
+  steps?: CaseStepInput[];
+  priority?: Priority;
+  type?: CaseType;
+  tags?: string[];
+  estimate_minutes?: number | null;
+}
+
+export interface BulkMoveCasesInput {
+  case_ids: string[];
+  suite_id: string;
+}
+
+export interface BulkMoveCasesResult {
+  moved: number;
+  case_ids: string[];
+}
+
+export interface CaseHistoryQuery {
+  page?: number;
+  limit?: number;
+}
