@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // `next upgrade --agent=security` (2026-10-25): keep security upgrade
+    // nudges enabled for coding agents.
+    agentUpgrade: "security",
+  },
   // Dev-only same-origin proxy: browser calls /api/v1 on THIS origin and Next
   // forwards to the NestJS API, so the app works from any host (LAN IP,
   // tunnels) without CORS. Set NEXT_PUBLIC_API_URL=/api/v1 when using this.
