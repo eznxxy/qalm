@@ -5,6 +5,7 @@ import { ConfigModule } from './config.module';
 import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
 import { ProjectsModule } from './projects/projects.module';
+import { SuitesModule } from './suites/suites.module';
 
 /**
  * Root module. Feature modules plug in here; the scaffold's health endpoint
@@ -16,6 +17,7 @@ import { ProjectsModule } from './projects/projects.module';
     DbModule,
     AuthModule,
     ProjectsModule,
+    SuitesModule,
     AdminUsersModule,
   ],
   controllers: [HealthController],
