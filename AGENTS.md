@@ -61,6 +61,21 @@ Goal / Files changed / Assumptions / How to run and verify / Open risks
 - Never mark something verified that you did not run.
 - Small commits with clear messages. Do not commit .env files.
 
+## Commit authorship
+The human owner is the author of every commit: `eznxxy
+<marjanramdhani@gmail.com>`. Agent work is credited with `Co-authored-by:`
+trailers, never as `Author:` — that keeps the GitHub contributor graph honest.
+
+```
+feat(qalm-f2): lib/dates.ts — one Intl site
+
+Co-authored-by: Daedalus <daedalus@qalm.local>
+```
+
+Agent identities use `<name>@qalm.local` (Daedalus, Hephaestus, Iris, Argus).
+Commits before 2026-10-25 keep their original agent `Author:` lines; that
+history is published and is not rewritten.
+
 ## Commands (update as the project grows)
 - Install: npm install
 - Dev: npm run dev (web), npm run start:dev (server)
