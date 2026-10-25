@@ -60,6 +60,7 @@ Goal / Files changed / Assumptions / How to run and verify / Open risks
 - Never weaken or delete a failing test to make it pass.
 - Never mark something verified that you did not run.
 - Small commits with clear messages. Do not commit .env files.
+- Never push to a remote unless the human explicitly asks for that push.
 
 ## Commit authorship
 The human owner is the author of every commit: `eznxxy

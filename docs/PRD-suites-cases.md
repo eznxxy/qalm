@@ -1,6 +1,7 @@
 # PRD — Test Suites & Cases (MVP)
 
-Status: **Draft — awaiting Arif's approval (2026-10-25)**
+Status: **Approved — Arif, 2026-10-25** (both open questions accepted as
+proposed: Testers read-only on cases, deleted case numbers stay reserved)
 Owner: Daedalus
 Slice: 2 (cards 1.1/1.2 of `docs/backlog-slice2-suites-cases.md`)
 API contracts: `docs/api-suites.md`, `docs/api-cases.md`, shared rules in
@@ -133,8 +134,9 @@ decision, not an implied one.
 4. **Estimate: numeric minutes.** Integer minutes in the API; the form accepts
    `1h 30m` and normalises on save.
 
-## Open questions for Arif (answer with the approval)
-1. **Tester write access** — the proposal keeps Testers read-only on cases
-   (they write only results in the runs slice). Confirm?
-2. **Case soft delete** — confirm that a deleted case's number stays reserved
-   (never reused), so old run results always point at a meaningful `C####`.
+## Confirmed with the approval (Arif, 2026-10-25)
+1. **Tester write access** — Testers stay read-only on cases; they write only
+   results in the runs slice.
+2. **Case soft delete** — confirmed: a deleted case's number stays reserved
+   and is never reused, so old run results always point at a meaningful
+   `C####`.

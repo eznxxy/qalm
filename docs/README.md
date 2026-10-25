@@ -14,7 +14,7 @@ exists and is approved (see `/AGENTS.md`).
   archive-only (no hard delete). Leads may create and archive projects;
   edit/restore are Admin-only (decision 2026-10-07).
 
-## Slice 2 (suites & cases) — status: contracts drafted 2026-10-25, awaiting approval
+## Slice 2 (suites & cases) — status: contracts approved (Arif, 2026-10-25)
 - `PRD-suites-cases.md` / `api-suites.md` / `api-cases.md` — project-scoped
   suite tree (max depth 3, non-empty delete blocked), cases with ordered
   steps, fixed type list, estimate in minutes, project-scoped `C####` ids,
