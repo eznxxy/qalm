@@ -1,0 +1,164 @@
+/*
+ * Two-pane test cases screen (DESIGN §4.2): 280px suite tree, flexible case
+ * pane. Content pans, not the page body. Tokens only.
+ */
+
+.cases-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  height: calc(100dvh - 48px);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.cases-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.cases-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex: none;
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.cases-heading h1 {
+  margin: 0;
+}
+
+.cases-breadcrumb {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.cases-readonly {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.cases-feedback {
+  flex: none;
+  padding: var(--space-2) var(--space-5) 0;
+}
+
+.cases-feedback p {
+  margin: 0 0 var(--space-2);
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--brand-tint);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-900);
+  font-size: 13px;
+  line-height: 18px;
+  flex: none;
+}
+
+.bulk-bar button {
+  height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  font-size: 12px;
+}
+
+.bulk-bar .linklike {
+  height: auto;
+  padding: 0;
+  font-size: 12px;
+}
+
+.cases-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.cases-pagination {
+  flex: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-4);
+}
+
+.case-id {
+  color: var(--text-muted);
+}
+
+.case-title-link {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.case-title-link:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.case-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+/* 1024: keep both panes but give the table more room. */
+@media (max-width: 1279px) and (min-width: 768px) {
+  .cases-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+/* Below 768 the layout stacks: tree first (capped), then the table. Tables
+ * still scroll horizontally inside DataTable, never the page body. */
+@media (max-width: 767px) {
+  .cases-layout {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    overflow: visible;
+  }
+
+  .cases-layout .suite-pane {
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cases-table-scroll {
+    overflow: visible;
+    padding: var(--space-3) var(--space-4) 0;
+  }
+
+  .cases-header,
+  .cases-pagination {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}
