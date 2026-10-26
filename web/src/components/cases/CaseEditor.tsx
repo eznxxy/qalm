@@ -47,7 +47,7 @@ import {
   type CaseFormValues,
   type CaseStepErrors,
 } from "@/lib/case-form";
-import { flattenSuites } from "@/lib/suites";
+import { findSuitePath, flattenSuites } from "@/lib/suites";
 import { api } from "@/lib/endpoints";
 import { isSessionDead } from "@/components/require-auth";
 import { Combobox, DisabledHint } from "@/components/ui";
@@ -87,13 +87,17 @@ export function CaseEditor({
 }: CaseEditorProps) {
   const mode = detail ? "edit" : "create";
   // The suite picker filters on the plain name, so the tree's depth travels
-  // alongside it rather than as a pre-indented label.
+  // alongside it rather than as a pre-indented label. Searching drops the
+  // indent, so each option also carries its ancestor names for the muted trail.
   const options = useMemo(
     () =>
       flattenSuites(suites).map(({ node }) => ({
         id: node.id,
         label: node.name,
         depth: node.depth,
+        path: findSuitePath(suites, node.id)
+          .slice(0, -1)
+          .map((ancestor) => ancestor.name),
       })),
     [suites]
   );

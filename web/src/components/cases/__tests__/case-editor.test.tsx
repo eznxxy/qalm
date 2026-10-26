@@ -180,6 +180,12 @@ describe("CaseEditor", () => {
     expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(
       1
     );
+    // The filtered row carries the ancestor trail the indent stood in for.
+    expect(
+      within(screen.getByRole("listbox"))
+        .getByRole("option")
+        .querySelector(".combobox-option-path")?.textContent
+    ).toBe("Checkout");
     fireEvent.keyDown(suiteField, { key: "Enter" });
     expect(suiteField).toHaveValue("Payments");
 

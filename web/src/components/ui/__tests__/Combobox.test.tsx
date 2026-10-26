@@ -12,7 +12,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui";
 const OPTIONS: ComboboxOption[] = [
   { id: "s-1", label: "Checkout", depth: 1 },
   { id: "s-2", label: "Payments", depth: 2 },
-  { id: "s-3", label: "Cards", depth: 3 },
+  { id: "s-3", label: "Cards", depth: 3, path: ["Payments", "Checkout"] },
   { id: "s-4", label: "Accounts", depth: 1 },
 ];
 
@@ -103,14 +103,41 @@ describe("Combobox", () => {
     fireEvent.focus(field());
     fireEvent.change(field(), { target: { value: "card" } });
 
-    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
-      "Cards✓",
-    ]);
+    const matches = screen.getAllByRole("option");
+    expect(matches).toHaveLength(1);
+    // Read the label span, not the whole row: a filtered row also carries the
+    // muted ancestor trail after the name.
+    expect(
+      matches[0].querySelector(".combobox-option-label")?.textContent
+    ).toBe("Cards");
 
     // The old select indented with an em dash; that glyph is not a name.
     fireEvent.change(field(), { target: { value: "—" } });
     expect(screen.queryAllByRole("option")).toHaveLength(0);
     expect(screen.getByText("No matches.")).toBeInTheDocument();
+  });
+
+  it("flattens matches and shows the ancestor path once a search hides the tree", () => {
+    render(<Harness initial="s-1" />);
+
+    fireEvent.focus(field());
+    // Browse mode: the row keeps its depth, and there is no trail to show.
+    const browse = screen.getByRole("option", { name: "Cards" });
+    expect(browse).toHaveAttribute("data-depth", "3");
+    expect(browse.querySelector(".combobox-option-path")).toBeNull();
+
+    fireEvent.change(field(), { target: { value: "cards" } });
+
+    // Searching: the indent is gone (a lone match would just float in blank
+    // space) and the ancestor names take over as the hierarchy cue.
+    const match = screen.getByRole("option", { name: "Cards" });
+    expect(match).toHaveAttribute("data-depth", "1");
+    expect(
+      match.querySelector(".combobox-option-label")?.textContent
+    ).toBe("Cards");
+    expect(match.querySelector(".combobox-option-path")?.textContent).toBe(
+      "Payments › Checkout"
+    );
   });
 
   it("moves the highlight with the arrows and commits with Enter", () => {

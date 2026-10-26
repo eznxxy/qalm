@@ -7,7 +7,9 @@
  *
  * Options carry an optional 1-based `depth` so a hierarchy (the suite tree)
  * reads as an indented list; indentation stops at level 3, the suite cap in
- * docs/api-suites.md. The control follows the ARIA combobox pattern — roles
+ * docs/api-suites.md. While a query is active the list flattens instead and
+ * shows each option's optional ancestor `path`, because an indent with no
+ * visible parent is just blank space. The control follows the ARIA combobox pattern — roles
  * combobox/listbox/option, `aria-activedescendant`, Home/End, Enter and
  * Escape — and keeps DOM focus on the input while the list is open, so the
  * host's per-field validation still runs when focus really leaves the control.
@@ -27,6 +29,13 @@ export interface ComboboxOption {
   label: string;
   /** 1-based hierarchy depth; rows indent one step per level (1–3). */
   depth?: number;
+  /**
+   * Ancestor names, root first. Shown as a muted trail after the label while
+   * searching: once the list is filtered the indent can no longer say where a
+   * match lives, so an orphaned `Cards` indented 40px just reads as blank
+   * space. The trail moves that information into the row instead.
+   */
+  path?: readonly string[];
 }
 
 export interface ComboboxProps {
@@ -88,6 +97,11 @@ export function Combobox({
   const optionId = (index: number): string => `${id}-option-${index}`;
   const selected = options.find((option) => option.id === value) ?? null;
   const filtered = useMemo(() => matchOptions(options, query), [options, query]);
+  // While the query is empty the list is a browse view of the hierarchy, so
+  // rows keep their indent. Once it is filtered, a lone match indented for
+  // ancestors that are no longer on screen reads as blank space, so matches go
+  // flush left and the ancestor `path` carries the hierarchy instead.
+  const searching = query.trim() !== "";
 
   /**
    * Opening clears the edit buffer so the box always shows what you type —
@@ -246,7 +260,13 @@ export function Combobox({
       </div>
 
       {open && (
-        <ul className="combobox-list" id={listId} role="listbox" ref={listRef}>
+        <ul
+          className="combobox-list"
+          id={listId}
+          role="listbox"
+          ref={listRef}
+          data-searching={searching}
+        >
           {filtered.length === 0 ? (
             <li className="combobox-empty" role="presentation">
               {emptyMessage}
@@ -259,7 +279,9 @@ export function Combobox({
                 data-index={index}
                 role="option"
                 aria-selected={option.id === value}
-                data-depth={Math.min(Math.max(option.depth ?? 1, 1), 3)}
+                data-depth={
+                  searching ? 1 : Math.min(Math.max(option.depth ?? 1, 1), 3)
+                }
                 data-active={index === activeIndex}
                 // Hold focus on the input so blur/validation only runs when
                 // focus truly leaves the control.
@@ -267,6 +289,11 @@ export function Combobox({
                 onClick={() => choose(option)}
               >
                 <span className="combobox-option-label">{option.label}</span>
+                {searching && option.path && option.path.length > 0 && (
+                  <span className="combobox-option-path" aria-hidden="true">
+                    {option.path.join(" › ")}
+                  </span>
+                )}
                 <span className="combobox-check" aria-hidden="true">
                   ✓
                 </span>
