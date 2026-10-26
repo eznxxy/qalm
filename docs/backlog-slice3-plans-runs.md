@@ -239,12 +239,30 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   with `/plans` and `/plans/[id]`. Flagged for 3.4: `/wip/[slug]` still maps
   `plans`, now unreachable from the nav.
 
-### Card 3.4 — Cases ↔ runs integration (small/medium) — PENDING
-- Cases bulk bar: wire **Add to run** (§4.2) to `POST /runs/:id/items`.
-- Replace the `CaseDrawer` "Linked runs" placeholder with the real list from
-  `GET /cases/:id/runs`.
-- Update the shell search placeholder/`g r`/`g p` targets and the help dialog
-  once the routes are real.
+### Card 3.4 — Cases ↔ runs integration (small/medium) — DONE 2026-10-27
+- Cases bulk bar: **Add to run…** opens `AddToRunDialog`, which lists the
+  project's open runs (`status=open`) and calls `POST /runs/:id/items`.
+  Nothing is preselected — the dialog refuses to submit until a run is chosen.
+  The API skips a case already in the run, so the flash names both counts
+  ("Added 1 case to “Run October”. 1 case was already in the run." / "No new
+  cases — all 2 cases are already in “Run October”.") and the selection is
+  cleared. Admin/Lead only; an archived project hides it like the other bulk
+  actions.
+- `CaseDrawer` "Linked runs" is real: `GET /cases/:id/runs`, paginated like
+  History, one row per run with the case's status in it, the run's own status
+  (Open/Completed) and a link to `/runs/:id?project=…`.
+- Shell honesty: the top bar only searches projects, so its label and
+  placeholder now say **Search projects**; `/wip/[slug]` keeps entries only
+  for screens that are still unbuilt (overview, milestones, reports) — the
+  shipped ones (cases, runs, plans, settings) fall through to the raw slug.
+  `g c`/`g r`/`g p` and the help dialog already pointed at the real routes.
+- Notes: the write lives on the page (`runAddToRun`) while the dialog owns the
+  run lookup, matching RunFormDialog's case search. `addToRunNotice()` is
+  exported so its copy has unit coverage. Not built here: adding a case to a
+  run from inside the drawer — the cases bulk bar is the only entry point.
+- Verified: `tsc`/`lint` clean, jest 545 passed (38 suites); live as viewer —
+  C38's Linked runs tab lists Run October (Passed, link opens the run) and the
+  three bulk actions render disabled.
 
 ### Card 3.5 — Run start date (review feedback, small) — DONE 2026-10-27
 - The New run dialog needed a **Start date** above **Due date**. Implemented end
