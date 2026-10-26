@@ -16,6 +16,7 @@
  * button with an index-bearing accessible name.
  */
 import {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -39,6 +40,7 @@ import {
   caseFormServerErrors,
   emptyCaseForm,
   hasCaseFormErrors,
+  isCaseFormDirty,
   validateCaseForm,
   type CaseFormErrors,
   type CaseFormStep,
@@ -59,6 +61,12 @@ export interface CaseEditorProps {
   defaultSuiteId: string;
   onSaved: (detail: CaseDetail, mode: "create" | "edit") => void;
   onCancel: () => void;
+  /**
+   * Reports whether the form holds input that would be lost if it were
+   * dismissed (create: differs from the empty form; edit: differs from the
+   * loaded case). The host uses it to confirm before discarding.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 function move<T>(list: readonly T[], from: number, to: number): T[] {
@@ -75,12 +83,17 @@ export function CaseEditor({
   defaultSuiteId,
   onSaved,
   onCancel,
+  onDirtyChange,
 }: CaseEditorProps) {
   const mode = detail ? "edit" : "create";
   const options = useMemo(() => suiteOptions(suites), [suites]);
-  const [values, setValues] = useState<CaseFormValues>(() =>
+  // The state the form opened with, captured once — the baseline the dirty
+  // check compares against. Both states share the same lazy initial value, so
+  // the baseline is real state (safe to read during render) rather than a ref.
+  const [initialValues] = useState<CaseFormValues>(() =>
     detail ? caseFormFromDetail(detail) : emptyCaseForm(defaultSuiteId)
   );
+  const [values, setValues] = useState<CaseFormValues>(initialValues);
   const [stepKeys, setStepKeys] = useState<string[]>(() =>
     values.steps.map((_, index) => `step-${index}`)
   );
@@ -92,6 +105,13 @@ export function CaseEditor({
   > | null>(null);
   const [busy, setBusy] = useState(false);
   const formId = useId();
+
+  // Tell the host when the form becomes dirty/clean so it can confirm before
+  // discarding a half-filled create form.
+  const dirty = isCaseFormDirty(values, initialValues);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   const clientErrors = useMemo(() => validateCaseForm(values), [values]);
   const showing = (field: string): boolean => submitted || touched.has(field);

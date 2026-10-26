@@ -189,4 +189,31 @@ describe("CaseEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalled();
   });
+
+  it("reports dirtiness to the host: clean at open, dirty after a keystroke", async () => {
+    const onDirtyChange = jest.fn();
+    await renderEditor({ onDirtyChange });
+
+    // Create mode opens on an empty form — nothing to discard yet.
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+    const title = screen.getByLabelText("Title");
+    fireEvent.change(title, { target: { value: "Checkout flow" } });
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+
+    // Typing it back to empty makes the form clean again.
+    fireEvent.change(title, { target: { value: "" } });
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it("starts clean in edit mode and turns dirty on a change", async () => {
+    const onDirtyChange = jest.fn();
+    await renderEditor({ detail: DETAIL, onDirtyChange });
+
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Pay with a saved card v2" },
+    });
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+  });
 });

@@ -387,6 +387,11 @@ export default function CasesPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [creating, setCreating] = useState(false);
+  /** Set by the New case editor: the form holds input worth confirming over. */
+  const [caseFormDirty, setCaseFormDirty] = useState(false);
+  const [confirmDiscardCase, setConfirmDiscardCase] = useState(false);
+  /** A row the user asked to open while a dirty New case form was up. */
+  const [pendingCaseId, setPendingCaseId] = useState<string | null>(null);
   const [suiteDialog, setSuiteDialog] = useState<SuiteDialogState | null>(null);
   const [suiteBusy, setSuiteBusy] = useState(false);
   const [suiteFieldErrors, setSuiteFieldErrors] = useState<{
@@ -564,11 +569,45 @@ export default function CasesPage() {
   }
 
   // ---- case actions ----
+  /** Tear down the New case drawer and every bit of discard-confirm state. */
+  function closeCreateCase(): void {
+    setCreating(false);
+    setCaseFormDirty(false);
+    setConfirmDiscardCase(false);
+    setPendingCaseId(null);
+  }
+
+  /**
+   * A dismissal the user asked for (drawer X, Esc, Cancel). A form with
+   * unsaved input is not thrown away silently — confirm first.
+   */
+  function requestCloseCreateCase(): void {
+    if (caseFormDirty) {
+      setPendingCaseId(null);
+      setConfirmDiscardCase(true);
+      return;
+    }
+    closeCreateCase();
+  }
+
+  /** "Discard" in the confirm dialog: drop the form, then honour the intent. */
+  function confirmDiscardCreateCase(): void {
+    const next = pendingCaseId;
+    closeCreateCase();
+    if (next) pushParams({ caseId: next });
+  }
+
   function openCase(id: string): void {
     // The case drawer and the New case drawer share the one right-hand slot
     // (docs/DESIGN.md §5 "Drawer"), so opening a case must close a New case
-    // form that is already open — otherwise the two panels overlap.
-    setCreating(false);
+    // form that is already open — otherwise the two panels overlap. A form
+    // with input is not discarded silently: confirm, then open the case.
+    if (creating && caseFormDirty) {
+      setPendingCaseId(id);
+      setConfirmDiscardCase(true);
+      return;
+    }
+    closeCreateCase();
     pushParams({ caseId: id });
   }
 
@@ -582,13 +621,14 @@ export default function CasesPage() {
     if (!canWrite || !createDefaultSuiteId) return;
     // Same slot: close the open case drawer before showing the New case form.
     if (url.caseId) pushParams({ caseId: null });
+    closeCreateCase();
     setCreating(true);
     setActionError(null);
     setNotice(null);
   }
 
   function onCaseSaved(detail: CaseDetail, mode: "create" | "edit"): void {
-    if (mode === "create") setCreating(false);
+    if (mode === "create") closeCreateCase();
     flash(
       mode === "create"
         ? `Case ${detail.display_id} added.`
@@ -1167,15 +1207,31 @@ export default function CasesPage() {
       )}
 
       {creating && (
-        <Drawer title="New case" onClose={() => setCreating(false)}>
+        <Drawer title="New case" onClose={requestCloseCreateCase}>
           <CaseEditor
             projectId={projectId}
             suites={suites}
             defaultSuiteId={createDefaultSuiteId}
             onSaved={onCaseSaved}
-            onCancel={() => setCreating(false)}
+            onCancel={requestCloseCreateCase}
+            onDirtyChange={setCaseFormDirty}
           />
         </Drawer>
+      )}
+
+      {confirmDiscardCase && (
+        <ConfirmDialog
+          title="Discard this new case?"
+          body="This new case has unsaved changes. Closing it will discard them."
+          confirmLabel="Discard"
+          cancelLabel="Keep editing"
+          danger
+          onConfirm={confirmDiscardCreateCase}
+          onCancel={() => {
+            setConfirmDiscardCase(false);
+            setPendingCaseId(null);
+          }}
+        />
       )}
 
       {suiteDialog && (

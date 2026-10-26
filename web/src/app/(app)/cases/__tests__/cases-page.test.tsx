@@ -356,6 +356,104 @@ describe("cases screen", () => {
     expect(lastReplaceUrl()).not.toContain("case=");
   });
 
+  it("closes an empty New case form without asking", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add case" }));
+    const drawer = await screen.findByRole("dialog", { name: "New case" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "New case" })).toBeNull()
+    );
+    expect(
+      screen.queryByRole("alertdialog", { name: /Discard/ })
+    ).toBeNull();
+  });
+
+  it("asks before closing a New case form that has input", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add case" }));
+    const drawer = await screen.findByRole("dialog", { name: "New case" });
+    fireEvent.change(within(drawer).getByLabelText("Title"), {
+      target: { value: "Checkout flow" },
+    });
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "Close" }));
+
+    const confirm = await screen.findByRole("alertdialog", {
+      name: "Discard this new case?",
+    });
+    // The form stays up behind the dialog...
+    expect(
+      screen.getByRole("dialog", { name: "New case" })
+    ).toBeInTheDocument();
+
+    // ...and "Keep editing" leaves it, input intact.
+    fireEvent.click(
+      within(confirm).getByRole("button", { name: "Keep editing" })
+    );
+    expect(
+      screen.queryByRole("alertdialog", { name: "Discard this new case?" })
+    ).toBeNull();
+    expect(
+      screen.getByRole("dialog", { name: "New case" })
+    ).toBeInTheDocument();
+    expect(within(drawer).getByLabelText("Title")).toHaveValue("Checkout flow");
+  });
+
+  it("discards the New case form when the confirm is accepted", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add case" }));
+    const drawer = await screen.findByRole("dialog", { name: "New case" });
+    fireEvent.change(within(drawer).getByLabelText("Title"), {
+      target: { value: "Checkout flow" },
+    });
+
+    // The form's Cancel button goes through the same guard.
+    fireEvent.click(within(drawer).getByRole("button", { name: "Cancel" }));
+    const confirm = await screen.findByRole("alertdialog", {
+      name: "Discard this new case?",
+    });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Discard" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "New case" })).toBeNull()
+    );
+    expect(
+      screen.queryByRole("alertdialog", { name: "Discard this new case?" })
+    ).toBeNull();
+  });
+
+  it("guards Esc on a non-empty New case form too", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add case" }));
+    const drawer = await screen.findByRole("dialog", { name: "New case" });
+    fireEvent.change(within(drawer).getByLabelText("Title"), {
+      target: { value: "Checkout flow" },
+    });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(
+      await screen.findByRole("alertdialog", { name: "Discard this new case?" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "New case" })
+    ).toBeInTheDocument();
+  });
+
   it("renders the History tab without raw JSON", async () => {
     mockRouterState.search = "project=p-1&suite=s-1&case=c-1";
     mockApi();

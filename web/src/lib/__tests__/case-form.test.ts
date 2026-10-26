@@ -8,6 +8,7 @@ import {
   emptyCaseForm,
   formatEstimateInput,
   hasCaseFormErrors,
+  isCaseFormDirty,
   parseEstimateInput,
   parseTagsInput,
   validateCaseForm,
@@ -302,5 +303,46 @@ describe("caseFormServerErrors", () => {
     expect(caseFormServerErrors(new Error("boom")).form).toBe(
       "Something went wrong. Please try again."
     );
+  });
+});
+
+describe("isCaseFormDirty", () => {
+  const baseline = emptyCaseForm("s-1");
+
+  it("treats an untouched form as clean", () => {
+    expect(isCaseFormDirty(emptyCaseForm("s-1"), baseline)).toBe(false);
+  });
+
+  it("flags any typed field, including a part-typed one", () => {
+    expect(isCaseFormDirty({ ...baseline, suite_id: "s-2" }, baseline)).toBe(true);
+    expect(isCaseFormDirty({ ...baseline, title: "Checkout" }, baseline)).toBe(true);
+    expect(isCaseFormDirty({ ...baseline, preconditions: "x" }, baseline)).toBe(true);
+    expect(isCaseFormDirty({ ...baseline, priority: "high" }, baseline)).toBe(true);
+    expect(isCaseFormDirty({ ...baseline, type: "smoke" }, baseline)).toBe(true);
+    // A half-typed tag/estimate is still input the user would lose.
+    expect(isCaseFormDirty({ ...baseline, tags: "smoke," }, baseline)).toBe(true);
+    expect(isCaseFormDirty({ ...baseline, estimate: "1h" }, baseline)).toBe(true);
+    // Spaces count too (deleting them again returns to clean).
+    expect(isCaseFormDirty({ ...baseline, title: " " }, baseline)).toBe(true);
+  });
+
+  it("flags added, edited and removed steps", () => {
+    const step = { text: "Open checkout", expected_result: "" };
+    const withStep = { ...baseline, steps: [step] };
+    expect(isCaseFormDirty(withStep, baseline)).toBe(true);
+    expect(isCaseFormDirty(baseline, withStep)).toBe(true);
+    expect(isCaseFormDirty(withStep, withStep)).toBe(false);
+
+    const withExpected = {
+      ...baseline,
+      steps: [{ text: "Open checkout", expected_result: "Cart shows" }],
+    };
+    expect(isCaseFormDirty(withExpected, withStep)).toBe(true);
+  });
+
+  it("compares against the loaded case in edit mode", () => {
+    const loaded = caseFormFromDetail(detail());
+    expect(isCaseFormDirty(caseFormFromDetail(detail()), loaded)).toBe(false);
+    expect(isCaseFormDirty({ ...loaded, title: "changed" }, loaded)).toBe(true);
   });
 });

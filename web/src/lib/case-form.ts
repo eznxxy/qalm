@@ -170,6 +170,38 @@ export function caseFormFromDetail(detail: CaseDetail): CaseFormValues {
   };
 }
 
+/**
+ * True when `values` differs from `baseline` — i.e. the form holds input that
+ * would be lost if it were dismissed. Compared on the raw form strings (not
+ * the parsed payload), so a half-typed tag or estimate still counts, and
+ * spaces count as input (deleting them again returns to pristine).
+ */
+export function isCaseFormDirty(
+  values: CaseFormValues,
+  baseline: CaseFormValues
+): boolean {
+  if (
+    values.suite_id !== baseline.suite_id ||
+    values.title !== baseline.title ||
+    values.preconditions !== baseline.preconditions ||
+    values.priority !== baseline.priority ||
+    values.type !== baseline.type ||
+    values.tags !== baseline.tags ||
+    values.estimate !== baseline.estimate ||
+    values.steps.length !== baseline.steps.length
+  ) {
+    return true;
+  }
+  return values.steps.some((step, index) => {
+    const original = baseline.steps[index];
+    return (
+      original === undefined ||
+      step.text !== original.text ||
+      step.expected_result !== original.expected_result
+    );
+  });
+}
+
 /** Validation mirroring the contract; an empty object means submittable. */
 export function validateCaseForm(values: CaseFormValues): CaseFormErrors {
   const errors: CaseFormErrors = {};
