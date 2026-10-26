@@ -63,16 +63,28 @@
   padding: 0;
 }
 
-/* ------------------------------------------------------ sort button */
+/* -------------------------------------------------- header cell box */
 
-.dt-sort-button {
+/* One inner box for both header variants: the sortable column's <button> and
+ * the plain <span> label of a non-sortable column. They must be identical so
+ * the header text starts on the same x as the body text — `.dt-table tbody td`
+ * insets its content by the same 12px, and the <th> itself has no padding.
+ * Without it a bare label hugged the <th> edge and sat 12px to the left of
+ * every value it labelled. The box also fills the cell so an aligned column
+ * (.dt-head-number) can push its content to the right edge. */
+.dt-head-box {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
   width: 100%;
   height: 40px;
   padding: 0 12px;
+}
+
+/* ------------------------------------------------------ sort button */
+
+.dt-sort-button {
+  justify-content: space-between;
+  gap: 4px;
   border: 0;
   font: inherit;
   color: inherit;

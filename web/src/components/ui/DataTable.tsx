@@ -4,7 +4,9 @@
  * DataTable — the shared data-table primitive (docs/DESIGN.md §5 "Data
  * table", §2.5 row heights, §6 states, §8 accessibility floor).
  *
- * - Real <table> with a sticky header; header cells 13/18 w600 ink-700,
+ * - Real <table> with a plain header row (it scrolls with the body — the
+ *   sticky variant was removed at the owner's request, DESIGN.md §5);
+ *   header cells 13/18 w600 ink-700,
  *   sentence case (the caller's header strings are used verbatim).
  * - Sortable columns: the header control is a real <button>, so it is
  *   keyboard operable for free; state is exposed via aria-sort on the <th>
@@ -377,7 +379,7 @@ export function DataTable<T>({
                   {col.sortable ? (
                     <button
                       type="button"
-                      className="dt-sort-button"
+                      className="dt-sort-button dt-head-box"
                       onClick={() => toggleSort(col)}
                       disabled={disabled || loading || !col.sortValue}
                     >
@@ -402,7 +404,9 @@ export function DataTable<T>({
                       )}
                     </button>
                   ) : (
-                    <span className="dt-header-label">{col.header}</span>
+                    <span className="dt-header-label dt-head-box">
+                      {col.header}
+                    </span>
                   )}
                 </th>
               );
@@ -539,7 +543,7 @@ export function TableSkeleton({
           <tr>
             {Array.from({ length: columns }, (_, i) => (
               <th key={i}>
-                <span className="dt-sort-button" style={{ cursor: "default" }}>
+                <span className="dt-sort-button dt-head-box" style={{ cursor: "default" }}>
                   <span className="dt-skeleton-bar" style={{ maxWidth: "60%" }} />
                 </span>
               </th>

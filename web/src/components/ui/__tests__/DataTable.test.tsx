@@ -257,6 +257,29 @@ describe("DataTable selection", () => {
   });
 });
 
+describe("DataTable header cell geometry", () => {
+  it("gives sortable and non-sortable headers the same inner box class", () => {
+    // `.dt-head-box` is the shared 40px-tall / 12px-inset box the CSS aligns
+    // header text on. A non-sortable column renders a plain label instead of
+    // the sort button, and the <th> has no padding, so a label that misses
+    // this class drifts 12px left of the values it labels (the cases screen's
+    // Type and Steps columns). Dropping the class from either variant fails
+    // here.
+    const columns = makeColumns({ sortable: false });
+    const { container } = render(
+      <DataTable<Row> {...baseProps({ columns })} />
+    );
+    const boxes = container.querySelectorAll("thead .dt-head-box");
+    expect(boxes).toHaveLength(2);
+    expect(
+      container.querySelector("thead .dt-sort-button.dt-head-box")
+    ).not.toBeNull();
+    expect(
+      container.querySelector("thead .dt-header-label.dt-head-box")
+    ).not.toBeNull();
+  });
+});
+
 describe("DataTable keyboard row navigation", () => {
   it("j/k and arrows move focus among rows (dt-row-focused tracks index)", () => {
     const { container } = render(<DataTable<Row> {...baseProps()} />);
