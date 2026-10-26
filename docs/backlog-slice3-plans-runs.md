@@ -134,7 +134,7 @@ breaking changes vs. older versions — see `web/AGENTS.md`). Reuse the existing
 primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 `Combobox`, `Dialog` from `web/src/components/ui/`.
 
-### Card 3.1 — Runs list screen (medium) — PENDING
+### Card 3.1 — Runs list screen (medium) — DONE 2026-10-26
 - Route `/runs` (project-scoped), replacing the `/wip/runs` placeholder; update
   the shell shortcut/`g r` target and the app-shell test.
 - §4.3 table: name, plan, **status bar** (per row, from `counts`), `% complete`,
@@ -143,6 +143,24 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 - **New run** dialog: name, description, plan (optional), due date, and a case
   selection (explicit cases and/or a suite + descendants); POST then open the
   run.
+- Notes: new `web/src/app/(app)/runs/page.tsx` (+ `runs.css`) mirrored from the
+  canonical cases screen, with `lib/run-url.ts` (URL-as-state for
+  search/status/sort/page), `lib/run-permissions.ts` (`canWriteRuns`) and
+  `components/runs/RunFormDialog.tsx`. **Open is the UI default**: the screen
+  always sends an explicit `status` to the API while the canonical URL drops it
+  (and the default `-created_at` sort) so shared links stay short. Columns map
+  backlog's `plan` in place of DESIGN §4.3's milestone; the assignee column is a
+  count label because the contract only returns `assignee_ids` (flagged to
+  Daedalus — `GET /users` is Admin-only, so non-Admins cannot resolve names).
+  Plan ids resolve to names via `listPlans` (best-effort, `—` fallback). Due
+  dates are plain `YYYY-MM-DD` rendered by `formatDateOnly` (parses the parts
+  into a local `Date`, so `2026-11-14` never shifts a day in negative-offset
+  zones). The dialog's case picker debounces into a separate
+  `debouncedCaseQuery` state and clears on empty input from the handler, keeping
+  every `setState` out of effect bodies (`react-hooks/set-state-in-effect`).
+  Only the runs nav/`g r` target moved in this card; `/wip/plans` → `/plans` is
+  card 3.3. 442 unit green (29 suites); a UI e2e suite does not exist (the "e2e"
+  suites are server-side `*.e2e-spec.ts`, untouched here).
 
 ### Card 3.2 — Run detail + result drawer (large — the most-used screen) — PENDING
 - Route `/runs/[id]`: header (name, status bar + "62% done · N passed · …",

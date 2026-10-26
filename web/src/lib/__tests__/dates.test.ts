@@ -1,6 +1,7 @@
 import {
   describeTimestamp,
   formatAbsoluteDate,
+  formatDateOnly,
   formatDateTime,
   formatFullTimestamp,
   formatRelativeTime,
@@ -117,5 +118,36 @@ describe("bad input", () => {
     expect(formatRelativeTime(invalid, { now: NOW, locale: LOCALE })).toBe(invalid);
     expect(formatAbsoluteDate(invalid, { locale: LOCALE })).toBe(invalid);
     expect(formatFullTimestamp(invalid, { locale: LOCALE })).toBe(invalid);
+  });
+});
+
+describe("formatDateOnly", () => {
+  it("renders a plain YYYY-MM-DD day in the user's locale", () => {
+    expect(formatDateOnly("2026-11-14", { locale: LOCALE })).toBe("14 Nov 2026");
+    expect(formatDateOnly("2026-01-05", { locale: LOCALE })).toBe("5 Jan 2026");
+  });
+
+  it("never shifts the day (no UTC-midnight parse)", () => {
+    // `new Date("2026-11-14")` is UTC midnight, which is still 13 Nov in
+    // negative-offset zones. Matching against the default (system) locale must
+    // still print the 14th everywhere.
+    expect(formatDateOnly("2026-11-14")).toBe(
+      new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(new Date(2026, 10, 14))
+    );
+  });
+
+  it("returns the raw string for a bad shape", () => {
+    expect(formatDateOnly("14/11/2026", { locale: LOCALE })).toBe("14/11/2026");
+    expect(formatDateOnly("2026-11", { locale: LOCALE })).toBe("2026-11");
+    expect(formatDateOnly("", { locale: LOCALE })).toBe("");
+  });
+
+  it("returns the raw string for a rollover date (2026-02-30)", () => {
+    expect(formatDateOnly("2026-02-30", { locale: LOCALE })).toBe("2026-02-30");
+    expect(formatDateOnly("2026-13-01", { locale: LOCALE })).toBe("2026-13-01");
   });
 });

@@ -10,15 +10,20 @@ import {
   CaseListQuery,
   CaseListItem,
   CreateProjectInput,
+  CreateRunInput,
   CreateSuiteInput,
   CreateUserInput,
   CreateCaseInput,
   LoginInput,
   PatchMeInput,
+  Plan,
+  PlanListQuery,
   Project,
   ProjectListQuery,
   RefreshResult,
   ReorderSuitesInput,
+  Run,
+  RunListQuery,
   SuiteDetail,
   SuiteNode,
   UpdateCaseInput,
@@ -214,5 +219,41 @@ export const api = {
     client.apiFetchPage<CaseHistoryEntry>(
       `/cases/${encodeURIComponent(id)}/history`,
       { query: { page: query.page, limit: query.limit } }
+    ),
+
+  // ---- plans (docs/api-plans.md) ----
+  listPlans: (projectId: string, query: PlanListQuery = {}) =>
+    client.apiFetchPage<Plan>(
+      `/projects/${encodeURIComponent(projectId)}/plans`,
+      {
+        query: {
+          query: query.query,
+          sort: query.sort,
+          page: query.page,
+          limit: query.limit,
+        },
+      }
+    ),
+
+  // ---- runs (docs/api-runs.md) ----
+  listRuns: (projectId: string, query: RunListQuery = {}) =>
+    client.apiFetchPage<Run>(
+      `/projects/${encodeURIComponent(projectId)}/runs`,
+      {
+        query: {
+          plan_id: query.plan_id,
+          status: query.status,
+          query: query.query,
+          sort: query.sort,
+          page: query.page,
+          limit: query.limit,
+        },
+      }
+    ),
+
+  createRun: (projectId: string, input: CreateRunInput) =>
+    client.apiFetch<Run>(
+      `/projects/${encodeURIComponent(projectId)}/runs`,
+      opts("POST", input)
     ),
 };

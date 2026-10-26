@@ -208,7 +208,7 @@ describe("sidebar navigation", () => {
     for (const [label, href] of [
       ["Overview", "/wip/overview"],
       ["Test cases", "/cases"],
-      ["Test runs", "/wip/runs"],
+      ["Test runs", "/runs"],
       ["Test plans", "/wip/plans"],
       ["Milestones", "/wip/milestones"],
       ["Reports", "/wip/reports"],

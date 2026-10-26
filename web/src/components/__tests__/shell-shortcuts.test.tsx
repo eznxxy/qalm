@@ -160,7 +160,7 @@ describe("§7 shortcuts", () => {
     fireEvent.keyDown(window, { key: "g" });
     fireEvent.keyDown(window, { key: "r" });
     await waitFor(() =>
-      expect(mockRouterState.push).toHaveBeenCalledWith("/wip/runs?project=p-2")
+      expect(mockRouterState.push).toHaveBeenCalledWith("/runs?project=p-2")
     );
 
     fireEvent.keyDown(window, { key: "g" });

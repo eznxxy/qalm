@@ -338,3 +338,133 @@ export interface CaseHistoryQuery {
   page?: number;
   limit?: number;
 }
+
+// ---- plans & runs (docs/api-plans.md, docs/api-runs.md) ----
+
+/**
+ * Rollup counts shared by a plan and a run (docs/api-plans.md § Resource: Plan,
+ * docs/api-runs.md § Resource: Run). Each item is counted once, by its latest
+ * result, or `untested` when it has none.
+ */
+export interface StatusCounts {
+  total: number;
+  passed: number;
+  failed: number;
+  blocked: number;
+  retest: number;
+  skipped: number;
+  untested: number;
+  /** round((total - untested) / total * 100); 0 when total is 0. */
+  percent_complete: number;
+}
+
+export type PlanSortKey = "created_at" | "updated_at" | "name" | "due_date";
+
+export type PlanSort =
+  | "created_at"
+  | "-created_at"
+  | "updated_at"
+  | "-updated_at"
+  | "name"
+  | "-name"
+  | "due_date"
+  | "-due_date";
+
+/** A thin container over runs (docs/api-plans.md). */
+export interface Plan {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  due_date: string | null;
+  run_count: number;
+  counts: StatusCounts;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanListQuery {
+  query?: string;
+  sort?: PlanSort;
+  page?: number;
+  limit?: number;
+}
+
+/** A run is `open` until it is closed; `completed_at` drives the status. */
+export type RunStatus = "open" | "completed";
+
+export const RUN_STATUSES: readonly RunStatus[] = ["open", "completed"] as const;
+
+export const RUN_STATUS_LABELS: Record<RunStatus, string> = {
+  open: "Open",
+  completed: "Completed",
+};
+
+/** Rollup over the run's items — same shape and rules as a plan's. */
+export type RunCounts = StatusCounts;
+
+/** docs/api-runs.md § Resource: Run */
+export interface Run {
+  id: string;
+  project_id: string;
+  plan_id: string | null;
+  name: string;
+  description: string | null;
+  status: RunStatus;
+  /** Plain `YYYY-MM-DD`, not an instant. */
+  due_date: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  counts: RunCounts;
+  /** Distinct non-null assignees among the run's items. */
+  assignee_ids: string[];
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type RunSortKey = "created_at" | "updated_at" | "due_date" | "name";
+
+/** Null `due_date` sorts last regardless of direction (server-side). */
+export type RunSort =
+  | "created_at"
+  | "-created_at"
+  | "updated_at"
+  | "-updated_at"
+  | "due_date"
+  | "-due_date"
+  | "name"
+  | "-name";
+
+export interface RunListQuery {
+  /** UUID, or the literal `"none"` for runs with no plan. */
+  plan_id?: string;
+  status?: RunStatus;
+  query?: string;
+  sort?: RunSort;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Create-only case selection: explicit cases and/or a suite subtree. The API
+ * unions and de-duplicates them; an omitted or empty selection creates an
+ * empty run.
+ */
+export interface RunSelection {
+  case_ids?: string[];
+  suite_id?: string;
+  /** Server default is true; send false for direct cases only. */
+  include_descendants?: boolean;
+}
+
+export interface CreateRunInput {
+  name: string;
+  description?: string;
+  plan_id?: string;
+  due_date?: string;
+  selection?: RunSelection;
+}

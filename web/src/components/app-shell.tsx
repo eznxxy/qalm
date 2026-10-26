@@ -37,7 +37,7 @@ import {
 /** §7 go-to sequences: `g` then the section's initial (g then c/r/p). */
 const GOTO_ROUTES: Record<string, string> = {
   c: "/cases",
-  r: "/wip/runs",
+  r: "/runs",
   p: "/wip/plans",
 };
 
@@ -81,7 +81,7 @@ function navGroups(isAdmin: boolean): ReadonlyArray<ReadonlyArray<{ href: string
       // placeholder at /wip/[slug]; the sidebar always points somewhere real.
       { href: "/wip/overview", label: "Overview", icon: <NavIcon icon="overview" /> },
       { href: "/cases", label: "Test cases", icon: <NavIcon icon="cases" /> },
-      { href: "/wip/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
+      { href: "/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
       { href: "/wip/plans", label: "Test plans", icon: <NavIcon icon="plans" /> },
       { href: "/wip/milestones", label: "Milestones", icon: <NavIcon icon="milestones" /> },
       { href: "/wip/reports", label: "Reports", icon: <NavIcon icon="reports" /> },
