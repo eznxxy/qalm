@@ -8,8 +8,14 @@
  * Filter state lives in the URL (the caller owns it); this component only
  * emits patches. Search is debounced so typing does not fire a request per
  * keystroke.
+ *
+ * The Priority / Type / Tags menus are an accordion: opening one closes the
+ * others, so the bar never shows two "active" (accent-bordered) summaries at
+ * once. They are React-controlled rather than native `<details>` toggles —
+ * `preventDefault` on the summary click stops the native toggle and the `open`
+ * prop (a single `openMenu` in state) is the sole source of truth.
  */
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import {
   CASE_TYPE_LABELS,
   PRIORITY_LABELS,
@@ -21,6 +27,9 @@ import { DisabledHint } from "@/components/ui";
 import "./CaseFilters.css";
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** The three filter menus; at most one may be open at a time. */
+type FilterMenuId = "priority" | "type" | "tags";
 
 export interface CaseFiltersPatch {
   query?: string;
@@ -51,6 +60,7 @@ export function CaseFilters({
 }: CaseFiltersProps) {
   const [search, setSearch] = useState(query);
   const [tagInput, setTagInput] = useState("");
+  const [openMenu, setOpenMenu] = useState<FilterMenuId | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Back/forward keeps the visible input honest (adjust during render).
@@ -127,6 +137,24 @@ export function CaseFilters({
     onChange({ query: "", priorities: [], types: [], tags: [] });
   }
 
+  /**
+   * Accordion: open the clicked menu and close whatever was open. We drive
+   * `<details>` ourselves (`open` + `preventDefault`) so exactly one summary
+   * carries the active border at any moment.
+   */
+  function toggleMenu(id: FilterMenuId): void {
+    setOpenMenu((current) => (current === id ? null : id));
+  }
+
+  /** Click handler for a menu's <summary>; stops the native details toggle. */
+  function onMenuSummaryClick(
+    id: FilterMenuId,
+    event: MouseEvent<HTMLElement>
+  ): void {
+    event.preventDefault();
+    toggleMenu(id);
+  }
+
   const knownTags = Array.from(
     new Set([...availableTags, ...tags])
   ).sort((a, b) => a.localeCompare(b));
@@ -146,8 +174,8 @@ export function CaseFilters({
         />
       </div>
 
-      <details className="filter-menu">
-        <summary>
+      <details className="filter-menu" open={openMenu === "priority"}>
+        <summary onClick={(event) => onMenuSummaryClick("priority", event)}>
           Priority
           {priorities.length > 0 && (
             <span className="filter-menu-count t-nums">{priorities.length}</span>
@@ -176,8 +204,8 @@ export function CaseFilters({
         </div>
       </details>
 
-      <details className="filter-menu">
-        <summary>
+      <details className="filter-menu" open={openMenu === "type"}>
+        <summary onClick={(event) => onMenuSummaryClick("type", event)}>
           Type
           {types.length > 0 && (
             <span className="filter-menu-count t-nums">{types.length}</span>
@@ -206,8 +234,8 @@ export function CaseFilters({
         </div>
       </details>
 
-      <details className="filter-menu">
-        <summary>
+      <details className="filter-menu" open={openMenu === "tags"}>
+        <summary onClick={(event) => onMenuSummaryClick("tags", event)}>
           Tags
           {tags.length > 0 && (
             <span className="filter-menu-count t-nums">{tags.length}</span>
