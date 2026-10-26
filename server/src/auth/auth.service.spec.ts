@@ -17,6 +17,7 @@ const CONFIG: AppConfig = {
   jwtSecret: 'unit-test-secret-that-is-definitely-32b',
   refreshCookieSecure: false,
   corsOrigins: [],
+  storageDir: './storage',
 };
 
 interface FakeUser {

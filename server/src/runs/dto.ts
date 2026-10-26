@@ -22,10 +22,15 @@ import {
   ITEM_SORT_PATTERN,
   ITEM_STATUSES,
   MAX_LIMIT,
+  RESULT_COMMENT_MAX,
+  RESULT_DEFECT_URL_MAX,
+  RESULT_ELAPSED_MAX,
+  RESULT_STATUSES,
   RUN_DESCRIPTION_MAX,
   RUN_NAME_MAX,
   RUN_SORT_PATTERN,
   ItemStatus,
+  ResultStatus,
 } from './runs.constants';
 
 /**
@@ -159,6 +164,35 @@ export function IsDateOnly(): PropertyDecorator {
         },
         defaultMessage(): string {
           return 'must be a date in YYYY-MM-DD format';
+        },
+      },
+    });
+  };
+}
+
+/**
+ * A defect link: an `http(s)` URL of at most `RESULT_DEFECT_URL_MAX` chars.
+ * Deliberately narrower than class-validator's `@IsUrl()` (which also accepts
+ * other schemes and has no length bound).
+ */
+export function IsHttpUrl(): PropertyDecorator {
+  return (target: object, propertyName: string | symbol) => {
+    registerDecorator({
+      name: 'isHttpUrl',
+      target: target.constructor,
+      propertyName: String(propertyName),
+      validator: {
+        validate(value: unknown): boolean {
+          if (typeof value !== 'string' || value.length > RESULT_DEFECT_URL_MAX) return false;
+          try {
+            const url = new URL(value);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+          } catch {
+            return false;
+          }
+        },
+        defaultMessage(): string {
+          return `must be an http(s) URL of at most ${RESULT_DEFECT_URL_MAX} characters`;
         },
       },
     });
@@ -351,4 +385,75 @@ export class AssignRunItemsDto {
   @ArrayMaxSize(2000)
   @IsUUID('all', { each: true })
   item_ids?: string[];
+}
+
+/**
+ * POST /runs/:id/items/:itemId/results — record a result. `failed` requires a
+ * comment, but that cross-field rule lives in ResultsService so the 400 can name
+ * the `comment` field (the DB check is the same invariant).
+ */
+export class CreateResultDto {
+  @IsIn([...RESULT_STATUSES])
+  status!: ResultStatus;
+
+  /** Optional ≤ 4,000 chars; required when `status = failed`. */
+  @IsOptional()
+  @IsString()
+  @Trimmed()
+  @Length(0, RESULT_COMMENT_MAX)
+  comment?: string | null;
+
+  @IsOptional()
+  @transformToNumber()
+  @IsInt()
+  @Min(0)
+  @Max(RESULT_ELAPSED_MAX)
+  elapsed_minutes?: number | null;
+
+  @IsOptional()
+  @IsString()
+  @IsHttpUrl()
+  defect_url?: string | null;
+}
+
+/**
+ * PATCH /results/:id — edit the latest result. `status` is not declared, so the
+ * global pipe's whitelist rejects it (PRD decision 4: status is immutable).
+ */
+export class UpdateResultDto {
+  /** `null` (or blank) clears the comment — rejected if the result is `failed`. */
+  @IsOptional()
+  @IsString()
+  @Trimmed()
+  @Length(0, RESULT_COMMENT_MAX)
+  comment?: string | null;
+
+  @IsOptional()
+  @transformToNumber()
+  @IsInt()
+  @Min(0)
+  @Max(RESULT_ELAPSED_MAX)
+  elapsed_minutes?: number | null;
+
+  /** `null` clears the link. */
+  @IsOptional()
+  @IsString()
+  @IsHttpUrl()
+  defect_url?: string | null;
+}
+
+/** GET /runs/:id/items/:itemId/results — the item's result history. */
+export class ListResultsQuery {
+  @IsOptional()
+  @transformToNumber()
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @transformToNumber()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_LIMIT)
+  limit?: number;
 }

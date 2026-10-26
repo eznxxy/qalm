@@ -1,6 +1,6 @@
 import { ItemStatus, ResultStatus } from './runs.constants';
 import { StatusCounts, percentComplete } from './run-counts';
-import { RunItemDetailRow, RunItemRow, RunWithCountsRow } from './runs.store';
+import { AttachmentRow, ResultRow, RunItemDetailRow, RunItemRow, RunWithCountsRow } from './runs.store';
 
 /** One ordered step of an item's snapshot — api-runs.md § Resource: Run item. */
 export interface RunItemStepDto {
@@ -163,5 +163,52 @@ export function toRunItemDetailDto(row: RunItemDetailRow): RunItemDetailDto {
     ...toRunItemDto(row),
     case_steps: toSteps(row.case_steps),
     case_preconditions: row.case_preconditions,
+  };
+}
+
+/** One attachment of a result — embedded in the Result resource. */
+export interface AttachmentDto {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+/** API projection of a result — docs/api-runs.md § Resource: Result. */
+export interface ResultDto {
+  id: string;
+  run_item_id: string;
+  status: ResultStatus;
+  comment: string | null;
+  elapsed_minutes: number | null;
+  defect_url: string | null;
+  attachments: AttachmentDto[];
+  created_by: string;
+  created_at: string;
+}
+
+export function toAttachmentDto(row: AttachmentRow): AttachmentDto {
+  return {
+    id: row.id,
+    filename: row.filename,
+    content_type: row.content_type,
+    size_bytes: Number(row.size_bytes),
+    created_at: row.created_at.toISOString(),
+  };
+}
+
+/** `attachments` are passed pre-grouped so a list never queries per result. */
+export function toResultDto(row: ResultRow, attachments: AttachmentRow[]): ResultDto {
+  return {
+    id: row.id,
+    run_item_id: row.run_item_id,
+    status: row.status,
+    comment: row.comment,
+    elapsed_minutes: row.elapsed_minutes,
+    defect_url: row.defect_url,
+    attachments: attachments.map(toAttachmentDto),
+    created_by: row.created_by,
+    created_at: row.created_at.toISOString(),
   };
 }

@@ -53,9 +53,11 @@ export const PLAN_SORTS = ['created_at', 'updated_at', 'name', 'due_date'] as co
 export type PlanSortKey = (typeof PLAN_SORTS)[number];
 export const PLAN_SORT_PATTERN = /^-?(created_at|updated_at|name|due_date)$/;
 
-/** Attachments (PRD decision 5). */
+/** Attachments (PRD decision 5, docs/api-runs.md § Resource: Result). */
 export const ATTACHMENT_MAX_PER_RESULT = 5;
 export const ATTACHMENT_MAX_BYTES = 10 * 1_048_576;
+/** Original filename, trimmed 1–255 chars (never used as a storage path). */
+export const ATTACHMENT_FILENAME_MAX = 255;
 export const ATTACHMENT_TYPES = [
   'image/png',
   'image/jpeg',

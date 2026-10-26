@@ -137,6 +137,68 @@ export interface RunItemUpdateFields {
   assignee_id?: string | null;
 }
 
+/** One recorded result (docs/api-runs.md § Resource: Result). */
+export interface ResultRow {
+  id: string;
+  run_item_id: string;
+  status: ResultStatus;
+  comment: string | null;
+  elapsed_minutes: number | null;
+  defect_url: string | null;
+  created_by: string;
+  created_at: Date;
+}
+
+/**
+ * A result joined to its item, run and project — everything the write rules
+ * need (project archived, run completed, item assignee, result author).
+ */
+export interface ResultContextRow extends ResultRow {
+  item_id: string;
+  item_assignee_id: string | null;
+  run_id: string;
+  project_id: string;
+  run_completed_at: Date | null;
+}
+
+/** `size_bytes` is selected `::int` (≤ 10 MB) so the API sees a number. */
+export interface AttachmentRow {
+  id: string;
+  result_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_key: string;
+  created_by: string;
+  created_at: Date;
+}
+
+/** An attachment plus its result/item/run context (write + read rules). */
+export interface AttachmentContextRow extends AttachmentRow {
+  result_created_by: string;
+  item_id: string;
+  item_assignee_id: string | null;
+  run_id: string;
+  project_id: string;
+  run_completed_at: Date | null;
+}
+
+export interface ResultUpdateFields {
+  comment?: string | null;
+  elapsed_minutes?: number | null;
+  defect_url?: string | null;
+}
+
+export interface AttachmentWrite {
+  id: string;
+  result_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_key: string;
+  created_by: string;
+}
+
 /** Escapes LIKE/ILIKE wildcards in user-supplied substring input. */
 export function escapeLike(raw: string): string {
   return raw.replace(/[\\%_]/g, (ch) => `\\${ch}`);
@@ -240,6 +302,70 @@ const ITEM_INSERT_RETURNING = `${ITEM_FIELDS.join(', ')},
   0::int AS latest_result_attachment_count,
   null::uuid AS latest_result_created_by,
   null::timestamptz AS latest_result_created_at`;
+
+const RESULT_FIELDS = [
+  'id',
+  'run_item_id',
+  'status',
+  'comment',
+  'elapsed_minutes',
+  'defect_url',
+  'created_by',
+  'created_at',
+] as const;
+
+function resultColumns(alias: string): string {
+  return RESULT_FIELDS.map((field) => `${alias}.${field}`).join(', ');
+}
+
+const ATTACHMENT_FIELDS = [
+  'id',
+  'result_id',
+  'filename',
+  'content_type',
+  'size_bytes',
+  'storage_key',
+  'created_by',
+  'created_at',
+] as const;
+
+/** `size_bytes` is a bigint; cast so pg hands the API a number. */
+function attachmentColumns(alias: string): string {
+  return ATTACHMENT_FIELDS.map((field) =>
+    field === 'size_bytes'
+      ? `${alias}.size_bytes::int AS size_bytes`
+      : `${alias}.${field}`,
+  ).join(', ');
+}
+
+/** Joins a result to its item, run and project for the write/read rules. */
+const RESULT_CONTEXT_JOIN = `
+  JOIN run_items i ON i.id = res.run_item_id
+  JOIN runs r ON r.id = i.run_id`;
+
+function resultContextColumns(): string {
+  return `${resultColumns('res')},
+    i.id AS item_id,
+    i.assignee_id AS item_assignee_id,
+    r.id AS run_id,
+    r.project_id AS project_id,
+    r.completed_at AS run_completed_at`;
+}
+
+const ATTACHMENT_CONTEXT_JOIN = `
+  JOIN results res ON res.id = a.result_id
+  JOIN run_items i ON i.id = res.run_item_id
+  JOIN runs r ON r.id = i.run_id`;
+
+function attachmentContextColumns(): string {
+  return `${attachmentColumns('a')},
+    res.created_by AS result_created_by,
+    i.id AS item_id,
+    i.assignee_id AS item_assignee_id,
+    r.id AS run_id,
+    r.project_id AS project_id,
+    r.completed_at AS run_completed_at`;
+}
 
 const RUN_SORT_COLUMNS: Record<RunSortKey, string> = {
   created_at: 'r.created_at',
@@ -844,5 +970,212 @@ export class RunsStore {
       [projectId, caseIds],
     );
     return new Set(result.rows.map((row) => row.id));
+  }
+
+  // --- results ------------------------------------------------------------
+
+  async insertResult(
+    row: {
+      run_item_id: string;
+      status: ResultStatus;
+      comment: string | null;
+      elapsed_minutes: number | null;
+      defect_url: string | null;
+      created_by: string;
+    },
+    q: Queryable = this.db,
+  ): Promise<ResultRow> {
+    const result = await q.query<ResultRow>(
+      `INSERT INTO results (run_item_id, status, comment, elapsed_minutes, defect_url, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING ${resultColumns('results')}`,
+      [
+        row.run_item_id,
+        row.status,
+        row.comment,
+        row.elapsed_minutes,
+        row.defect_url,
+        row.created_by,
+      ],
+    );
+    const created = result.rows[0];
+    if (!created) throw new ApiError('INTERNAL', 'Result creation failed.');
+    return created;
+  }
+
+  /** A result with its item/run/project context, locked against concurrent writes. */
+  async findResultContextForUpdate(
+    id: string,
+    client: Queryable,
+  ): Promise<ResultContextRow | null> {
+    const result = await client.query<ResultContextRow>(
+      `SELECT ${resultContextColumns()}
+       FROM results res
+       ${RESULT_CONTEXT_JOIN}
+       WHERE res.id = $1 AND r.deleted_at IS NULL
+       FOR UPDATE OF res, r`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /** The item's newest result id (contract § PATCH /results/:id — latest only). */
+  async latestResultIdOf(itemId: string, q: Queryable = this.db): Promise<string | null> {
+    const result = await q.query<{ id: string }>(
+      `SELECT id FROM results
+       WHERE run_item_id = $1
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`,
+      [itemId],
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
+  async countResults(itemId: string, q: Queryable = this.db): Promise<number> {
+    const result = await q.query<{ count: string }>(
+      'SELECT count(*) AS count FROM results WHERE run_item_id = $1',
+      [itemId],
+    );
+    return Number(result.rows[0]?.count ?? '0');
+  }
+
+  async listResults(
+    itemId: string,
+    limit: number,
+    offset: number,
+    q: Queryable = this.db,
+  ): Promise<ResultRow[]> {
+    const result = await q.query<ResultRow>(
+      `SELECT ${resultColumns('res')}
+       FROM results res
+       WHERE res.run_item_id = $1
+       ORDER BY res.created_at DESC, res.id DESC
+       LIMIT $2 OFFSET $3`,
+      [itemId, limit, offset],
+    );
+    return result.rows;
+  }
+
+  async updateResult(
+    id: string,
+    fields: ResultUpdateFields,
+    q: Queryable = this.db,
+  ): Promise<ResultRow | null> {
+    const assignments: string[] = [];
+    const values: unknown[] = [];
+    const assign = (column: string, value: unknown): void => {
+      values.push(value);
+      assignments.push(`${column} = $${values.length + 1}`);
+    };
+    if (fields.comment !== undefined) assign('comment', fields.comment);
+    if (fields.elapsed_minutes !== undefined) assign('elapsed_minutes', fields.elapsed_minutes);
+    if (fields.defect_url !== undefined) assign('defect_url', fields.defect_url);
+    if (assignments.length === 0) return this.findResultById(id, q);
+
+    const result = await q.query<ResultRow>(
+      `UPDATE results SET ${assignments.join(', ')}
+       WHERE id = $1
+       RETURNING ${resultColumns('results')}`,
+      [id, ...values],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async findResultById(id: string, q: Queryable = this.db): Promise<ResultRow | null> {
+    const result = await q.query<ResultRow>(
+      `SELECT ${resultColumns('res')} FROM results res WHERE res.id = $1`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /** Bumps an item's `updated_at` after a result/attachment write. */
+  async touchItem(itemId: string, q: Queryable = this.db): Promise<void> {
+    await q.query('UPDATE run_items SET updated_at = now() WHERE id = $1', [itemId]);
+  }
+
+  // --- result attachments -------------------------------------------------
+
+  async countAttachments(resultId: string, q: Queryable = this.db): Promise<number> {
+    const result = await q.query<{ count: string }>(
+      'SELECT count(*) AS count FROM result_attachments WHERE result_id = $1',
+      [resultId],
+    );
+    return Number(result.rows[0]?.count ?? '0');
+  }
+
+  async insertAttachment(
+    row: AttachmentWrite,
+    q: Queryable = this.db,
+  ): Promise<AttachmentRow> {
+    const result = await q.query<AttachmentRow>(
+      `INSERT INTO result_attachments
+         (id, result_id, filename, content_type, size_bytes, storage_key, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING ${attachmentColumns('result_attachments')}`,
+      [
+        row.id,
+        row.result_id,
+        row.filename,
+        row.content_type,
+        row.size_bytes,
+        row.storage_key,
+        row.created_by,
+      ],
+    );
+    const created = result.rows[0];
+    if (!created) throw new ApiError('INTERNAL', 'Attachment creation failed.');
+    return created;
+  }
+
+  /** Attachments of several results in one query (no per-row lookups). */
+  async attachmentsByResultIds(
+    resultIds: string[],
+    q: Queryable = this.db,
+  ): Promise<AttachmentRow[]> {
+    if (resultIds.length === 0) return [];
+    const result = await q.query<AttachmentRow>(
+      `SELECT ${attachmentColumns('a')}
+       FROM result_attachments a
+       WHERE a.result_id = ANY($1::uuid[])
+       ORDER BY a.created_at ASC, a.id ASC`,
+      [resultIds],
+    );
+    return result.rows;
+  }
+
+  async findAttachmentContext(
+    id: string,
+    q: Queryable = this.db,
+  ): Promise<AttachmentContextRow | null> {
+    const result = await q.query<AttachmentContextRow>(
+      `SELECT ${attachmentContextColumns()}
+       FROM result_attachments a
+       ${ATTACHMENT_CONTEXT_JOIN}
+       WHERE a.id = $1 AND r.deleted_at IS NULL`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /** Locks the attachment, its result and the run for a delete/read decision. */
+  async findAttachmentContextForUpdate(
+    id: string,
+    client: Queryable,
+  ): Promise<AttachmentContextRow | null> {
+    const result = await client.query<AttachmentContextRow>(
+      `SELECT ${attachmentContextColumns()}
+       FROM result_attachments a
+       ${ATTACHMENT_CONTEXT_JOIN}
+       WHERE a.id = $1 AND r.deleted_at IS NULL
+       FOR UPDATE OF a, res, r`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async deleteAttachment(id: string, q: Queryable = this.db): Promise<boolean> {
+    const result = await q.query('DELETE FROM result_attachments WHERE id = $1', [id]);
+    return (result.rowCount ?? 0) > 0;
   }
 }

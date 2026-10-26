@@ -28,6 +28,7 @@ describe('loadConfig', () => {
       jwtSecret: 'x'.repeat(32),
       refreshCookieSecure: false,
       corsOrigins: [],
+      storageDir: './storage',
     });
   });
 
@@ -94,6 +95,19 @@ describe('loadConfig', () => {
 
   it('defaults CORS_DEV_ORIGINS to an empty allowlist (CORS disabled)', () => {
     expect(loadConfig(envWith({})).corsOrigins).toEqual([]);
+  });
+
+  it('defaults STORAGE_DIR to ./storage and trims a provided value', () => {
+    expect(loadConfig(envWith({})).storageDir).toBe('./storage');
+    expect(loadConfig(envWith({ STORAGE_DIR: '  /var/qalm/storage  ' })).storageDir).toBe(
+      '/var/qalm/storage',
+    );
+  });
+
+  it('rejects an empty STORAGE_DIR', () => {
+    expect(() => loadConfig(envWith({ STORAGE_DIR: '   ' }))).toThrow(
+      /STORAGE_DIR must be a non-empty path/,
+    );
   });
 
   it('parses CORS_DEV_ORIGINS as a comma-separated exact-origin allowlist', () => {

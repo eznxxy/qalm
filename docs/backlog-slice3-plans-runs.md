@@ -2,8 +2,10 @@
 
 Status: **APPROVED for planning** (Arif signed off all ten proposals,
 2026-10-26). Phase 1 contracts are **approved**: `docs/PRD-plans-runs.md`,
-`docs/api-runs.md`, `docs/api-plans.md`. Next: Phase 2 backend, then Phase 3
-frontend (they overlap against the frozen contract, as in slice 2).
+`docs/api-runs.md`, `docs/api-plans.md`. Phase 2 backend: card 2.1 (runs &
+items) and card 2.2 (results & attachments) are **DONE 2026-10-26**; card 2.3
+(plans, rollups & linked runs) is next, and Phase 3 frontend can start against
+the frozen contract (phases overlap, as in slice 2).
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus
 (QA). Spec source: `docs/PRD-plans-runs.md` + `docs/api-runs.md` +
 `docs/api-plans.md` + `docs/DESIGN.md` §4.3/§4.4/§4.5 (and §5, §6, §8, §9).
@@ -36,7 +38,7 @@ statuses, external file storage.
 
 ## Phase 2 — backend (Hephaestus)
 
-### Card 2.1 — Slice-3 schema + runs & items API (large) — PENDING
+### Card 2.1 — Slice-3 schema + runs & items API (large) — DONE 2026-10-26
 - **Migration** `20261026000001_runs_schema.js`, all five tables in one step
   (as slice 2 landed `cases` with 2.1, because counts need the child tables):
   `plans`, `runs`, `run_items`, `results`, `result_attachments` — columns,
@@ -62,8 +64,15 @@ statuses, external file storage.
   `runs.service.spec.ts` (selection de-dup, cap, close/reopen guard, item
   delete-with-results 409), `dto.spec.ts`, `test/runs.e2e-spec.ts`.
 - DoD: endpoints per contract; unit + e2e green; lint/tsc/build clean.
+- Notes: the migration shipped as `20261026000001_plans_runs_results_schema.js`
+  (all five tables in one step). Contract-ambiguity resolutions are recorded in
+  the commit body: runs list default sort `-created_at`; an unknown
+  `selection.suite_id` is 400 `VALIDATION_ERROR`, unknown explicit `case_ids`
+  are silently skipped and an unknown/foreign `plan_id` is 400; item DELETE
+  guards on an existing result (409) but not on a completed run. 394 unit /
+  208 e2e green; counts are derived live from `results`.
 
-### Card 2.2 — Results & attachments (large) — PENDING
+### Card 2.2 — Results & attachments (large) — DONE 2026-10-26
 - **No new migration** (2.1 created `results`/`result_attachments`).
 - **Endpoints**: `POST /runs/:id/items/:itemId/results`,
   `GET /runs/:id/items/:itemId/results`, `PATCH /results/:id`,
@@ -84,6 +93,13 @@ statuses, external file storage.
   `test/results.e2e-spec.ts` (upload → download → 401 without token → limits).
 - DoD: green unit + e2e; a stored file survives a restart; no secrets in code
   or logs.
+- Notes: uploaded parts go through Nest's `FileInterceptor` (multer memory
+  storage, no new dependency) wrapped so multer's 413 is rewritten to 400
+  naming `file`; bytes are written before the metadata row and removed again if
+  the row write fails, and DELETE removes the row before the bytes.
+  `PATCH /results/:id` carries no completed-run guard (the contract literal
+  lists only the latest-only and archived 409s). 420 unit / 227 e2e green, with
+  a stored file surviving the request and streaming back byte-for-byte.
 
 ### Card 2.3 — Plans, rollups & linked runs (medium) — PENDING
 - **Endpoints**: `GET/POST /projects/:projectId/plans`,
