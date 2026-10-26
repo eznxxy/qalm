@@ -5,3 +5,6 @@ coverage/
 .env.*
 !.env.example
 *.log
+
+# Result attachment bytes (STORAGE_DIR default) — never committed.
+storage/
