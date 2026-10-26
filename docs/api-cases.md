@@ -70,7 +70,7 @@ Paginated list for the case table.
 | `priority` | optional, repeatable (`priority=high&priority=medium`); OR within the parameter |
 | `type` | optional, repeatable; OR within |
 | `tag` | optional, repeatable; **AND** across values (a case must carry every requested tag) |
-| `sort` | optional: `case_number` (default, ascending), `updated_at`, `title`; prefix `-` for descending (`-updated_at`) |
+| `sort` | optional: `case_number` (default, ascending), `updated_at`, `title`, `priority`; prefix `-` for descending (`-updated_at`). `priority` orders by severity, not alphabetically: `critical` → `high` → `medium` → `low` when ascending. Ties break on `case_number` ascending in both directions |
 | `page`, `limit` | per api-conventions (default 25, max 100) |
 
 Filters combine with AND across different parameters. Soft-deleted cases are
