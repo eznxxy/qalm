@@ -51,7 +51,9 @@
 
 .filter-menu summary::after {
   content: "▾";
-  font-size: 10px;
+  /* Match the suite-tree chevron (`.suite-toggle`) so the two read alike. */
+  font-size: 15px;
+  line-height: 1;
   color: var(--ink-500);
 }
 
