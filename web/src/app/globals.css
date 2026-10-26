@@ -707,7 +707,12 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled) {
+/* Border/label darken on hover for the *unfilled* buttons. Filled variants
+ * (.primary/.danger) are excluded: this rule has higher specificity than the
+ * plain `button.primary` / `button.danger` colour rules, so without the
+ * exclusions it forced --ink-900 onto a dark brand/danger fill and the label
+ * went near-invisible on hover. */
+button:hover:not(:disabled):not(.primary):not(.danger) {
   border-color: var(--ink-500);
   color: var(--ink-900);
 }
@@ -722,6 +727,8 @@ button.primary {
 button.primary:hover:not(:disabled) {
   background: var(--accent-strong);
   border-color: var(--accent-strong);
+  /* keep the light label on the darkened fill */
+  color: var(--text-on-brand);
 }
 
 button.secondary {
@@ -737,6 +744,8 @@ button.danger {
 
 button.danger:hover:not(:disabled) {
   filter: brightness(0.92);
+  /* keep the light label on the darkened fill */
+  color: var(--text-on-brand);
 }
 
 button:disabled {
