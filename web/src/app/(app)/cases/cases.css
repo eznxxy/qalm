@@ -1,0 +1,217 @@
+/*
+ * Two-pane test cases screen (DESIGN §4.2): 280px suite tree, flexible case
+ * pane. Content pans, not the page body. Tokens only.
+ */
+
+.cases-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  height: calc(100dvh - 48px);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.cases-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.cases-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex: none;
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.cases-heading h1 {
+  margin: 0;
+}
+
+.cases-breadcrumb {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.cases-readonly {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.cases-feedback {
+  flex: none;
+  padding: var(--space-2) var(--space-5) 0;
+}
+
+.cases-feedback p {
+  margin: 0 0 var(--space-2);
+}
+
+/* The feedback line is dismissible: text on the left, an × on the right that
+ * clears that message. Scoped here so the shared .form-notice/.form-error
+ * (change-password, dialogs) keep their block layout. */
+.cases-feedback .form-notice,
+.cases-feedback .form-error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.feedback-text {
+  min-width: 0;
+}
+
+.feedback-dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.feedback-dismiss:hover:not(:disabled) {
+  background: var(--canvas);
+  border: none;
+}
+
+.feedback-dismiss:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--brand-tint);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-900);
+  font-size: 13px;
+  line-height: 18px;
+  flex: none;
+}
+
+.bulk-bar button {
+  height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  font-size: 12px;
+}
+
+.bulk-bar .linklike {
+  height: auto;
+  padding: 0;
+  font-size: 12px;
+}
+
+.cases-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.cases-pagination {
+  flex: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-4);
+}
+
+.case-id {
+  color: var(--text-muted);
+}
+
+.case-title-link {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.case-title-link:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.case-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+/* Type and Updated hold short, fixed-shape values, so their columns shrink to
+ * the content instead of sharing the spare width equally with Title. `width:
+ * 1%` is the auto-layout shrink-to-fit idiom; `nowrap` keeps the widest row /
+ * header as the floor. DataTable applies `col.className` to both the th and
+ * the td, so one rule sizes the header and every body cell together. */
+.cases-table-scroll .case-col-type,
+.cases-table-scroll .case-col-updated {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* 1024: keep both panes but give the table more room. */
+@media (max-width: 1279px) and (min-width: 768px) {
+  .cases-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+/* Below 768 the layout stacks: tree first (capped), then the table. Tables
+ * still scroll horizontally inside DataTable, never the page body. */
+@media (max-width: 767px) {
+  .cases-layout {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    overflow: visible;
+  }
+
+  .cases-layout .suite-pane {
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cases-table-scroll {
+    overflow: visible;
+    padding: var(--space-3) var(--space-4) 0;
+  }
+
+  .cases-header,
+  .cases-pagination {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}

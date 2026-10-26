@@ -192,7 +192,7 @@ describe("sidebar navigation", () => {
   });
 
   it("marks the active nav item with aria-current=page", async () => {
-    mockRouterState.pathname = "/wip/cases";
+    mockRouterState.pathname = "/cases";
     await renderShell();
 
     expect(screen.getByRole("link", { name: "Test cases" })).toHaveAttribute(
@@ -202,12 +202,12 @@ describe("sidebar navigation", () => {
     expect(screen.getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
   });
 
-  it("points unbuilt sections at their /wip/[slug] placeholder routes", async () => {
+  it("points sections at their routes", async () => {
     await renderShell();
 
     for (const [label, href] of [
       ["Overview", "/wip/overview"],
-      ["Test cases", "/wip/cases"],
+      ["Test cases", "/cases"],
       ["Test runs", "/wip/runs"],
       ["Test plans", "/wip/plans"],
       ["Milestones", "/wip/milestones"],
@@ -234,7 +234,7 @@ describe("sidebar navigation", () => {
     await renderShell();
 
     const cases = screen.getByRole("link", { name: "Test cases" });
-    expect(cases).toHaveAttribute("href", "/wip/cases?project=p-2");
+    expect(cases).toHaveAttribute("href", "/cases?project=p-2");
   });
 });
 
@@ -430,7 +430,7 @@ describe("project switcher", () => {
     expect(screen.getByRole("option", { name: "Late project" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Test cases" })).toHaveAttribute(
       "href",
-      "/wip/cases?project=p-150"
+      "/cases?project=p-150"
     );
   });
 });

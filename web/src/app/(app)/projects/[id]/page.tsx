@@ -218,12 +218,17 @@ export default function ProjectDetailPage() {
               </time>
             </p>
             <p className="muted">
-              Test suites, cases, runs and reports for this project arrive in
-              later slices.
+              Test runs and reports for this project arrive in later slices.
             </p>
           </div>
 
           <div className="button-row">
+            <Link
+              href={`/cases?project=${encodeURIComponent(project.id)}`}
+              className="button-link"
+            >
+              Test cases
+            </Link>
             {canEdit && (
               <button type="button" onClick={() => setEditing(true)}>
                 Edit

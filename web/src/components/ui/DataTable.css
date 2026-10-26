@@ -48,10 +48,9 @@
 
 /* ----------------------------------------------------------- header */
 
+/* Plain header row: it scrolls with the body. The sticky variant was removed
+ * at the owner's request (docs/DESIGN.md §5 updated). */
 .dt-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   height: 40px;
   background: var(--surface);
   color: var(--ink-700);
@@ -64,16 +63,28 @@
   padding: 0;
 }
 
-/* ------------------------------------------------------ sort button */
+/* -------------------------------------------------- header cell box */
 
-.dt-sort-button {
+/* One inner box for both header variants: the sortable column's <button> and
+ * the plain <span> label of a non-sortable column. They must be identical so
+ * the header text starts on the same x as the body text — `.dt-table tbody td`
+ * insets its content by the same 12px, and the <th> itself has no padding.
+ * Without it a bare label hugged the <th> edge and sat 12px to the left of
+ * every value it labelled. The box also fills the cell so an aligned column
+ * (.dt-head-number) can push its content to the right edge. */
+.dt-head-box {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
   width: 100%;
   height: 40px;
   padding: 0 12px;
+}
+
+/* ------------------------------------------------------ sort button */
+
+.dt-sort-button {
+  justify-content: space-between;
+  gap: 4px;
   border: 0;
   font: inherit;
   color: inherit;
@@ -166,27 +177,45 @@ th.dt-head-number .dt-header-label {
 
 /* -------------------------------------------------------- selection */
 
-.dt-select-all {
+/* Header and body selection cells share one geometry so the two checkboxes
+ * line up on the same vertical axis. `.dt-table tbody td` (0,1,2) would win
+ * over a bare `.dt-select-cell` (0,1,0), so the body rule is prefixed with
+ * `.dt-table tbody` to keep the 40px/padding-0 box on both cells. */
+.dt-table th.dt-select-all,
+.dt-table tbody td.dt-select-cell {
   width: 40px;
   min-width: 40px;
   padding: 0;
 }
 
+/* The 32px target sits centred inside the 40px cell (4px either side)
+ * instead of hugging the left edge of the body cell's 12px padding. */
+.dt-table th.dt-select-all .dt-checkbox,
+.dt-table tbody td.dt-select-cell .dt-checkbox {
+  margin: 0 auto;
+}
+
 .dt-checkbox {
-  /* flex (not inline-flex): a block-level box adds no baseline strut, so
-     the cell content height is exactly 32px and every row density holds */
+  /* The hit target, not the drawn box: a 32px square that satisfies the §8
+     floor ("touch targets at least 32px") at every row density (32/36/44).
+     It is a <label>, so the whole square toggles the control even though the
+     native box the user sees inside it is only 20px (`.dt-checkbox input`).
+     flex (not inline-flex): a block-level box adds no baseline strut, so the
+     cell content height is exactly 32px. */
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
-  margin: 0; /* 32px target fits every row density: 32/36/44 (§8) */
+  margin: 0;
 }
 
 .dt-checkbox input {
+  /* 20px visual box, centred in the 32px label above. The focus ring (2px at
+     2px offset = 24px) stays inside the target instead of overflowing it. */
   margin: 0;
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
 }
 
@@ -212,6 +241,13 @@ th.dt-head-number .dt-header-label {
 
 .dt-status p {
   margin: 0 0 8px;
+}
+
+/* The empty state is a single centred message block (title + body + the one
+ * primary action). The full-width table-cell keeps the block vertically
+ * centred; text-align centres the copy and the inline action together. */
+.dt-status-empty > div {
+  text-align: center;
 }
 
 /* --------------------------------------------------------- skeleton */

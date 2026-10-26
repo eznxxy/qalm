@@ -37,7 +37,15 @@ function parseRetryAfter(response: Response): number | undefined {
 export interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+  /**
+   * Query values. Arrays are sent as repeated parameters
+   * (`priority=high&priority=medium`) — the contract's shape for the
+   * repeatable case filters.
+   */
+  query?: Record<
+    string,
+    string | number | boolean | ReadonlyArray<string | number> | undefined
+  >;
   signal?: AbortSignal;
   /**
    * Internal: the refresh call itself must not trigger another refresh from
@@ -50,7 +58,13 @@ function buildUrl(base: string, path: string, query: RequestOptions["query"]): s
   const qs = new URLSearchParams();
   if (query) {
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined) qs.set(key, String(value));
+      if (value === undefined) continue;
+      // Repeatable parameters (priority/type/tag) use append, not set.
+      if (Array.isArray(value)) {
+        for (const item of value) qs.append(key, String(item));
+      } else {
+        qs.set(key, String(value));
+      }
     }
   }
   const search = qs.toString();

@@ -11,3 +11,9 @@ export type {
   DataTableSort,
   SortDir,
 } from "./DataTable";
+export { Drawer } from "./Drawer";
+export type { DrawerProps } from "./Drawer";
+export { DisabledHint } from "./DisabledHint";
+export type { DisabledHintProps } from "./DisabledHint";
+export { Combobox } from "./Combobox";
+export type { ComboboxProps, ComboboxOption } from "./Combobox";

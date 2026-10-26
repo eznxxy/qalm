@@ -1,0 +1,154 @@
+/*
+ * Combobox — DESIGN.md §5 "form field" and §2.5 "popover".
+ *
+ * The input keeps the shared control geometry (globals.css `input`), so the
+ * field lines up with every other input in the form; this file only adds the
+ * anchored listbox, the decorative chevron and the suite-tree indentation.
+ */
+
+.combobox {
+  position: relative;
+}
+
+/* Busy/read-only: mirror the button disabled treatment (§5, globals.css). */
+.combobox[data-disabled="true"] {
+  opacity: 0.55;
+}
+
+.combobox[data-disabled="true"] .combobox-input {
+  cursor: not-allowed;
+}
+
+.combobox-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Room for the chevron, which never sits on top of the text. */
+.combobox-input {
+  width: 100%;
+  padding-right: calc(var(--space-3) + 16px);
+}
+
+.combobox-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.combobox-chevron {
+  position: absolute;
+  right: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none; /* the whole field is the target */
+  transition: transform 120ms ease;
+}
+
+.combobox[data-open="true"] .combobox-chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combobox-chevron {
+    transition: none;
+  }
+}
+
+/* Anchored popover (§2.5: a popover carries the overlay shadow). */
+.combobox-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  max-height: 264px;
+  overflow-y: auto;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-overlay);
+}
+
+.combobox-list > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--ink-700);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Suite tree reads as an indented list; the contract caps depth at 3. */
+.combobox-list > li[data-depth="2"] {
+  padding-left: calc(var(--space-3) + 16px);
+}
+
+.combobox-list > li[data-depth="3"] {
+  padding-left: calc(var(--space-3) + 32px);
+}
+
+.combobox-list > li[data-active="true"] {
+  background: var(--canvas);
+  color: var(--ink-900);
+}
+
+.combobox-list > li[aria-selected="true"] {
+  color: var(--brand);
+  font-weight: 500;
+}
+
+.combobox-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Filtered list: matches go flush left. The indent only says something while
+ * the parents are on screen, so once a search hides them the ancestor path
+ * takes over as the hierarchy cue — the label shrinks to its text and the
+ * muted trail carries the rest of the row.
+ */
+.combobox-list[data-searching="true"] .combobox-option-label {
+  flex: none;
+}
+
+.combobox-option-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.combobox-list[data-searching="true"] .combobox-check {
+  margin-left: auto;
+}
+
+.combobox-check {
+  visibility: hidden;
+  color: var(--brand);
+  font-size: 12px;
+}
+
+.combobox-list > li[aria-selected="true"] .combobox-check {
+  visibility: visible;
+}
+
+.combobox-empty {
+  cursor: default;
+  color: var(--text-muted);
+}

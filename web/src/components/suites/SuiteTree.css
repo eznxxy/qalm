@@ -1,0 +1,295 @@
+/*
+ * SuiteTree — DESIGN.md §4.2 (280px left pane), §5 "Tree", §8 focus floor.
+ * Colours come from the §2 tokens; no hard-coded values.
+ */
+
+.suite-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg-raised);
+  border-right: 1px solid var(--border);
+}
+
+.suite-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.suite-pane-header h2 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.suite-pane-add {
+  height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  font-size: 12px;
+}
+
+.suite-tree {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Pseudo-row for the unscoped list; it sits above the ARIA tree so the
+ * treeview itself stays a pure suite hierarchy. */
+.suite-all {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  flex: none;
+}
+
+.suite-all:hover:not(:disabled) {
+  background: var(--canvas);
+  border: none;
+  color: var(--ink-900);
+}
+
+.suite-all.is-selected {
+  background: var(--brand-tint);
+  color: var(--ink-900);
+  font-weight: 500;
+}
+
+.suite-all.is-selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--brand);
+}
+
+.suite-tree-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height);
+  /* depth indent (0 for roots) + room for the toggle */
+  padding-left: calc(var(--space-2) + var(--suite-indent) * 16px);
+  padding-right: var(--space-3);
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.suite-tree-item:hover {
+  background: var(--canvas);
+  color: var(--ink-900);
+}
+
+.suite-tree-item.is-selected {
+  background: var(--brand-tint);
+  color: var(--ink-900);
+  font-weight: 500;
+}
+
+.suite-tree-item.is-selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--brand);
+}
+
+.suite-tree-item.is-dragging {
+  opacity: 0.5;
+}
+
+/* Drop affordances: a brand line for reordering, an inset ring for nesting. */
+.suite-tree-item.drop-before::after,
+.suite-tree-item.drop-after::after {
+  content: "";
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  height: 2px;
+  background: var(--brand);
+  pointer-events: none;
+}
+
+.suite-tree-item.drop-before::after {
+  top: 0;
+}
+
+.suite-tree-item.drop-after::after {
+  bottom: 0;
+}
+
+.suite-tree-item.drop-inside {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.suite-item-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  width: 100%;
+}
+
+.suite-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-500);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.suite-toggle:hover:not(:disabled) {
+  border: none;
+  background: transparent;
+  color: var(--ink-900);
+}
+
+.suite-toggle-leaf {
+  cursor: default;
+}
+
+.suite-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.suite-count {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Drag affordance (DESIGN §4.2, §5 "Tree"): rows that accept a drag show a
+ * grab cursor and a grip handle on the right, so reorder/nest is
+ * discoverable without a hover. The handle brightens on hover/focus. */
+.suite-tree-item.is-draggable {
+  cursor: grab;
+}
+
+.suite-tree-item.is-draggable.is-dragging {
+  cursor: grabbing;
+}
+
+.suite-grip {
+  flex: none;
+  margin-left: var(--space-2);
+  color: var(--ink-500);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.suite-tree-item.is-draggable:hover .suite-grip,
+.suite-tree-item.is-draggable:focus-visible .suite-grip {
+  color: var(--ink-900);
+  opacity: 1;
+}
+
+.suite-pane-footer {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.suite-pane-footer button {
+  height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  font-size: 12px;
+}
+
+.suite-tree-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.suite-tree-state p {
+  margin: 0;
+}
+
+.suite-tree-empty {
+  align-items: flex-start;
+}
+
+/* §6: row-shaped skeleton bars, never a spinner over the pane. */
+.suite-skeleton {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-badge);
+  background: var(--canvas);
+  animation: suite-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.suite-skeleton:nth-child(1) {
+  width: 72%;
+}
+
+.suite-skeleton:nth-child(2) {
+  width: 54%;
+  margin-left: var(--space-4);
+}
+
+.suite-skeleton:nth-child(3) {
+  width: 64%;
+}
+
+@keyframes suite-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suite-skeleton {
+    animation: none;
+  }
+}

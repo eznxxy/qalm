@@ -187,6 +187,38 @@ describe("DataTable selection", () => {
     expect(screen.getByTestId("count")).toHaveTextContent("0");
   });
 
+  it("header and row selection cells share the geometry classes the CSS aligns on", () => {
+    const { container } = render(<SelectionHarness />);
+    // The CSS centres the two checkbox boxes on one vertical axis by keying on
+    // these classes (.dt-table th.dt-select-all / .dt-table tbody td.dt-select-cell);
+    // dropping either one re-introduces the 12px header/body misalignment.
+    const header = container.querySelector("thead th.dt-select-all");
+    expect(header).not.toBeNull();
+    expect(
+      header!.querySelector(".dt-checkbox input[type='checkbox']")
+    ).not.toBeNull();
+    const rowCheckboxes = container.querySelectorAll(
+      "tbody td.dt-select-cell .dt-checkbox input[type='checkbox']"
+    );
+    expect(rowCheckboxes).toHaveLength(3);
+  });
+
+  it("keeps a 32px target around the 20px box: clicking the label toggles it", () => {
+    // The drawn checkbox is 20px (DataTable.css), but the wrapper is a <label>
+    // sized to the 32px §8 target, so a click anywhere in that square — not
+    // just on the 20px box — toggles the row. Swapping the label back to a
+    // plain <span> leaves that ring dead and fails here.
+    const { container } = render(<SelectionHarness />);
+    const target = container.querySelector(
+      "tbody td.dt-select-cell .dt-checkbox"
+    ) as HTMLElement;
+    expect(target.tagName).toBe("LABEL");
+    fireEvent.click(target);
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+    fireEvent.click(target);
+    expect(screen.getByTestId("count")).toHaveTextContent("0");
+  });
+
   it("header checkbox: unchecked -> all -> none", () => {
     render(<SelectionHarness />);
     const header = screen.getByLabelText("Select all 3 rows");
@@ -238,6 +270,29 @@ describe("DataTable selection", () => {
     fireEvent.keyUp(header, { key: " " });
     fireEvent.click(header); // jsdom: space "click" is simulated natively; direct click asserts handler
     expect(screen.getByTestId("count")).toHaveTextContent("3");
+  });
+});
+
+describe("DataTable header cell geometry", () => {
+  it("gives sortable and non-sortable headers the same inner box class", () => {
+    // `.dt-head-box` is the shared 40px-tall / 12px-inset box the CSS aligns
+    // header text on. A non-sortable column renders a plain label instead of
+    // the sort button, and the <th> has no padding, so a label that misses
+    // this class drifts 12px left of the values it labels (the cases screen's
+    // Type and Steps columns). Dropping the class from either variant fails
+    // here.
+    const columns = makeColumns({ sortable: false });
+    const { container } = render(
+      <DataTable<Row> {...baseProps({ columns })} />
+    );
+    const boxes = container.querySelectorAll("thead .dt-head-box");
+    expect(boxes).toHaveLength(2);
+    expect(
+      container.querySelector("thead .dt-sort-button.dt-head-box")
+    ).not.toBeNull();
+    expect(
+      container.querySelector("thead .dt-header-label.dt-head-box")
+    ).not.toBeNull();
   });
 });
 
