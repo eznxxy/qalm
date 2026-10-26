@@ -14,6 +14,7 @@ Cases referenced here are defined in `docs/api-cases.md`.
   "name": "Release 2.4 smoke",
   "description": "Smoke pass over Payments and Accounts.",
   "status": "open",
+  "start_date": "2026-11-01",
   "due_date": "2026-11-14",
   "completed_at": null,
   "completed_by": null,
@@ -40,6 +41,9 @@ Cases referenced here are defined in `docs/api-cases.md`.
   `untested` when it has none). `percent_complete = round((total - untested) /
   total * 100)`, `0` when `total = 0`.
 - `assignee_ids` are the distinct non-null assignees among the run's items.
+- `start_date` and `due_date` are plain calendar dates (`YYYY-MM-DD`), never
+  instants, so they cannot shift with a timezone. Both are optional and
+  independent of each other except for the ordering rule below.
 
 ### Validation
 | Field | Rules |
@@ -48,6 +52,7 @@ Cases referenced here are defined in `docs/api-cases.md`.
 | `description` | optional, ≤ 1,000 chars; `null` clears |
 | `plan_id` | optional UUID of a plan in the same project; `null` detaches |
 | `due_date` | optional `YYYY-MM-DD`; `null` clears |
+| `start_date` | optional `YYYY-MM-DD`; `null` clears; when both dates are set, `start_date` must be **on or before** `due_date` (`400` otherwise) |
 | `selection` | create-only; `{ "case_ids"?: [uuid], "suite_id"?: uuid, "include_descendants"?: bool (default true) }`. Omit for an empty run |
 
 A run may hold at most **2,000 items**; exceeding it is `400`.
@@ -144,6 +149,7 @@ Paginated list for the runs screen (§4.3).
   "name": "Release 2.4 smoke",
   "description": "Smoke pass over Payments and Accounts.",
   "plan_id": "018f3a10-4b2c-7d3e-8f40-5a6b7c8d9e0f",
+  "start_date": "2026-11-01",
   "due_date": "2026-11-14",
   "selection": {
     "case_ids": ["018f2c57-2b3c-7d4e-9f50-6a7b8c9d0e1f"],
@@ -157,7 +163,8 @@ Paginated list for the runs screen (§4.3).
   (`case_number` ascending). An omitted `selection` or empty result creates an
   **empty** run (items can be added later).
 - `201` → `{ "data": { ...run } }` with `counts.total` = items created.
-- `400` `VALIDATION_ERROR` — bad fields, unknown suite, or more than 2,000 items.
+- `400` `VALIDATION_ERROR` — bad fields, unknown suite, `start_date` after
+  `due_date`, or more than 2,000 items.
 - `404` — project or referenced case/suite unknown; `409` — project archived or
   duplicate plan name is irrelevant here; `403` — non-writer.
 
@@ -172,7 +179,8 @@ Paginated list for the runs screen (§4.3).
 { "name": "Release 2.4 smoke (final)", "plan_id": null }
 ```
 - `200` → `{ "data": { ...run } }`
-- `400` `VALIDATION_ERROR`; `404`; `409` — project archived; `403`.
+- `400` `VALIDATION_ERROR` — including a `start_date` that would land after the
+  run's (existing or new) `due_date`; `404`; `409` — project archived; `403`.
 
 ### `POST /api/v1/runs/:id/close` — Admin, Lead
 Sets `completed_at`/`completed_by`. Items may be left untested (the status bar
@@ -362,11 +370,15 @@ Backs the case drawer's **Linked runs** tab (§4.2). Newest run first.
   1. `plans` — see `docs/api-plans.md`.
   2. `runs` — `id uuid pk`, `project_id uuid not null fk → projects`,
      `plan_id uuid null fk → plans (on delete set null)`,
-     `name text not null`, `description text null`, `due_date date null`,
-     `completed_at timestamptz null`, `completed_by uuid null fk → users`,
+     `name text not null`, `description text null`, `start_date date null`,
+     `due_date date null`, `completed_at timestamptz null`,
+     `completed_by uuid null fk → users`,
      `created_by`/`updated_by uuid fk → users`, `deleted_at timestamptz null`,
      `created_at`/`updated_at timestamptz`.
      Indexes: `(project_id, deleted_at, created_at)`, `(plan_id)`.
+     `start_date` was added by the follow-up migration
+     `20261027000001_runs_start_date` (additive, nullable, no backfill), which
+     keeps existing rows valid.
   3. `run_items` — `id uuid pk`, `run_id uuid not null fk → runs (on delete
      cascade)`, `case_id uuid null fk → cases (on delete set null)`,
      `case_display_id text not null`, `case_title text not null`,
