@@ -258,10 +258,10 @@ Do not add a UI library without Daedalus's approval.
 | **Button** | Primary (`--brand`), secondary (outline), ghost, danger. One primary per view. Label is a verb: "Save case", "Add result", never "Submit". |
 | **Status badge** | Tint background, `--ink-900` text, status-solid icon (untested icon uses `--ink-700`) — exact rules in §2.2. 4px radius, 22px high. Same markup everywhere. |
 | **Status bar** | Segmented horizontal bar, 8px high in tables, 16px on dashboards. Segment order: Passed, Retest, Blocked, Failed, Skipped, Untested. Hover shows counts. Include `role="img"` and an `aria-label` that spells out the numbers. |
-| **Data table** | Sticky header, sortable columns, column resize, row selection, row hover `--canvas`, selected row `--brand-tint`. Virtualise above 200 rows. Pagination or infinite scroll must keep scroll position. |
+| **Data table** | Plain (non-sticky) header, sortable columns, column resize, row selection, row hover `--canvas`, selected row `--brand-tint`. Virtualise above 200 rows. Pagination or infinite scroll must keep scroll position. |
 | **Tree** | ARIA treeview, arrow-key navigation, counts right-aligned, drag handle on hover. |
 | **Tabs** | Underline style, active tab has a 2px `--brand` underline. |
-| **Drawer** | Right side, 480px, closes with Esc, does not block the table behind it. |
+| **Drawer** | Right side, 480px, closes with Esc, does not block the table behind it. One drawer at a time: opening a case closes an open New case form (and vice versa) instead of stacking two panels in the same slot. |
 | **Dialog** | For destructive or short forms only. Focus trap, Esc closes. |
 | **Form field** | Label above, helper text below, error text replaces helper text. Validate on blur and on submit. |
 | **Filter bar** | Chips for active filters, "Clear all" link, saved views (phase 2). |
