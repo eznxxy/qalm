@@ -246,6 +246,23 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 - Update the shell search placeholder/`g r`/`g p` targets and the help dialog
   once the routes are real.
 
+### Card 3.5 — Run start date (review feedback, small) — DONE 2026-10-27
+- The New run dialog needed a **Start date** above **Due date**. Implemented end
+  to end: `docs/api-runs.md` (commit `b491d31`), migration
+  `20261027000001_runs_start_date` + DTOs/service/store (`54c2207`), dialog +
+  run detail subtitle (`ae119cc`).
+- Notes: the column is nullable, so every existing run reads back
+  `start_date: null`. The single cross-field rule is `start_date ≤ due_date`,
+  enforced on the merged PATCH value (400 `VALIDATION_ERROR`, field
+  `start_date`), so a due date moving before an existing start fails too.
+  Create run stores it; the page maps the server's `start_date` field error
+  onto the Start date input. Deferred at the user's request: **multi-suite
+  selection** in the same dialog — needs a decision on shape (several suites as
+  chips vs. a single suite) before it is built.
+- Verified: server unit 445 (27 suites), server e2e 258 (11 suites), web unit
+  534 (37 suites), `tsc`/`lint` clean; live API on `:3001` returns
+  `start_date` on run list/detail.
+
 ---
 
 ## Phase 4 — QA (Argus)
