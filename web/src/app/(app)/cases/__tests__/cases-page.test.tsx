@@ -319,6 +319,43 @@ describe("cases screen", () => {
     await waitFor(() => expect(lastReplaceUrl()).not.toContain("case="));
   });
 
+  it("opening a case closes the New case form instead of stacking drawers", async () => {
+    mockApi();
+    await renderPage();
+    const table = await screen.findByRole("table", { name: "Test cases" });
+
+    // Start the New case form (its own drawer in the same right-hand slot).
+    fireEvent.click(screen.getByRole("button", { name: "Add case" }));
+    expect(
+      await screen.findByRole("dialog", { name: "New case" })
+    ).toBeInTheDocument();
+
+    // Clicking a row must close the form, not open a second overlapping drawer.
+    fireEvent.click(
+      await within(table).findByRole("button", {
+        name: /Open C1: Pay with a saved card/,
+      })
+    );
+
+    expect(screen.queryByRole("dialog", { name: "New case" })).toBeNull();
+    expect(lastReplaceUrl()).toContain("case=c-1");
+  });
+
+  it("Add case clears the open case drawer (only one drawer at a time)", async () => {
+    mockRouterState.search = "project=p-1&suite=s-1&case=c-1";
+    mockApi();
+    await renderPage();
+
+    await screen.findByRole("dialog", { name: /C1/ });
+    fireEvent.click(screen.getByRole("button", { name: "Add case" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "New case" })
+    ).toBeInTheDocument();
+    // The case drawer is URL-driven, so clearing `case=` is what removes it.
+    expect(lastReplaceUrl()).not.toContain("case=");
+  });
+
   it("renders the History tab without raw JSON", async () => {
     mockRouterState.search = "project=p-1&suite=s-1&case=c-1";
     mockApi();

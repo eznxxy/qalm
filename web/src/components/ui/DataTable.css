@@ -48,10 +48,9 @@
 
 /* ----------------------------------------------------------- header */
 
+/* Plain header row: it scrolls with the body. The sticky variant was removed
+ * at the owner's request (docs/DESIGN.md §5 updated). */
 .dt-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   height: 40px;
   background: var(--surface);
   color: var(--ink-700);

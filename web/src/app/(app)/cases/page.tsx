@@ -565,6 +565,10 @@ export default function CasesPage() {
 
   // ---- case actions ----
   function openCase(id: string): void {
+    // The case drawer and the New case drawer share the one right-hand slot
+    // (docs/DESIGN.md §5 "Drawer"), so opening a case must close a New case
+    // form that is already open — otherwise the two panels overlap.
+    setCreating(false);
     pushParams({ caseId: id });
   }
 
@@ -576,6 +580,8 @@ export default function CasesPage() {
 
   function openCreateCase(): void {
     if (!canWrite || !createDefaultSuiteId) return;
+    // Same slot: close the open case drawer before showing the New case form.
+    if (url.caseId) pushParams({ caseId: null });
     setCreating(true);
     setActionError(null);
     setNotice(null);
