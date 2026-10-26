@@ -59,6 +59,48 @@
   margin: 0 0 var(--space-2);
 }
 
+/* The feedback line is dismissible: text on the left, an × on the right that
+ * clears that message. Scoped here so the shared .form-notice/.form-error
+ * (change-password, dialogs) keep their block layout. */
+.cases-feedback .form-notice,
+.cases-feedback .form-error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.feedback-text {
+  min-width: 0;
+}
+
+.feedback-dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.feedback-dismiss:hover:not(:disabled) {
+  background: var(--canvas);
+  border: none;
+}
+
+.feedback-dismiss:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
 .bulk-bar {
   display: flex;
   align-items: center;

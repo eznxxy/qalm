@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CASE_TYPE_LABELS,
+  PRIORITIES,
   PRIORITY_LABELS,
   type CaseDetail,
   type CaseListItem,
@@ -54,6 +55,7 @@ import {
 } from "@/lib/suites";
 import {
   DataTable,
+  DisabledHint,
   Drawer,
   PriorityIcon,
   TableSkeleton,
@@ -644,6 +646,11 @@ export default function CasesPage() {
     {
       key: "priority",
       header: "Priority",
+      sortable: true,
+      // Severity order happens server-side (sort=priority), so pagination
+      // never reorders a single page. This value only matters if the table
+      // ever sorts client-side.
+      sortValue: (row) => PRIORITIES.indexOf(row.priority),
       render: (row) => (
         <span className="case-priority">
           <PriorityIcon priority={row.priority} />{" "}
@@ -945,19 +952,22 @@ export default function CasesPage() {
             )}
           </div>
           {canWrite && (
-            <button
-              type="button"
-              className="primary"
-              onClick={openCreateCase}
-              disabled={!createDefaultSuiteId}
-              title={
+            <DisabledHint
+              hint={
                 createDefaultSuiteId
                   ? "Add a case to the selected suite"
-                  : "Add a suite first"
+                  : "Add a suite first, then you can add cases to it"
               }
             >
-              Add case
-            </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={openCreateCase}
+                disabled={!createDefaultSuiteId}
+              >
+                Add case
+              </button>
+            </DisabledHint>
           )}
         </header>
 
@@ -965,12 +975,30 @@ export default function CasesPage() {
           <div className="cases-feedback">
             {notice && (
               <p className="form-notice" role="status">
-                {notice}
+                <span className="feedback-text">{notice}</span>
+                <button
+                  type="button"
+                  className="feedback-dismiss"
+                  aria-label="Dismiss notification"
+                  title="Dismiss"
+                  onClick={() => setNotice(null)}
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
               </p>
             )}
             {actionError && (
               <p className="form-error" role="alert">
-                {actionError}
+                <span className="feedback-text">{actionError}</span>
+                <button
+                  type="button"
+                  className="feedback-dismiss"
+                  aria-label="Dismiss error"
+                  title="Dismiss"
+                  onClick={() => setActionError(null)}
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
               </p>
             )}
           </div>
@@ -981,21 +1009,39 @@ export default function CasesPage() {
             <span>
               <strong className="t-nums">{selectedCount}</strong> selected
             </span>
-            <button
-              type="button"
-              onClick={() => setBulkMoveOpen(true)}
-              disabled={!canWrite || bulkSuiteOptions.length === 0}
+            <DisabledHint
+              hint={
+                !canWrite
+                  ? "You need the Admin or Lead role to move cases"
+                  : bulkSuiteOptions.length === 0
+                    ? "Nowhere to move them yet — add another suite first"
+                    : "Move the selected cases to another suite"
+              }
             >
-              Move…
-            </button>
-            <button
-              type="button"
-              className="danger"
-              onClick={() => setBulkDeleteOpen(true)}
-              disabled={!canWrite}
+              <button
+                type="button"
+                onClick={() => setBulkMoveOpen(true)}
+                disabled={!canWrite || bulkSuiteOptions.length === 0}
+              >
+                Move…
+              </button>
+            </DisabledHint>
+            <DisabledHint
+              hint={
+                canWrite
+                  ? "Delete the selected cases"
+                  : "You need the Admin or Lead role to delete cases"
+              }
             >
-              Delete…
-            </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => setBulkDeleteOpen(true)}
+                disabled={!canWrite}
+              >
+                Delete…
+              </button>
+            </DisabledHint>
             <button
               type="button"
               className="linklike"
@@ -1040,23 +1086,39 @@ export default function CasesPage() {
 
         {meta && meta.total_pages > 1 && (
           <nav className="pagination cases-pagination" aria-label="Case pages">
-            <button
-              type="button"
-              disabled={url.page <= 1}
-              onClick={() => pushParams({ page: Math.max(1, url.page - 1) })}
+            <DisabledHint
+              hint={
+                url.page <= 1
+                  ? "You are on the first page"
+                  : "Go to the previous page"
+              }
             >
-              Previous
-            </button>
+              <button
+                type="button"
+                disabled={url.page <= 1}
+                onClick={() => pushParams({ page: Math.max(1, url.page - 1) })}
+              >
+                Previous
+              </button>
+            </DisabledHint>
             <span>
               Page {meta.page} of {meta.total_pages} ({meta.total} cases)
             </span>
-            <button
-              type="button"
-              disabled={url.page >= meta.total_pages}
-              onClick={() => pushParams({ page: url.page + 1 })}
+            <DisabledHint
+              hint={
+                url.page >= meta.total_pages
+                  ? "You are on the last page"
+                  : "Go to the next page"
+              }
             >
-              Next
-            </button>
+              <button
+                type="button"
+                disabled={url.page >= meta.total_pages}
+                onClick={() => pushParams({ page: url.page + 1 })}
+              >
+                Next
+              </button>
+            </DisabledHint>
           </nav>
         )}
       </section>

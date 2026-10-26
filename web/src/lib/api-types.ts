@@ -268,13 +268,18 @@ export interface CaseHistoryEntry {
   created_at: string;
 }
 
+export type CaseSortKey = "case_number" | "updated_at" | "title" | "priority";
+
+/** `priority` sorts by severity (critical first when ascending). */
 export type CaseSort =
   | "case_number"
   | "-case_number"
   | "updated_at"
   | "-updated_at"
   | "title"
-  | "-title";
+  | "-title"
+  | "priority"
+  | "-priority";
 
 export interface CaseListQuery {
   suite_id?: string;

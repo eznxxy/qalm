@@ -195,7 +195,10 @@ describe("SuiteTree", () => {
 
     const del = screen.getByRole("button", { name: "Delete" });
     expect(del).toBeDisabled();
-    expect(del).toHaveAttribute("title", "Move or delete its cases first");
+    expect(del.closest(".disabled-hint")).toHaveAttribute(
+      "title",
+      "Move or delete its cases first"
+    );
   });
 
   it("enables delete for an empty leaf", () => {
@@ -217,7 +220,10 @@ describe("SuiteTree", () => {
 
     const addChild = screen.getByRole("button", { name: "+ Add child" });
     expect(addChild).toBeDisabled();
-    expect(addChild).toHaveAttribute("title", "Suites are limited to 3 levels");
+    expect(addChild.closest(".disabled-hint")).toHaveAttribute(
+      "title",
+      "Suites are limited to 3 levels"
+    );
   });
 
   it("disables 'Move to…' without a selection", () => {
@@ -228,6 +234,22 @@ describe("SuiteTree", () => {
     );
 
     expect(screen.getByRole("button", { name: "Move to…" })).toBeDisabled();
+  });
+
+  it("shows a drag affordance on draggable rows only", () => {
+    const { rerender } = render(<SuiteTree {...treeProps({ onMove: jest.fn() })} />);
+
+    const checkout = item("Checkout");
+    expect(checkout).toHaveClass("is-draggable");
+    expect(checkout).toHaveAttribute("draggable", "true");
+    expect(within(checkout).getByText("⠿")).toBeInTheDocument();
+
+    // A read-only tree (no onMove) is not draggable and shows no grip.
+    rerender(<SuiteTree {...treeProps()} />);
+    const readonly = item("Checkout");
+    expect(readonly).not.toHaveClass("is-draggable");
+    expect(readonly).toHaveAttribute("draggable", "false");
+    expect(within(readonly).queryByText("⠿")).toBeNull();
   });
 
   it("shows the loading state", () => {

@@ -48,12 +48,19 @@ describe("parseCaseListParams", () => {
 
   it("drops unknown priorities, types, sort and bad pages", () => {
     const state = parseCaseListParams(
-      params("priority=urgent,high&type=bogus&sort=priority&page=0")
+      params("priority=urgent,high&type=bogus&sort=bogus&page=0")
     );
     expect(state.priorities).toEqual(["high"]);
     expect(state.types).toEqual([]);
     expect(state.sort).toBe(DEFAULT_CASE_SORT);
     expect(state.page).toBe(1);
+  });
+
+  it("accepts priority as a known sort key", () => {
+    expect(parseCaseListParams(params("sort=priority")).sort).toBe("priority");
+    expect(parseCaseListParams(params("sort=-priority")).sort).toBe(
+      "-priority"
+    );
   });
 
   it("keeps `all` distinct from absent", () => {
@@ -123,13 +130,16 @@ describe("sort mapping", () => {
     ["case_number", "asc", "case_number"],
     ["case_number", "desc", "-case_number"],
     ["title", "desc", "-title"],
+    ["priority", "asc", "priority"],
+    ["priority", "desc", "-priority"],
     ["updated_at", "asc", "updated_at"],
   ] as const)("maps %s %s to %s", (key, dir, expected) => {
     expect(caseSortParam(key, dir)).toBe(expected);
   });
 
   it("falls back to the default for unsortable columns", () => {
-    expect(caseSortParam("priority", "desc")).toBe(DEFAULT_CASE_SORT);
+    expect(caseSortParam("step_count", "desc")).toBe(DEFAULT_CASE_SORT);
+    expect(caseSortParam("tags", "asc")).toBe(DEFAULT_CASE_SORT);
   });
 
   it("round-trips through DataTable sort state", () => {
@@ -138,6 +148,10 @@ describe("sort mapping", () => {
       dir: "desc",
     });
     expect(caseSortState("title")).toEqual({ key: "title", dir: "asc" });
+    expect(caseSortState("-priority")).toEqual({
+      key: "priority",
+      dir: "desc",
+    });
     expect(caseSortParam("title", caseSortState("title").dir)).toBe("title");
   });
 });

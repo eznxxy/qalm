@@ -48,6 +48,7 @@ import {
 import { suiteOptions } from "@/lib/suites";
 import { api } from "@/lib/endpoints";
 import { isSessionDead } from "@/components/require-auth";
+import { DisabledHint } from "@/components/ui";
 import "./CaseEditor.css";
 
 export interface CaseEditorProps {
@@ -420,24 +421,36 @@ export function CaseEditor({
                     </div>
                   </div>
                   <div className="step-actions">
-                    <button
-                      type="button"
-                      disabled={index === 0}
-                      aria-label={`Move step ${index + 1} up`}
-                      title="Move up"
-                      onClick={() => moveStep(index, -1)}
+                    <DisabledHint
+                      hint={
+                        index === 0 ? "This is the first step" : "Move step up"
+                      }
                     >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      disabled={index === values.steps.length - 1}
-                      aria-label={`Move step ${index + 1} down`}
-                      title="Move down"
-                      onClick={() => moveStep(index, 1)}
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        aria-label={`Move step ${index + 1} up`}
+                        onClick={() => moveStep(index, -1)}
+                      >
+                        ↑
+                      </button>
+                    </DisabledHint>
+                    <DisabledHint
+                      hint={
+                        index === values.steps.length - 1
+                          ? "This is the last step"
+                          : "Move step down"
+                      }
                     >
-                      ↓
-                    </button>
+                      <button
+                        type="button"
+                        disabled={index === values.steps.length - 1}
+                        aria-label={`Move step ${index + 1} down`}
+                        onClick={() => moveStep(index, 1)}
+                      >
+                        ↓
+                      </button>
+                    </DisabledHint>
                     <button
                       type="button"
                       aria-label={`Remove step ${index + 1}`}
@@ -453,18 +466,21 @@ export function CaseEditor({
           </ol>
         )}
 
-        <button
-          type="button"
-          onClick={addStep}
-          disabled={values.steps.length >= 50}
-          title={
+        <DisabledHint
+          hint={
             values.steps.length >= 50
               ? "A case can have at most 50 steps"
-              : "Add a step"
+              : "Add another step"
           }
         >
-          + Add step
-        </button>
+          <button
+            type="button"
+            onClick={addStep}
+            disabled={values.steps.length >= 50}
+          >
+            + Add step
+          </button>
+        </DisabledHint>
       </fieldset>
 
       <div className="form-grid">
@@ -557,16 +573,22 @@ export function CaseEditor({
       </div>
 
       <div className="button-row case-form-actions">
-        <button type="submit" className="primary" disabled={busy}>
-          {busy
-            ? "Saving…"
-            : mode === "create"
-              ? "Add case"
-              : "Save changes"}
-        </button>
-        <button type="button" disabled={busy} onClick={onCancel}>
-          Cancel
-        </button>
+        <DisabledHint
+          hint={busy ? "Saving — please wait" : null}
+        >
+          <button type="submit" className="primary" disabled={busy}>
+            {busy
+              ? "Saving…"
+              : mode === "create"
+                ? "Add case"
+                : "Save changes"}
+          </button>
+        </DisabledHint>
+        <DisabledHint hint={busy ? "Can't cancel while saving" : null}>
+          <button type="button" disabled={busy} onClick={onCancel}>
+            Cancel
+          </button>
+        </DisabledHint>
         <span className="field-hint case-save-hint">
           <kbd>Ctrl</kbd> + <kbd>Enter</kbd> saves
         </span>

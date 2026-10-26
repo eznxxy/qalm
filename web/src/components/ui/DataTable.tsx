@@ -446,7 +446,7 @@ export function DataTable<T>({
           {showEmpty && (
             <tr>
               <td colSpan={columnCount}>
-                <div className="dt-status">
+                <div className="dt-status dt-status-empty">
                   <div>
                     <p>
                       <strong>{emptyTitle}</strong>

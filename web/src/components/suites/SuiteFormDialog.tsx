@@ -8,6 +8,7 @@
  */
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { SuiteNode } from "@/lib/api-types";
+import { DisabledHint } from "@/components/ui";
 
 export const SUITE_NAME_MAX = 100;
 export const SUITE_DESCRIPTION_MAX = 500;
@@ -212,16 +213,20 @@ export function SuiteFormDialog({
           </div>
 
           <div className="button-row dialog-actions">
-            <button type="submit" className="primary" disabled={busy}>
-              {busy
-                ? "Saving…"
-                : mode === "create"
-                  ? "Create suite"
-                  : "Save name"}
-            </button>
-            <button type="button" disabled={busy} onClick={onCancel}>
-              Cancel
-            </button>
+            <DisabledHint hint={busy ? "Saving — please wait" : null}>
+              <button type="submit" className="primary" disabled={busy}>
+                {busy
+                  ? "Saving…"
+                  : mode === "create"
+                    ? "Create suite"
+                    : "Save name"}
+              </button>
+            </DisabledHint>
+            <DisabledHint hint={busy ? "Can't cancel while saving" : null}>
+              <button type="button" disabled={busy} onClick={onCancel}>
+                Cancel
+              </button>
+            </DisabledHint>
           </div>
         </form>
       </div>

@@ -173,12 +173,15 @@ interface ApiOptions {
   role?: Role;
   project?: Project;
   cases?: CaseListItem[];
+  /** Make the bulk-move POST fail with a 500 so the error banner shows. */
+  bulkMoveError?: boolean;
 }
 
 function mockApi({
   role = "admin",
   project = PROJECT,
   cases = ROWS,
+  bulkMoveError = false,
 }: ApiOptions = {}): void {
   const user = makeUser({ role });
   fetchMock.mockImplementation(
@@ -197,6 +200,13 @@ function mockApi({
         return Promise.resolve(jsonResponse(200, { data: user }));
       }
       if (target.includes("/cases/bulk-move") && method === "POST") {
+        if (bulkMoveError) {
+          return Promise.resolve(
+            jsonResponse(500, {
+              error: { code: "INTERNAL", message: "Something went wrong." },
+            })
+          );
+        }
         const body = JSON.parse(init?.body ?? "{}") as { case_ids: string[] };
         return Promise.resolve(
           jsonResponse(200, { data: { moved: body.case_ids.length, case_ids: body.case_ids } })
@@ -393,5 +403,86 @@ describe("cases screen", () => {
     expect(
       await screen.findByText("No cases in Checkout.")
     ).toBeInTheDocument();
+  });
+
+  it("sorts the Priority column through the URL in both directions", async () => {
+    mockApi();
+    const first = await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+    const table = screen.getByRole("table", { name: "Test cases" });
+
+    // First click sorts ascending by severity (critical first).
+    fireEvent.click(within(table).getByRole("button", { name: "Priority" }));
+    expect(lastReplaceUrl()).toContain("sort=priority");
+    expect(lastReplaceUrl()).not.toContain("page=");
+    first.unmount();
+
+    // An ascending sort in the URL flips to descending on the next click.
+    mockRouterState.search = "project=p-1&suite=s-1&sort=priority";
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+    const sortedTable = screen.getByRole("table", {
+      name: "Test cases",
+    });
+    fireEvent.click(
+      within(sortedTable).getByRole("button", {
+        name: /Sorted ascending by Priority/,
+      })
+    );
+    expect(lastReplaceUrl()).toContain("sort=-priority");
+  });
+
+  it("dismisses a success notification with its × button", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    const bulk = screen.getByRole("region", { name: "Selected cases" });
+    fireEvent.click(within(bulk).getByRole("button", { name: "Move…" }));
+    const dialog = screen.getByRole("dialog", { name: "Move cases" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Move cases" }));
+
+    const notice = await screen.findByRole("status");
+    expect(notice).toHaveTextContent("1 case moved.");
+
+    fireEvent.click(
+      within(notice).getByRole("button", { name: "Dismiss notification" })
+    );
+    expect(screen.queryByText("1 case moved.")).toBeNull();
+  });
+
+  it("dismisses an action error with its × button", async () => {
+    mockApi({ bulkMoveError: true });
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    const bulk = screen.getByRole("region", { name: "Selected cases" });
+    fireEvent.click(within(bulk).getByRole("button", { name: "Move…" }));
+    const dialog = screen.getByRole("dialog", { name: "Move cases" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Move cases" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Something went wrong.");
+
+    fireEvent.click(
+      within(alert).getByRole("button", { name: "Dismiss error" })
+    );
+    expect(screen.queryByText("Something went wrong.")).toBeNull();
+  });
+
+  it("explains why a bulk action is disabled", async () => {
+    mockApi({ role: "tester" });
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    const move = screen.getByRole("button", { name: "Move…" });
+    expect(move).toBeDisabled();
+    expect(move.closest(".disabled-hint")).toHaveAttribute(
+      "title",
+      "You need the Admin or Lead role to move cases"
+    );
   });
 });

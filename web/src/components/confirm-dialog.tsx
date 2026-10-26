@@ -6,6 +6,7 @@
  * will happen before the call is made.
  */
 import { ReactNode, useEffect, useRef } from "react";
+import { DisabledHint } from "@/components/ui";
 
 export interface ConfirmDialogProps {
   title: string;
@@ -86,17 +87,21 @@ export function ConfirmDialog({
         <h2 id="confirm-dialog-title">{title}</h2>
         <div id="confirm-dialog-body">{body}</div>
         <div className="button-row dialog-actions">
-          <button
-            type="button"
-            className={danger ? "danger" : "primary"}
-            disabled={busy}
-            onClick={onConfirm}
-          >
-            {busy ? "Working…" : confirmLabel}
-          </button>
-          <button type="button" disabled={busy} onClick={onCancel}>
-            {cancelLabel}
-          </button>
+          <DisabledHint hint={busy ? "Working — please wait" : null}>
+            <button
+              type="button"
+              className={danger ? "danger" : "primary"}
+              disabled={busy}
+              onClick={onConfirm}
+            >
+              {busy ? "Working…" : confirmLabel}
+            </button>
+          </DisabledHint>
+          <DisabledHint hint={busy ? "Can't cancel while working" : null}>
+            <button type="button" disabled={busy} onClick={onCancel}>
+              {cancelLabel}
+            </button>
+          </DisabledHint>
         </div>
       </div>
     </div>

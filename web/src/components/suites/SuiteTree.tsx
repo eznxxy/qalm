@@ -27,6 +27,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import type { SuiteNode } from "@/lib/api-types";
+import { DisabledHint } from "@/components/ui";
 import {
   dropRequest,
   findSuiteById,
@@ -304,6 +305,7 @@ export function SuiteTree({
               isSelected ? "is-selected" : "",
               dragId === node.id ? "is-dragging" : "",
               isDrop ? `drop-${dropTarget.intent}` : "",
+              onMove ? "is-draggable" : "",
             ]
               .filter(Boolean)
               .join(" ");
@@ -361,6 +363,11 @@ export function SuiteTree({
                   )}
                   <span className="suite-name">{node.name}</span>
                   <span className="suite-count t-nums">{node.case_count}</span>
+                  {onMove && (
+                    <span className="suite-grip" aria-hidden="true" title="Drag to reorder or nest">
+                      ⠿
+                    </span>
+                  )}
                 </span>
               </li>
             );
@@ -373,47 +380,61 @@ export function SuiteTree({
         !error && (
           <div className="suite-pane-footer">
             {onAddSuite && (
-              <button
-                type="button"
-                onClick={() => onAddSuite(selected ? selected.id : null)}
-                disabled={!selected || selected.depth >= 3}
-                title={
+              <DisabledHint
+                hint={
                   selected && selected.depth >= 3
                     ? "Suites are limited to 3 levels"
-                    : "Add a child suite under the selected suite"
+                    : selected
+                      ? "Add a child suite under the selected suite"
+                      : "Select a suite to add a child to"
                 }
               >
-                + Add child
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onAddSuite(selected ? selected.id : null)}
+                  disabled={!selected || selected.depth >= 3}
+                >
+                  + Add child
+                </button>
+              </DisabledHint>
             )}
             {onRenameSuite && (
-              <button
-                type="button"
-                onClick={() => selected && onRenameSuite(selected)}
-                disabled={!selected}
+              <DisabledHint
+                hint={
+                  selected
+                    ? "Rename the selected suite"
+                    : "Select a suite to rename"
+                }
               >
-                Rename
-              </button>
+                <button
+                  type="button"
+                  onClick={() => selected && onRenameSuite(selected)}
+                  disabled={!selected}
+                >
+                  Rename
+                </button>
+              </DisabledHint>
             )}
             {onRequestMove && (
-              <button
-                type="button"
-                onClick={() => selected && onRequestMove(selected.id)}
-                disabled={!selected}
+              <DisabledHint
+                hint={
+                  selected
+                    ? "Move the selected suite to another suite or the top level"
+                    : "Select a suite to move"
+                }
               >
-                Move to…
-              </button>
+                <button
+                  type="button"
+                  onClick={() => selected && onRequestMove(selected.id)}
+                  disabled={!selected}
+                >
+                  Move to…
+                </button>
+              </DisabledHint>
             )}
             {onDeleteSuite && (
-              <button
-                type="button"
-                onClick={() => selected && onDeleteSuite(selected)}
-                disabled={
-                  !selected ||
-                  selected.case_count > 0 ||
-                  selected.children.length > 0
-                }
-                title={
+              <DisabledHint
+                hint={
                   !selected
                     ? "Select a suite to delete"
                     : selected.case_count > 0
@@ -423,8 +444,18 @@ export function SuiteTree({
                         : "Delete the selected suite"
                 }
               >
-                Delete
-              </button>
+                <button
+                  type="button"
+                  onClick={() => selected && onDeleteSuite(selected)}
+                  disabled={
+                    !selected ||
+                    selected.case_count > 0 ||
+                    selected.children.length > 0
+                  }
+                >
+                  Delete
+                </button>
+              </DisabledHint>
             )}
           </div>
         )}

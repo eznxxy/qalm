@@ -8,7 +8,7 @@
  * URL and become repeated query parameters at the API boundary (the client
  * appends arrays; see docs/api-cases.md).
  */
-import type { CaseSort, CaseType, Priority } from "./api-types";
+import type { CaseSort, CaseSortKey, CaseType, Priority } from "./api-types";
 import { CASE_TYPES, PRIORITIES } from "./api-types";
 
 export const CASE_SORTS: readonly CaseSort[] = [
@@ -18,6 +18,16 @@ export const CASE_SORTS: readonly CaseSort[] = [
   "-updated_at",
   "title",
   "-title",
+  "priority",
+  "-priority",
+] as const;
+
+/** Columns the table may sort by; their keys match the contract's `sort`. */
+export const CASE_SORT_KEYS: readonly CaseSortKey[] = [
+  "case_number",
+  "title",
+  "priority",
+  "updated_at",
 ] as const;
 
 export const DEFAULT_CASE_SORT: CaseSort = "case_number";
@@ -161,27 +171,20 @@ export function caseSortParam(
   key: string,
   dir: "asc" | "desc"
 ): CaseSort {
-  if (!["case_number", "updated_at", "title"].includes(key)) {
+  if (!(CASE_SORT_KEYS as readonly string[]).includes(key)) {
     return DEFAULT_CASE_SORT;
   }
-  const base = key as "case_number" | "updated_at" | "title";
-  const value = `${dir === "desc" ? "-" : ""}${base}`;
+  const value = `${dir === "desc" ? "-" : ""}${key}`;
   return isCaseSort(value) ? value : DEFAULT_CASE_SORT;
 }
 
 /** Contract sort string → DataTable sort state. */
 export function caseSortState(sort: CaseSort): {
-  key: "case_number" | "updated_at" | "title";
+  key: CaseSortKey;
   dir: "asc" | "desc";
 } {
   if (sort.startsWith("-")) {
-    return {
-      key: sort.slice(1) as "case_number" | "updated_at" | "title",
-      dir: "desc",
-    };
+    return { key: sort.slice(1) as CaseSortKey, dir: "desc" };
   }
-  return {
-    key: sort as "case_number" | "updated_at" | "title",
-    dir: "asc",
-  };
+  return { key: sort as CaseSortKey, dir: "asc" };
 }

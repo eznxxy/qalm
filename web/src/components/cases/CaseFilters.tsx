@@ -17,6 +17,7 @@ import {
   type Priority,
 } from "@/lib/api-types";
 import { CASE_TYPES, PRIORITIES } from "@/lib/api-types";
+import { DisabledHint } from "@/components/ui";
 import "./CaseFilters.css";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -240,13 +241,21 @@ export function CaseFilters({
               onChange={(event) => setTagInput(event.target.value)}
               onKeyDown={onTagKeyDown}
             />
-            <button
-              type="button"
-              onClick={addTag}
-              disabled={!tagInput.trim()}
+            <DisabledHint
+              hint={
+                tagInput.trim()
+                  ? "Add this tag as a filter"
+                  : "Type a tag first, then Add"
+              }
             >
-              Add
-            </button>
+              <button
+                type="button"
+                onClick={addTag}
+                disabled={!tagInput.trim()}
+              >
+                Add
+              </button>
+            </DisabledHint>
           </div>
           {tags.length > 0 && (
             <button

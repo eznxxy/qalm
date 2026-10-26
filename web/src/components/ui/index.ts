@@ -13,3 +13,5 @@ export type {
 } from "./DataTable";
 export { Drawer } from "./Drawer";
 export type { DrawerProps } from "./Drawer";
+export { DisabledHint } from "./DisabledHint";
+export type { DisabledHintProps } from "./DisabledHint";

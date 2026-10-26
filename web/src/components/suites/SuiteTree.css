@@ -163,13 +163,13 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 15px;
   line-height: 1;
   cursor: pointer;
 }
@@ -197,6 +197,32 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 16px;
+}
+
+/* Drag affordance (DESIGN §4.2, §5 "Tree"): rows that accept a drag show a
+ * grab cursor and a grip handle on the right, so reorder/nest is
+ * discoverable without a hover. The handle brightens on hover/focus. */
+.suite-tree-item.is-draggable {
+  cursor: grab;
+}
+
+.suite-tree-item.is-draggable.is-dragging {
+  cursor: grabbing;
+}
+
+.suite-grip {
+  flex: none;
+  margin-left: var(--space-2);
+  color: var(--ink-500);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.suite-tree-item.is-draggable:hover .suite-grip,
+.suite-tree-item.is-draggable:focus-visible .suite-grip {
+  color: var(--ink-900);
+  opacity: 1;
 }
 
 .suite-pane-footer {

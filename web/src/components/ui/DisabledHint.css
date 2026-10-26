@@ -1,0 +1,15 @@
+/*
+ * DisabledHint — see DisabledHint.tsx. Tokens only (no hard-coded palette).
+ */
+
+.disabled-hint {
+  display: inline-flex;
+  min-width: 0;
+}
+
+/* The wrapper, not the dead control, owns the hover that shows the title.
+ * Only disabled children are made transparent: an enabled control keeps all
+ * of its own pointer behaviour. */
+.disabled-hint > :disabled {
+  pointer-events: none;
+}

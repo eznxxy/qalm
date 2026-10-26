@@ -13,6 +13,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { DisabledHint } from "@/components/ui";
 
 export interface MoveDialogOption {
   value: string;
@@ -122,12 +123,24 @@ export function MoveDialog({
             </select>
           </div>
           <div className="button-row dialog-actions">
-            <button type="submit" className="primary" disabled={busy || !value}>
-              {busy ? "Moving…" : confirmLabel}
-            </button>
-            <button type="button" disabled={busy} onClick={onCancel}>
-              Cancel
-            </button>
+            <DisabledHint
+              hint={
+                busy
+                  ? "Moving — please wait"
+                  : !value
+                    ? "Choose a destination first"
+                    : null
+              }
+            >
+              <button type="submit" className="primary" disabled={busy || !value}>
+                {busy ? "Moving…" : confirmLabel}
+              </button>
+            </DisabledHint>
+            <DisabledHint hint={busy ? "Can't cancel while moving" : null}>
+              <button type="button" disabled={busy} onClick={onCancel}>
+                Cancel
+              </button>
+            </DisabledHint>
           </div>
         </form>
       </div>

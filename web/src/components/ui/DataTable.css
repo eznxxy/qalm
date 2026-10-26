@@ -214,6 +214,13 @@ th.dt-head-number .dt-header-label {
   margin: 0 0 8px;
 }
 
+/* The empty state is a single centred message block (title + body + the one
+ * primary action). The full-width table-cell keeps the block vertically
+ * centred; text-align centres the copy and the inline action together. */
+.dt-status-empty > div {
+  text-align: center;
+}
+
 /* --------------------------------------------------------- skeleton */
 
 .dt-skeleton-bar {
