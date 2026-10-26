@@ -432,6 +432,21 @@ describe("cases screen", () => {
     expect(lastReplaceUrl()).toContain("sort=-priority");
   });
 
+  it("marks the Type and Updated columns for shrink-to-fit sizing", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+    const table = screen.getByRole("table", { name: "Test cases" });
+
+    // DataTable applies col.className to both the th and the td, and cases.css
+    // keys on these classes to size each column to its own value length rather
+    // than letting the value wrap onto a second line.
+    for (const cls of ["case-col-type", "case-col-updated"]) {
+      expect(table.querySelector(`thead th.${cls}`)).not.toBeNull();
+      expect(table.querySelector(`tbody td.${cls}`)).not.toBeNull();
+    }
+  });
+
   it("dismisses a success notification with its × button", async () => {
     mockApi();
     await renderPage();

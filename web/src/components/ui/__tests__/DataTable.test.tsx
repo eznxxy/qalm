@@ -187,6 +187,22 @@ describe("DataTable selection", () => {
     expect(screen.getByTestId("count")).toHaveTextContent("0");
   });
 
+  it("header and row selection cells share the geometry classes the CSS aligns on", () => {
+    const { container } = render(<SelectionHarness />);
+    // The CSS centres the two checkbox boxes on one vertical axis by keying on
+    // these classes (.dt-table th.dt-select-all / .dt-table tbody td.dt-select-cell);
+    // dropping either one re-introduces the 12px header/body misalignment.
+    const header = container.querySelector("thead th.dt-select-all");
+    expect(header).not.toBeNull();
+    expect(
+      header!.querySelector(".dt-checkbox input[type='checkbox']")
+    ).not.toBeNull();
+    const rowCheckboxes = container.querySelectorAll(
+      "tbody td.dt-select-cell .dt-checkbox input[type='checkbox']"
+    );
+    expect(rowCheckboxes).toHaveLength(3);
+  });
+
   it("header checkbox: unchecked -> all -> none", () => {
     render(<SelectionHarness />);
     const header = screen.getByLabelText("Select all 3 rows");

@@ -661,6 +661,7 @@ export default function CasesPage() {
     {
       key: "type",
       header: "Type",
+      className: "case-col-type",
       render: (row) => CASE_TYPE_LABELS[row.type],
     },
     {
@@ -672,6 +673,7 @@ export default function CasesPage() {
     {
       key: "updated_at",
       header: "Updated",
+      className: "case-col-updated",
       sortable: true,
       sortValue: (row) => row.updated_at,
       render: (row) => {

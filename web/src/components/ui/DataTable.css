@@ -166,10 +166,22 @@ th.dt-head-number .dt-header-label {
 
 /* -------------------------------------------------------- selection */
 
-.dt-select-all {
+/* Header and body selection cells share one geometry so the two checkboxes
+ * line up on the same vertical axis. `.dt-table tbody td` (0,1,2) would win
+ * over a bare `.dt-select-cell` (0,1,0), so the body rule is prefixed with
+ * `.dt-table tbody` to keep the 40px/padding-0 box on both cells. */
+.dt-table th.dt-select-all,
+.dt-table tbody td.dt-select-cell {
   width: 40px;
   min-width: 40px;
   padding: 0;
+}
+
+/* The 32px checkbox box sits centred inside the 40px cell (4px either side)
+ * instead of hugging the left edge of the body cell's 12px padding. */
+.dt-table th.dt-select-all .dt-checkbox,
+.dt-table tbody td.dt-select-cell .dt-checkbox {
+  margin: 0 auto;
 }
 
 .dt-checkbox {

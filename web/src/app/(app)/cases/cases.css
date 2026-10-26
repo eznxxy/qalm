@@ -171,6 +171,17 @@
   white-space: nowrap;
 }
 
+/* Type and Updated hold short, fixed-shape values, so their columns shrink to
+ * the content instead of sharing the spare width equally with Title. `width:
+ * 1%` is the auto-layout shrink-to-fit idiom; `nowrap` keeps the widest row /
+ * header as the floor. DataTable applies `col.className` to both the th and
+ * the td, so one rule sizes the header and every body cell together. */
+.cases-table-scroll .case-col-type,
+.cases-table-scroll .case-col-updated {
+  width: 1%;
+  white-space: nowrap;
+}
+
 /* 1024: keep both panes but give the table more room. */
 @media (max-width: 1279px) and (min-width: 768px) {
   .cases-layout {

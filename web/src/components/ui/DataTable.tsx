@@ -473,7 +473,7 @@ export function DataTable<T>({
               return (
                 <tr key={id} className={rowClassNameList}>
                   {selectable && (
-                    <td>
+                    <td className="dt-select-cell">
                       <span className="dt-checkbox">
                         <input
                           type="checkbox"
