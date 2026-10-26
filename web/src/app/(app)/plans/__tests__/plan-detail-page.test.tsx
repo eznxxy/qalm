@@ -86,6 +86,7 @@ function makeRun(overrides: Partial<Run> = {}): Run {
     name: "Release 2.4 smoke",
     description: null,
     status: "open",
+    start_date: null,
     due_date: "2026-11-10",
     completed_at: null,
     completed_by: null,

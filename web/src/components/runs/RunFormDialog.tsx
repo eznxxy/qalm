@@ -27,6 +27,7 @@ import type {
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
+import { isDateOnly } from "@/lib/dates";
 import { suiteSearchOptions } from "@/lib/suites";
 import { Combobox, DisabledHint } from "@/components/ui";
 
@@ -41,6 +42,8 @@ export interface RunFormValues {
   description: string;
   /** Empty string = no plan. */
   planId: string;
+  /** Empty string = no start date; otherwise `YYYY-MM-DD`. */
+  startDate: string;
   /** Empty string = no due date; otherwise `YYYY-MM-DD`. */
   dueDate: string;
 }
@@ -53,6 +56,7 @@ export interface RunFormDialogProps {
   serverFieldErrors?: {
     name?: string;
     description?: string;
+    start_date?: string;
     due_date?: string;
     plan_id?: string;
     selection?: string;
@@ -65,7 +69,19 @@ export interface RunFormDialogProps {
 interface Errors {
   name?: string;
   description?: string;
+  startDate?: string;
+  dueDate?: string;
 }
+
+/** Form field → the `field` string the API uses in `error.details`. */
+type ServerField = keyof NonNullable<RunFormDialogProps["serverFieldErrors"]>;
+
+const SERVER_FIELDS: Record<keyof Errors, ServerField> = {
+  name: "name",
+  description: "description",
+  startDate: "start_date",
+  dueDate: "due_date",
+};
 
 /** True when the key's target is an expanded combobox (its list is open). */
 function isExpandedCombobox(target: EventTarget | null): boolean {
@@ -90,6 +106,7 @@ export function RunFormDialog({
     name: "",
     description: "",
     planId: "",
+    startDate: "",
     dueDate: "",
   });
   const [suiteId, setSuiteId] = useState("");
@@ -115,6 +132,7 @@ export function RunFormDialog({
   const nameId = useId();
   const descriptionId = useId();
   const planId = useId();
+  const startDateId = useId();
   const dueDateId = useId();
   const suiteIdField = useId();
   const descendantsId = useId();
@@ -129,10 +147,27 @@ export function RunFormDialog({
   if (values.description.trim().length > RUN_DESCRIPTION_MAX) {
     errors.description = `Description must be at most ${RUN_DESCRIPTION_MAX} characters.`;
   }
+  if (values.startDate && !isDateOnly(values.startDate)) {
+    errors.startDate = "Use a valid date (YYYY-MM-DD).";
+  }
+  if (values.dueDate && !isDateOnly(values.dueDate)) {
+    errors.dueDate = "Use a valid date (YYYY-MM-DD).";
+  }
+  // Both are plain `YYYY-MM-DD`, so a string comparison is a date comparison.
+  // The API enforces the same rule (docs/api-runs.md § Validation).
+  if (
+    values.startDate &&
+    values.dueDate &&
+    !errors.startDate &&
+    !errors.dueDate &&
+    values.startDate > values.dueDate
+  ) {
+    errors.startDate = "Start date must be on or before the due date.";
+  }
 
   function shown(field: keyof Errors): string | undefined {
     return (
-      serverFieldErrors?.[field] ??
+      serverFieldErrors?.[SERVER_FIELDS[field]] ??
       (submitted || touched.has(field) ? errors[field] : undefined)
     );
   }
@@ -265,12 +300,13 @@ export function RunFormDialog({
   function handleSubmit(event: FormEvent): void {
     event.preventDefault();
     setSubmitted(true);
-    if (errors.name || errors.description) return;
+    if (Object.keys(errors).length > 0) return;
     onSubmit(
       {
         name: trimmedName,
         description: values.description.trim(),
         planId: values.planId,
+        startDate: values.startDate,
         dueDate: values.dueDate,
       },
       buildSelection()
@@ -383,20 +419,55 @@ export function RunFormDialog({
             </div>
 
             <div className="field">
+              <label htmlFor={startDateId}>Start date</label>
+              <input
+                id={startDateId}
+                type="date"
+                value={values.startDate}
+                disabled={busy}
+                max={values.dueDate || undefined}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    startDate: event.target.value,
+                  }))
+                }
+                aria-invalid={shown("startDate") ? true : undefined}
+                aria-describedby={
+                  shown("startDate") ? `${startDateId}-error` : undefined
+                }
+              />
+              {shown("startDate") && (
+                <p className="field-error" id={`${startDateId}-error`}>
+                  {shown("startDate")}
+                </p>
+              )}
+            </div>
+
+            <div className="field">
               <label htmlFor={dueDateId}>Due date</label>
               <input
                 id={dueDateId}
                 type="date"
                 value={values.dueDate}
                 disabled={busy}
+                min={values.startDate || undefined}
                 onChange={(event) =>
                   setValues((current) => ({
                     ...current,
                     dueDate: event.target.value,
                   }))
                 }
-                aria-invalid={serverFieldErrors?.due_date ? true : undefined}
+                aria-invalid={shown("dueDate") ? true : undefined}
+                aria-describedby={
+                  shown("dueDate") ? `${dueDateId}-error` : undefined
+                }
               />
+              {shown("dueDate") && (
+                <p className="field-error" id={`${dueDateId}-error`}>
+                  {shown("dueDate")}
+                </p>
+              )}
             </div>
           </div>
 

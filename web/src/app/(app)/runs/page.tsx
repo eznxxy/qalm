@@ -314,6 +314,7 @@ export default function RunsPage() {
   const [createFieldErrors, setCreateFieldErrors] = useState<{
     name?: string;
     description?: string;
+    start_date?: string;
     due_date?: string;
     plan_id?: string;
     selection?: string;
@@ -333,6 +334,7 @@ export default function RunsPage() {
         name: values.name,
         ...(values.description ? { description: values.description } : {}),
         ...(values.planId ? { plan_id: values.planId } : {}),
+        ...(values.startDate ? { start_date: values.startDate } : {}),
         ...(values.dueDate ? { due_date: values.dueDate } : {}),
         ...(selection ? { selection } : {}),
       });
@@ -350,6 +352,7 @@ export default function RunsPage() {
         if (
           detail.field === "name" ||
           detail.field === "description" ||
+          detail.field === "start_date" ||
           detail.field === "due_date" ||
           detail.field === "plan_id" ||
           detail.field === "selection"

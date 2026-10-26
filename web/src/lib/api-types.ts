@@ -429,6 +429,8 @@ export interface Run {
   name: string;
   description: string | null;
   status: RunStatus;
+  /** Plain `YYYY-MM-DD`, not an instant; may not be after `due_date`. */
+  start_date: string | null;
   /** Plain `YYYY-MM-DD`, not an instant. */
   due_date: string | null;
   completed_at: string | null;
@@ -481,6 +483,8 @@ export interface CreateRunInput {
   name: string;
   description?: string;
   plan_id?: string;
+  /** Plain `YYYY-MM-DD`; server 400s a start date after `due_date`. */
+  start_date?: string;
   due_date?: string;
   selection?: RunSelection;
 }
@@ -491,6 +495,7 @@ export interface UpdateRunInput {
   description?: string | null;
   /** `null` detaches the run from its plan. */
   plan_id?: string | null;
+  start_date?: string | null;
   due_date?: string | null;
 }
 

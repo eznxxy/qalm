@@ -114,6 +114,7 @@ function run(overrides: Partial<Run> & { id: string; name: string }): Run {
     plan_id: null,
     description: null,
     status: "open",
+    start_date: null,
     due_date: null,
     completed_at: null,
     completed_by: null,
@@ -169,7 +170,7 @@ interface ApiOptions {
   runs?: Run[];
   plans?: Plan[];
   /** Make the create POST fail with a 400 so the field error shows. */
-  createError?: boolean;
+  createError?: boolean | "start_date";
 }
 
 function mockApi({
@@ -197,12 +198,17 @@ function mockApi({
       }
       if (/\/projects\/[\w-]+\/runs$/.test(target) && method === "POST") {
         if (createError) {
+          const field = createError === "start_date" ? "start_date" : "name";
+          const issue =
+            createError === "start_date"
+              ? "must be on or before due_date"
+              : "Name is required.";
           return Promise.resolve(
             jsonResponse(400, {
               error: {
                 code: "VALIDATION_ERROR",
                 message: "Validation failed.",
-                details: [{ field: "name", issue: "Name is required." }],
+                details: [{ field, issue }],
               },
             })
           );
@@ -415,6 +421,64 @@ describe("runs list", () => {
         "/runs/r-new?project=p-1"
       )
     );
+  });
+
+  it("posts the start and due dates when both are filled in", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New run" }));
+    const dialog = await screen.findByRole("dialog", { name: "New run" });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Checkout smoke" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Start date"), {
+      target: { value: "2026-11-01" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Due date"), {
+      target: { value: "2026-11-14" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create run" }));
+
+    const post = await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        ([url, init]) =>
+          /\/projects\/[\w-]+\/runs$/.test(String(url)) &&
+          init?.method === "POST"
+      );
+      expect(call).toBeTruthy();
+      return call!;
+    });
+    expect(JSON.parse(post[1]?.body as string)).toEqual({
+      name: "Checkout smoke",
+      start_date: "2026-11-01",
+      due_date: "2026-11-14",
+    });
+  });
+
+  it("shows a server start_date error on the Start date field", async () => {
+    mockApi({ createError: "start_date" });
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New run" }));
+    const dialog = await screen.findByRole("dialog", { name: "New run" });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Checkout smoke" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create run" }));
+
+    expect(
+      await screen.findByText("must be on or before due_date")
+    ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Start date")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+    expect(mockRouterState.push).not.toHaveBeenCalled();
   });
 
   it("shows a server field error on a failed create", async () => {

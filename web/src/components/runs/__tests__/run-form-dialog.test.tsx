@@ -169,10 +169,71 @@ describe("RunFormDialog", () => {
         name: "Checkout smoke",
         description: "",
         planId: "",
+        startDate: "",
         dueDate: "",
       },
       undefined
     );
+  });
+
+  it("hands back the start and due dates as plain YYYY-MM-DD values", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit);
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Checkout smoke" },
+    });
+    fireEvent.change(screen.getByLabelText("Start date"), {
+      target: { value: "2026-11-01" },
+    });
+    fireEvent.change(screen.getByLabelText("Due date"), {
+      target: { value: "2026-11-14" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create run" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: "2026-11-01", dueDate: "2026-11-14" }),
+      undefined
+    );
+  });
+
+  it("blocks submit when the start date is after the due date", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit);
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Checkout smoke" },
+    });
+    fireEvent.change(screen.getByLabelText("Start date"), {
+      target: { value: "2026-11-20" },
+    });
+    fireEvent.change(screen.getByLabelText("Due date"), {
+      target: { value: "2026-11-14" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create run" }));
+
+    expect(
+      screen.getByText("Start date must be on or before the due date.")
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("accepts the same day for both dates", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit);
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Checkout smoke" },
+    });
+    fireEvent.change(screen.getByLabelText("Start date"), {
+      target: { value: "2026-11-14" },
+    });
+    fireEvent.change(screen.getByLabelText("Due date"), {
+      target: { value: "2026-11-14" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create run" }));
+
+    expect(onSubmit).toHaveBeenCalled();
   });
 
   it("builds a suite selection with descendants included by default", async () => {

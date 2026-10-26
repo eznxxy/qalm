@@ -710,6 +710,7 @@ export default function RunDetailPage() {
 
   const subtitleParts = [project.name];
   if (planName) subtitleParts.push(planName);
+  if (run.start_date) subtitleParts.push(`Starts ${formatDateOnly(run.start_date)}`);
   if (run.due_date) subtitleParts.push(`Due ${formatDateOnly(run.due_date)}`);
 
   return (

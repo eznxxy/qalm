@@ -14,6 +14,9 @@
  */
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Plan } from "@/lib/api-types";
+import { isDateOnly } from "@/lib/dates";
+
+export { isDateOnly };
 
 export const PLAN_NAME_MAX = 120;
 export const PLAN_DESCRIPTION_MAX = 1000;
@@ -44,20 +47,6 @@ interface Errors {
   name?: string;
   description?: string;
   dueDate?: string;
-}
-
-const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** True for a real calendar date in `YYYY-MM-DD` form (2026-02-30 is not). */
-export function isDateOnly(value: string): boolean {
-  if (!DATE_ONLY_RE.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year!, month! - 1, day!));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month! - 1 &&
-    date.getUTCDate() === day
-  );
 }
 
 export function PlanFormDialog({

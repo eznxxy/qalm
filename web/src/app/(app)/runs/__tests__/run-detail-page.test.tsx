@@ -118,6 +118,7 @@ function run(overrides: Partial<Run> = {}): Run {
     name: "Release 2.4 smoke",
     description: "Smoke pass.",
     status: "open",
+    start_date: "2026-11-01",
     due_date: "2026-11-14",
     completed_at: null,
     completed_by: null,
@@ -348,9 +349,11 @@ describe("run detail", () => {
       await screen.findByRole("heading", { level: 1, name: "Release 2.4 smoke" })
     ).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
-    // Subtitle stitches project · plan · due date.
+    // Subtitle stitches project · plan · start date · due date.
     expect(
-      screen.getByText("Payments · Release 2.4 · Due 14 Nov 2026")
+      screen.getByText(
+        "Payments · Release 2.4 · Starts 1 Nov 2026 · Due 14 Nov 2026"
+      )
     ).toBeInTheDocument();
 
     const table = await screen.findByRole("table", { name: "Run items" });
@@ -364,6 +367,14 @@ describe("run detail", () => {
 
     // The list was fetched with the default (position) sort.
     expect(itemListCalls()[0]).toContain("sort=position");
+  });
+
+  it("omits the dates from the subtitle when the run has none", async () => {
+    mockApi({ run: run({ start_date: null, due_date: null }) });
+    await renderPage();
+
+    await screen.findByRole("heading", { level: 1, name: "Release 2.4 smoke" });
+    expect(screen.getByText("Payments · Release 2.4")).toBeInTheDocument();
   });
 
   it("opens the result drawer through ?item in the URL", async () => {
