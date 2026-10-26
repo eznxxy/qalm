@@ -162,7 +162,7 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   card 3.3. 442 unit green (29 suites); a UI e2e suite does not exist (the "e2e"
   suites are server-side `*.e2e-spec.ts`, untouched here).
 
-### Card 3.2 — Run detail + result drawer (large — the most-used screen) — PENDING
+### Card 3.2 — Run detail + result drawer (large — the most-used screen) — DONE 2026-10-26
 - Route `/runs/[id]`: header (name, status bar + "62% done · N passed · …",
   `[Assign] [Close run]`/`[Reopen]`), filter bar (Status / Assignee / Section /
   search, §4.4), items table (ID `C####`, title, Status badge, assignee,
@@ -172,6 +172,43 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   elapsed time, defect link, attachment drop-zone; "Save and next"
   (`Ctrl+Enter`) advances to the next `untested` row; item result history.
 - Assign / bulk assign; remove item (disabled with a reason once results exist).
+- Notes: new `app/(app)/runs/[id]/page.tsx` (+ `run-detail.css`, all `rd-*`
+  classes) and `components/runs/RunResultDrawer.tsx`,
+  `components/runs/AssignItemsDialog.tsx`, `components/runs/MarkdownLite.tsx`,
+  `lib/run-detail-url.ts`, `lib/markdown-lite.ts`. The URL is the state:
+  `item` (drawer), repeatable `status` (comma-separated, sent as repeated query
+  params), `assignee` (`none` = unassigned), `suite`, `query`, `sort` (default
+  `position`) and `page`. A filter/search change resets the page; opening or
+  closing the drawer never does, and the items list is keyed on the params with
+  `item` removed, so recording a result does not refetch the table. Run status
+  renders as a plain chip (`rd-run-status`) because `StatusBadge` only accepts
+  the six result names; the items table's Status column does use `StatusBadge`.
+  The drawer gates per item, not per run: `canRecordHere = canRecord &&
+  canRecordOnItem(role, userId, item.assignee_id)` is computed **after** the item
+  loads, so a deep link to an item outside the loaded page still gates correctly
+  (the page only passes the run-level `canRecord` + the reason it is false).
+  Shortcuts live in a scoped keymap on a `display: contents` wrapper around the
+  shared `Drawer` (`data-shortcut-scope="run-result-form"`): `P F B R S` set the
+  status, `Ctrl/Cmd+Enter` saves and advances to the next untested row of the
+  loaded page (no next row ⇒ the drawer closes). Comments are markdown-lite —
+  plain text, line breaks and auto-linked `http(s)` URLs only, rendered as React
+  nodes (never `dangerouslySetInnerHTML`); a bare `https://` with no host stays
+  text. Attachments: files staged on a new result upload one-per-request after
+  the result is created; only the latest result offers `Edit result` (status is
+  immutable, the segmented buttons are disabled while editing) and
+  `Add attachment`, both for the author or Admin/Lead. `Remove from run` sits in
+  the drawer footer and is disabled with "Items with results cannot be removed —
+  clear the assignee instead" once `result_count > 0`. Client attachment rules
+  mirror the server (allow-list, 5 per result, 10 MB each). `api-client.ts` grew
+  a `formData` request option (multipart, no explicit `Content-Type`) and
+  `apiFetchBlob` (token + one refresh/retry on 401) for attachment downloads.
+  Assign options are role-limited: Admin gets the active `admin|lead|tester`
+  users by name from `GET /users`, while Lead/Tester get the ids already on the
+  run (short ids) plus Unassign with a hint — **flagged to Daedalus**: the
+  contract has no non-Admin user list, and the run screen has no "add cases"
+  control yet (card 3.4). Tests: 8 page, 8 drawer, 30 for `run-detail-url` +
+  `markdown-lite`; full web suite 488 unit green (33 suites), `tsc`/`lint`/`build`
+  clean. Only `/wip/plans` → `/plans` and the cases↔runs wiring remain (3.3, 3.4).
 
 ### Card 3.3 — Plans screen (medium) — PENDING
 - Route `/plans` replacing `/wip/plans`; plans table with an aggregate status

@@ -468,3 +468,213 @@ export interface CreateRunInput {
   due_date?: string;
   selection?: RunSelection;
 }
+
+/** Any non-empty subset per PATCH /runs/:id. */
+export interface UpdateRunInput {
+  name?: string;
+  description?: string | null;
+  /** `null` detaches the run from its plan. */
+  plan_id?: string | null;
+  due_date?: string | null;
+}
+
+// ---- run items & results (docs/api-runs.md) ----
+
+/** An item's status: its latest result, or `untested` when it has none. */
+export type ItemStatus =
+  | "passed"
+  | "failed"
+  | "blocked"
+  | "retest"
+  | "skipped"
+  | "untested";
+
+export const ITEM_STATUSES: readonly ItemStatus[] = [
+  "passed",
+  "failed",
+  "blocked",
+  "retest",
+  "skipped",
+  "untested",
+] as const;
+
+/** What a result may be recorded with — everything except `untested`. */
+export type ResultStatus = Exclude<ItemStatus, "untested">;
+
+export const RESULT_STATUSES: readonly ResultStatus[] = [
+  "passed",
+  "failed",
+  "blocked",
+  "retest",
+  "skipped",
+] as const;
+
+/** Result status → its design shortcut (DESIGN §4.4: P, F, B, R, S). */
+export const RESULT_STATUS_SHORTCUTS: Record<ResultStatus, string> = {
+  passed: "P",
+  failed: "F",
+  blocked: "B",
+  retest: "R",
+  skipped: "S",
+};
+
+export function isResultStatus(value: string): value is ResultStatus {
+  return (RESULT_STATUSES as readonly string[]).includes(value);
+}
+
+export function isItemStatus(value: string): value is ItemStatus {
+  return (ITEM_STATUSES as readonly string[]).includes(value);
+}
+
+/** docs/api-runs.md § Resource: Result → attachments[] */
+export interface ResultAttachment {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+/** docs/api-runs.md § Resource: Result */
+export interface Result {
+  id: string;
+  run_item_id: string;
+  status: ResultStatus;
+  comment: string | null;
+  elapsed_minutes: number | null;
+  defect_url: string | null;
+  attachments: ResultAttachment[];
+  created_by: string;
+  created_at: string;
+}
+
+/** The item's newest result as embedded in the items list (no bytes). */
+export interface LatestResult {
+  id: string;
+  status: ResultStatus;
+  comment: string | null;
+  elapsed_minutes: number | null;
+  defect_url: string | null;
+  attachment_count: number;
+  created_by: string;
+  created_at: string;
+}
+
+/** docs/api-runs.md § Resource: Run item */
+export interface RunItem {
+  id: string;
+  run_id: string;
+  /** `null` only if the case row was later hard-deleted (the snapshot stays).
+   */
+  case_id: string | null;
+  case_display_id: string;
+  case_title: string;
+  case_priority: Priority;
+  case_suite_id: string | null;
+  assignee_id: string | null;
+  /** The run's authored order (ascending). */
+  position: number;
+  status: ItemStatus;
+  result_count: number;
+  latest_result: LatestResult | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GET /runs/:id/items/:itemId — the item plus the result drawer's snapshots. */
+export interface RunItemDetail extends RunItem {
+  case_steps: CaseStep[];
+  /** Read-through from the live case, not snapshotted. */
+  case_preconditions: string | null;
+}
+
+export type RunItemSortKey =
+  | "position"
+  | "case_display_id"
+  | "status"
+  | "updated_at";
+
+/** `status` sorts by severity: failed → blocked → retest → passed → skipped →
+ * untested (server-side). */
+export type RunItemSort =
+  | "position"
+  | "-position"
+  | "case_display_id"
+  | "-case_display_id"
+  | "status"
+  | "-status"
+  | "updated_at"
+  | "-updated_at";
+
+export interface RunItemListQuery {
+  /** Repeatable; OR within. `untested` matches items with no results. */
+  status?: ItemStatus[];
+  /** A user id, or the literal `"none"` for unassigned items. */
+  assignee_id?: string;
+  /** Matches the item's snapshotted `case_suite_id` (with descendants). */
+  suite_id?: string;
+  query?: string;
+  sort?: RunItemSort;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateResultInput {
+  status: ResultStatus;
+  /** Required when `status` is `failed` (validated by the API too). */
+  comment?: string;
+  elapsed_minutes?: number;
+  defect_url?: string;
+}
+
+/** PATCH /results/:id — `status` is immutable and never accepted. */
+export interface UpdateResultInput {
+  comment?: string | null;
+  elapsed_minutes?: number | null;
+  defect_url?: string | null;
+}
+
+export interface ResultListQuery {
+  page?: number;
+  limit?: number;
+}
+
+/** POST /runs/:id/items/:itemId (single) or the bulk POST /runs/:id/assign. */
+export interface AssignRunItemsInput {
+  /** `null` unassigns. */
+  assignee_id: string | null;
+  /** Omit to assign every item in the run. */
+  item_ids?: string[];
+}
+
+/** Any non-empty subset per PATCH /runs/:id/items/:itemId. */
+export interface UpdateRunItemInput {
+  assignee_id?: string | null;
+  position?: number;
+}
+
+export interface AddRunItemsInput {
+  case_ids: string[];
+}
+
+export interface AddRunItemsResult {
+  added: number;
+  skipped: number;
+  item_ids: string[];
+}
+
+/** GET /cases/:id/runs — a run that contains the case (Linked runs tab). */
+export interface LinkedRun {
+  run_id: string;
+  run_name: string;
+  run_status: RunStatus;
+  plan_id: string | null;
+  item_id: string;
+  status: ItemStatus;
+  updated_at: string;
+}
+
+export interface LinkedRunQuery {
+  page?: number;
+  limit?: number;
+}

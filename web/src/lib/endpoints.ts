@@ -1,5 +1,8 @@
 import { createApiClient, ApiClient, RequestOptions } from "./api-client";
 import {
+  AddRunItemsInput,
+  AddRunItemsResult,
+  AssignRunItemsInput,
   AuthSession,
   BootstrapInput,
   BulkMoveCasesInput,
@@ -10,10 +13,13 @@ import {
   CaseListQuery,
   CaseListItem,
   CreateProjectInput,
+  CreateResultInput,
   CreateRunInput,
   CreateSuiteInput,
   CreateUserInput,
   CreateCaseInput,
+  LinkedRun,
+  LinkedRunQuery,
   LoginInput,
   PatchMeInput,
   Plan,
@@ -22,12 +28,21 @@ import {
   ProjectListQuery,
   RefreshResult,
   ReorderSuitesInput,
+  Result,
+  ResultAttachment,
+  ResultListQuery,
   Run,
+  RunItem,
+  RunItemDetail,
+  RunItemListQuery,
   RunListQuery,
   SuiteDetail,
   SuiteNode,
   UpdateCaseInput,
   UpdateProjectInput,
+  UpdateResultInput,
+  UpdateRunInput,
+  UpdateRunItemInput,
   UpdateSuiteInput,
   UpdateUserInput,
   User,
@@ -255,5 +270,114 @@ export const api = {
     client.apiFetch<Run>(
       `/projects/${encodeURIComponent(projectId)}/runs`,
       opts("POST", input)
+    ),
+
+  getRun: (id: string) => client.apiFetch<Run>(`/runs/${encodeURIComponent(id)}`),
+
+  updateRun: (id: string, input: UpdateRunInput) =>
+    client.apiFetch<Run>(`/runs/${encodeURIComponent(id)}`, opts("PATCH", input)),
+
+  closeRun: (id: string) =>
+    client.apiFetch<Run>(`/runs/${encodeURIComponent(id)}/close`, opts("POST")),
+
+  reopenRun: (id: string) =>
+    client.apiFetch<Run>(`/runs/${encodeURIComponent(id)}/reopen`, opts("POST")),
+
+  deleteRun: (id: string) =>
+    client.apiFetch<void>(`/runs/${encodeURIComponent(id)}`, opts("DELETE")),
+
+  // ---- run items (docs/api-runs.md) ----
+  listRunItems: (runId: string, query: RunItemListQuery = {}) =>
+    client.apiFetchPage<RunItem>(
+      `/runs/${encodeURIComponent(runId)}/items`,
+      {
+        query: {
+          status: query.status?.length ? query.status : undefined,
+          assignee_id: query.assignee_id,
+          suite_id: query.suite_id,
+          query: query.query,
+          sort: query.sort,
+          page: query.page,
+          limit: query.limit,
+        },
+      }
+    ),
+
+  /** The result drawer's data: the item plus its snapshotted case steps. */
+  getRunItem: (runId: string, itemId: string) =>
+    client.apiFetch<RunItemDetail>(
+      `/runs/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}`
+    ),
+
+  /** Admin/Lead; a case already in the run is skipped, not an error. */
+  addRunItems: (runId: string, input: AddRunItemsInput) =>
+    client.apiFetch<AddRunItemsResult>(
+      `/runs/${encodeURIComponent(runId)}/items`,
+      opts("POST", input)
+    ),
+
+  updateRunItem: (runId: string, itemId: string, input: UpdateRunItemInput) =>
+    client.apiFetch<RunItem>(
+      `/runs/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}`,
+      opts("PATCH", input)
+    ),
+
+  /** Omitting `item_ids` assigns every item in the run. */
+  assignRunItems: (runId: string, input: AssignRunItemsInput) =>
+    client.apiFetch<{ assigned: number }>(
+      `/runs/${encodeURIComponent(runId)}/assign`,
+      opts("POST", input)
+    ),
+
+  deleteRunItem: (runId: string, itemId: string) =>
+    client.apiFetch<void>(
+      `/runs/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}`,
+      opts("DELETE")
+    ),
+
+  // ---- results & attachments (docs/api-runs.md) ----
+  createResult: (runId: string, itemId: string, input: CreateResultInput) =>
+    client.apiFetch<Result>(
+      `/runs/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}/results`,
+      opts("POST", input)
+    ),
+
+  listItemResults: (runId: string, itemId: string, query: ResultListQuery = {}) =>
+    client.apiFetchPage<Result>(
+      `/runs/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}/results`,
+      { query: { page: query.page, limit: query.limit } }
+    ),
+
+  updateResult: (resultId: string, input: UpdateResultInput) =>
+    client.apiFetch<Result>(
+      `/results/${encodeURIComponent(resultId)}`,
+      opts("PATCH", input)
+    ),
+
+  /** One file per request, field name `file` (DESIGN §4.4). */
+  uploadResultAttachment: (resultId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return client.apiFetch<ResultAttachment>(
+      `/results/${encodeURIComponent(resultId)}/attachments`,
+      { method: "POST", formData }
+    );
+  },
+
+  deleteAttachment: (id: string) =>
+    client.apiFetch<void>(
+      `/attachments/${encodeURIComponent(id)}`,
+      opts("DELETE")
+    ),
+
+  /** Bytes for GET /attachments/:id — always sent with the access token. */
+  fetchAttachmentBlob: (id: string) =>
+    client.apiFetchBlob(`/attachments/${encodeURIComponent(id)}`),
+
+  // ---- linked runs (docs/api-runs.md § Linked runs; card 3.4) ----
+  listCaseRuns: (caseId: string, query: LinkedRunQuery = {}) =>
+    client.apiFetchPage<LinkedRun>(
+      `/cases/${encodeURIComponent(caseId)}/runs`,
+      { query: { page: query.page, limit: query.limit } }
     ),
 };

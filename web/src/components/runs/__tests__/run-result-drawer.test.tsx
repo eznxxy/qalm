@@ -1,0 +1,224 @@
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import React from "react";
+import type { Result, RunItemDetail } from "@/lib/api-types";
+
+/**
+ * RunResultDrawer (card 3.2). The behaviour the primitives do not own: the
+ * failed⇒comment rule shown inline (PRD criterion 4), the save / save-and-next
+ * paths, the per-item Tester gate and the "status is immutable" edit path.
+ *
+ * The API module is mocked at its relative path so the component's `@/lib`
+ * import and the mock resolve to the same module.
+ */
+
+const mockApi = {
+  getRunItem: jest.fn(),
+  listItemResults: jest.fn(),
+  createResult: jest.fn(),
+  updateResult: jest.fn(),
+  uploadResultAttachment: jest.fn(),
+  deleteAttachment: jest.fn(),
+  deleteRunItem: jest.fn(),
+  fetchAttachmentBlob: jest.fn(),
+};
+
+jest.mock("../../../lib/endpoints", () => ({ api: mockApi }));
+
+function detail(overrides: Partial<RunItemDetail> = {}): RunItemDetail {
+  return {
+    id: "i-1",
+    run_id: "r-1",
+    case_id: "c-1",
+    case_display_id: "C1042",
+    case_title: "Pay with a saved card",
+    case_priority: "high",
+    case_suite_id: "s-1",
+    assignee_id: "u-1",
+    position: 1,
+    status: "untested",
+    result_count: 0,
+    latest_result: null,
+    created_at: "2026-10-24T09:00:00Z",
+    updated_at: "2026-10-24T09:00:00Z",
+    case_steps: [{ position: 1, text: "Open checkout", expected_result: "Cart shows" }],
+    case_preconditions: "Signed in as a returning customer.",
+    ...overrides,
+  };
+}
+
+function result(overrides: Partial<Result> = {}): Result {
+  return {
+    id: "res-1",
+    run_item_id: "i-1",
+    status: "passed",
+    comment: "All good",
+    elapsed_minutes: 5,
+    defect_url: null,
+    attachments: [],
+    created_by: "u-1",
+    created_at: "2026-10-25T09:00:00Z",
+    ...overrides,
+  };
+}
+
+interface RenderOptions {
+  canRecord?: boolean;
+  canManage?: boolean;
+  role?: "admin" | "lead" | "tester" | "viewer";
+  userId?: string;
+  nextUntestedId?: string | null;
+  recordHint?: string | null;
+}
+
+async function renderDrawer(options: RenderOptions = {}): Promise<{
+  onChanged: jest.Mock;
+  onSaveAndNext: jest.Mock;
+  onRemoved: jest.Mock;
+}> {
+  const onChanged = jest.fn();
+  const onSaveAndNext = jest.fn();
+  const onRemoved = jest.fn();
+  const { RunResultDrawer } = await import("@/components/runs/RunResultDrawer");
+  // The drawer's load effect yields a microtask before its first setState (the
+  // lint rule forbids a synchronous setState in an effect body), so render
+  // inside act to flush both loads with the component mounted.
+  await act(async () => {
+    render(
+      <RunResultDrawer
+        runId="r-1"
+        itemId="i-1"
+        canRecord={options.canRecord ?? true}
+        recordHint={options.recordHint ?? null}
+        canManage={options.canManage ?? false}
+        role={options.role ?? "lead"}
+        userId={options.userId ?? "u-1"}
+        nextUntestedId={options.nextUntestedId ?? null}
+        onClose={jest.fn()}
+        onChanged={onChanged}
+        onSaveAndNext={onSaveAndNext}
+        onRemoved={onRemoved}
+      />
+    );
+  });
+  return { onChanged, onSaveAndNext, onRemoved };
+}
+
+beforeEach(() => {
+  Object.values(mockApi).forEach((fn) => fn.mockReset());
+  mockApi.getRunItem.mockResolvedValue(detail());
+  mockApi.listItemResults.mockResolvedValue({
+    data: [],
+    meta: { page: 1, limit: 25, total: 0, total_pages: 1 },
+  });
+  mockApi.createResult.mockResolvedValue(result());
+  mockApi.updateResult.mockResolvedValue(result());
+});
+
+describe("RunResultDrawer", () => {
+  it("shows the case's steps, preconditions and an empty history", async () => {
+    await renderDrawer();
+
+    expect(await screen.findByText("Signed in as a returning customer.")).toBeInTheDocument();
+    expect(screen.getByText("Open checkout")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Add result/ })
+    ).toBeInTheDocument();
+    expect(await screen.findByText("No results recorded yet.")).toBeInTheDocument();
+  });
+
+  it("requires a comment for a failed result, inline, without a request", async () => {
+    await renderDrawer();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Failed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save result" }));
+
+    expect(
+      await screen.findByText("A comment is required for a failed result.")
+    ).toBeInTheDocument();
+    expect(mockApi.createResult).not.toHaveBeenCalled();
+  });
+
+  it("saves a passed result and reports the change", async () => {
+    const { onChanged } = await renderDrawer();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Passed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save result" }));
+
+    await waitFor(() =>
+      expect(mockApi.createResult).toHaveBeenCalledWith("r-1", "i-1", {
+        status: "passed",
+      })
+    );
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("'Save and next' advances to the next untested item", async () => {
+    const { onSaveAndNext } = await renderDrawer({ nextUntestedId: "i-2" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Passed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save and next" }));
+
+    await waitFor(() => expect(onSaveAndNext).toHaveBeenCalled());
+  });
+
+  it("blocks a Tester on an item that is not assigned to them", async () => {
+    mockApi.getRunItem.mockResolvedValue(detail({ assignee_id: "u-2" }));
+    await renderDrawer({ role: "tester", userId: "u-9" });
+
+    expect(
+      await screen.findByText(/This item isn't assigned to you/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save result" })).toBeNull();
+  });
+
+  it("edits the latest result but never its status", async () => {
+    mockApi.listItemResults.mockResolvedValue({
+      data: [result({ comment: "old" })],
+      meta: { page: 1, limit: 25, total: 1, total_pages: 1 },
+    });
+    await renderDrawer();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit result" }));
+
+    // Status is frozen once a result exists.
+    expect(screen.getByRole("button", { name: "Passed" })).toBeDisabled();
+    expect(
+      screen.getByText(/Status cannot be changed after a result is recorded/)
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Comment"), {
+      target: { value: "new comment" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    // `onStartEdit` seeds the form from the latest result, so the unchanged
+    // elapsed time (5) and the empty defect URL round-trip as-is.
+    await waitFor(() =>
+      expect(mockApi.updateResult).toHaveBeenCalledWith("res-1", {
+        comment: "new comment",
+        elapsed_minutes: 5,
+        defect_url: null,
+      })
+    );
+  });
+
+  it("disables Remove from run once the item has a result", async () => {
+    mockApi.getRunItem.mockResolvedValue(detail({ result_count: 1 }));
+    mockApi.listItemResults.mockResolvedValue({
+      data: [result()],
+      meta: { page: 1, limit: 25, total: 1, total_pages: 1 },
+    });
+    await renderDrawer({ canManage: true });
+
+    expect(
+      await screen.findByRole("button", { name: "Remove from run" })
+    ).toBeDisabled();
+  });
+
+  it("does not render the result form when the item is read-only", async () => {
+    await renderDrawer({ canRecord: false, recordHint: "This run is completed." });
+
+    expect(await screen.findByText("This run is completed.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save result" })).toBeNull();
+  });
+});
