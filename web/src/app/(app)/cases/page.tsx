@@ -65,6 +65,10 @@ import {
 import { SuiteTree } from "@/components/suites/SuiteTree";
 import { SuiteFormDialog } from "@/components/suites/SuiteFormDialog";
 import { MoveDialog } from "@/components/cases/MoveDialog";
+import {
+  AddToRunDialog,
+  addToRunNotice,
+} from "@/components/cases/AddToRunDialog";
 import { CaseDrawer } from "@/components/cases/CaseDrawer";
 import { CaseEditor } from "@/components/cases/CaseEditor";
 import { CaseFilters, type CaseFiltersPatch } from "@/components/cases/CaseFilters";
@@ -408,6 +412,9 @@ export default function CasesPage() {
   const [bulkMoveBusy, setBulkMoveBusy] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
+  const [addToRunOpen, setAddToRunOpen] = useState(false);
+  const [addToRunBusy, setAddToRunBusy] = useState(false);
+  const [addToRunError, setAddToRunError] = useState<string | null>(null);
 
   function flash(message: string): void {
     setNotice(message);
@@ -774,6 +781,30 @@ export default function CasesPage() {
     }
   }
 
+  async function runAddToRun(runId: string, runName: string): Promise<void> {
+    if (selectedIds.size === 0) return;
+    setAddToRunBusy(true);
+    setAddToRunError(null);
+    try {
+      const result = await api.addRunItems(runId, {
+        case_ids: Array.from(selectedIds),
+      });
+      setAddToRunOpen(false);
+      setSelectedIds(new Set());
+      flash(addToRunNotice(result, runName));
+    } catch (err) {
+      if (isSessionDead(err)) {
+        setAddToRunOpen(false);
+        return;
+      }
+      setAddToRunError(
+        detailIssue(err, "Could not add the selected cases to the run.")
+      );
+    } finally {
+      setAddToRunBusy(false);
+    }
+  }
+
   async function runBulkDelete(): Promise<void> {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -1079,6 +1110,24 @@ export default function CasesPage() {
             <DisabledHint
               hint={
                 canWrite
+                  ? "Add the selected cases to an open run"
+                  : "You need the Admin or Lead role to add cases to a run"
+              }
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setAddToRunError(null);
+                  setAddToRunOpen(true);
+                }}
+                disabled={!canWrite}
+              >
+                Add to run…
+              </button>
+            </DisabledHint>
+            <DisabledHint
+              hint={
+                canWrite
                   ? "Delete the selected cases"
                   : "You need the Admin or Lead role to delete cases"
               }
@@ -1316,6 +1365,17 @@ export default function CasesPage() {
           searchable
           onConfirm={(value) => void runBulkMove(value)}
           onCancel={() => setBulkMoveOpen(false)}
+        />
+      )}
+
+      {addToRunOpen && (
+        <AddToRunDialog
+          projectId={projectId}
+          caseCount={selectedCount}
+          busy={addToRunBusy}
+          error={addToRunError}
+          onSubmit={(runId, runName) => void runAddToRun(runId, runName)}
+          onCancel={() => setAddToRunOpen(false)}
         />
       )}
 

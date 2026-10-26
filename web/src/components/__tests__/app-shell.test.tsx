@@ -453,10 +453,10 @@ describe("top bar", () => {
   it("search submits to the projects list with the query", async () => {
     await renderShell();
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search cases and runs" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search projects" }), {
       target: { value: "login" },
     });
-    fireEvent.submit(screen.getByRole("searchbox", { name: "Search cases and runs" }));
+    fireEvent.submit(screen.getByRole("searchbox", { name: "Search projects" }));
 
     await waitFor(() =>
       expect(mockRouterState.push).toHaveBeenCalledWith("/projects?query=login")
@@ -466,7 +466,7 @@ describe("top bar", () => {
   it("an empty search goes to the plain projects list", async () => {
     await renderShell();
 
-    fireEvent.submit(screen.getByRole("searchbox", { name: "Search cases and runs" }));
+    fireEvent.submit(screen.getByRole("searchbox", { name: "Search projects" }));
 
     await waitFor(() => expect(mockRouterState.push).toHaveBeenCalledWith("/projects"));
   });
@@ -511,12 +511,31 @@ describe("(app) layout", () => {
 });
 
 describe("not-built-yet placeholder (/wip/[slug])", () => {
+  const originalSlug = mockRouterState.slug;
+  afterEach(() => {
+    mockRouterState.slug = originalSlug;
+  });
+
   it("renders the §6 one-sentence empty state, no fake screens", async () => {
     const { default: NotBuiltPage } = await import("@/app/(app)/wip/[slug]/page");
+    mockRouterState.slug = "milestones";
     render(<NotBuiltPage />);
 
-    expect(screen.getByRole("heading", { name: "Test cases" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Milestones" })).toBeInTheDocument();
     expect(screen.getByText("This screen is not built yet.")).toBeInTheDocument();
+  });
+
+  it("has no entry for sections that shipped (cases, runs, plans)", async () => {
+    // Those routes are real now; /wip/<them> must not masquerade as a screen.
+    const { default: NotBuiltPage } = await import("@/app/(app)/wip/[slug]/page");
+    for (const slug of ["cases", "runs", "plans", "settings"]) {
+      mockRouterState.slug = slug;
+      const { unmount } = render(<NotBuiltPage />);
+      expect(
+        screen.getByRole("heading", { name: slug })
+      ).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("falls back to the raw slug for unknown segments", async () => {

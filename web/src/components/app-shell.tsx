@@ -487,12 +487,12 @@ function AppShellInner({ children }: { children: ReactNode }) {
           }}
         >
           <label htmlFor="topbar-search-input" className="sr-only">
-            Search cases and runs
+            Search projects
           </label>
           <input
             id="topbar-search-input"
             type="search"
-            placeholder="Search cases, runs…"
+            placeholder="Search projects…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             /* §7: '/' from anywhere lands here. Marked out of the shell's

@@ -4,8 +4,10 @@ import type {
   CaseDetail,
   CaseHistoryEntry,
   CaseListItem,
+  LinkedRun,
   Project,
   Role,
+  Run,
   SuiteNode,
   User,
 } from "@/lib/api-types";
@@ -167,6 +169,50 @@ const HISTORY: CaseHistoryEntry[] = [
   },
 ];
 
+/** Open runs the Add to run dialog offers. */
+const RUNS: Run[] = [
+  {
+    id: "r-1",
+    project_id: "p-1",
+    plan_id: null,
+    name: "Run October",
+    description: null,
+    status: "open",
+    start_date: null,
+    due_date: "2026-10-28",
+    completed_at: null,
+    completed_by: null,
+    counts: {
+      total: 3,
+      passed: 1,
+      failed: 0,
+      blocked: 0,
+      retest: 0,
+      skipped: 0,
+      untested: 2,
+      percent_complete: 33,
+    },
+    assignee_ids: [],
+    created_by: "u-1",
+    updated_by: "u-1",
+    created_at: "2026-10-24T09:00:00Z",
+    updated_at: "2026-10-24T09:00:00Z",
+  },
+];
+
+/** GET /cases/:id/runs — the runs that already contain the case. */
+const LINKED: LinkedRun[] = [
+  {
+    run_id: "r-1",
+    run_name: "Run October",
+    run_status: "open",
+    plan_id: null,
+    item_id: "i-1",
+    status: "passed",
+    updated_at: "2026-10-25T10:00:00Z",
+  },
+];
+
 let fetchMock: jest.Mock;
 
 interface ApiOptions {
@@ -175,6 +221,12 @@ interface ApiOptions {
   cases?: CaseListItem[];
   /** Make the bulk-move POST fail with a 500 so the error banner shows. */
   bulkMoveError?: boolean;
+  /** Open runs the Add to run dialog offers; empty means "no open runs". */
+  runs?: Run[];
+  /** Runs that already contain the case (Linked runs tab). */
+  linked?: LinkedRun[];
+  /** What POST /runs/:id/items reports back. */
+  addResult?: { added: number; skipped: number; item_ids: string[] };
 }
 
 function mockApi({
@@ -182,6 +234,9 @@ function mockApi({
   project = PROJECT,
   cases = ROWS,
   bulkMoveError = false,
+  runs = RUNS,
+  linked = LINKED,
+  addResult = { added: 1, skipped: 1, item_ids: ["i-9"] },
 }: ApiOptions = {}): void {
   const user = makeUser({ role });
   fetchMock.mockImplementation(
@@ -210,6 +265,25 @@ function mockApi({
         const body = JSON.parse(init?.body ?? "{}") as { case_ids: string[] };
         return Promise.resolve(
           jsonResponse(200, { data: { moved: body.case_ids.length, case_ids: body.case_ids } })
+        );
+      }
+      if (/\/projects\/[\w-]+\/runs(\?|$)/.test(target) && method === "GET") {
+        return Promise.resolve(
+          jsonResponse(200, {
+            data: runs,
+            meta: { page: 1, limit: 25, total: runs.length, total_pages: 1 },
+          })
+        );
+      }
+      if (/\/runs\/[\w-]+\/items$/.test(target) && method === "POST") {
+        return Promise.resolve(jsonResponse(200, { data: addResult }));
+      }
+      if (/\/cases\/[\w-]+\/runs/.test(target) && method === "GET") {
+        return Promise.resolve(
+          jsonResponse(200, {
+            data: linked,
+            meta: { page: 1, limit: 25, total: linked.length, total_pages: 1 },
+          })
         );
       }
       if (/\/cases\/[\w-]+\/history/.test(target) && method === "GET") {
@@ -465,6 +539,93 @@ describe("cases screen", () => {
     expect(await within(drawer).findByText("Updated")).toBeInTheDocument();
     expect(within(drawer).getByText("Priority:")).toBeInTheDocument();
     expect(within(drawer).getByText(/medium → high/)).toBeInTheDocument();
+  });
+
+  it("lists the runs a case belongs to, linking each one", async () => {
+    mockRouterState.search = "project=p-1&suite=s-1&case=c-1";
+    mockApi();
+    await renderPage();
+
+    const drawer = await screen.findByRole("dialog", { name: /C1/ });
+    fireEvent.click(within(drawer).getByRole("tab", { name: "Linked runs" }));
+
+    const link = await within(drawer).findByRole("link", { name: "Run October" });
+    expect(link).toHaveAttribute("href", "/runs/r-1?project=p-1");
+    // The case's own status inside that run, not just the run's status.
+    expect(within(drawer).getByText("Passed")).toBeInTheDocument();
+  });
+
+  it("says so when the case is in no run yet", async () => {
+    mockRouterState.search = "project=p-1&suite=s-1&case=c-1";
+    mockApi({ linked: [] });
+    await renderPage();
+
+    const drawer = await screen.findByRole("dialog", { name: /C1/ });
+    fireEvent.click(within(drawer).getByRole("tab", { name: "Linked runs" }));
+
+    expect(
+      await within(drawer).findByText("Not in any run yet.")
+    ).toBeInTheDocument();
+  });
+
+  it("adds the selected cases to an open run from the bulk bar", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 2" }));
+    const bulk = screen.getByRole("region", { name: "Selected cases" });
+    fireEvent.click(within(bulk).getByRole("button", { name: "Add to run…" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Add to run" });
+    const select = await within(dialog).findByLabelText("Run");
+    expect(
+      within(select).getByRole("option", { name: "Run October · due 28 Oct 2026" })
+    ).toBeInTheDocument();
+    // Nothing is preselected: adding to the wrong run must take a choice.
+    expect(
+      within(dialog).getByRole("button", { name: "Add to run" })
+    ).toBeDisabled();
+
+    fireEvent.change(select, { target: { value: "r-1" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add to run" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        ([url, init]) =>
+          /\/runs\/r-1\/items$/.test(String(url)) && init?.method === "POST"
+      );
+      expect(call).toBeDefined();
+      expect(JSON.parse((call?.[1] as { body: string }).body)).toEqual({
+        case_ids: ["c-1", "c-2"],
+      });
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Added 1 case to “Run October”. 1 case was already in the run."
+    );
+    // The selection is spent, so the bulk bar gives way to the filters again.
+    expect(screen.queryByRole("region", { name: "Selected cases" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Add to run" })).toBeNull();
+  });
+
+  it("explains that there is no open run to add to", async () => {
+    mockApi({ runs: [] });
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    const bulk = screen.getByRole("region", { name: "Selected cases" });
+    fireEvent.click(within(bulk).getByRole("button", { name: "Add to run…" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Add to run" });
+    expect(
+      await within(dialog).findByText("No open runs in this project.")
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Add to run" })
+    ).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
   it("writes filter changes to the URL", async () => {
