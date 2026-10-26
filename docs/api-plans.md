@@ -83,7 +83,7 @@ screen.
 
 ### `DELETE /api/v1/plans/:id` — Admin, Lead
 Removes the plan. Its runs are **detached** (`plan_id` set to `null`), never
-deleted (PRD Open question Q7).
+deleted (PRD decision 7, 2026-10-26).
 - `204` — no body.
 - `404`; `409` — project archived; `403` — non-writer.
 

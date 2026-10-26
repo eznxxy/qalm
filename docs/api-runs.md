@@ -82,7 +82,7 @@ A run may hold at most **2,000 items**; exceeding it is `400`.
 ```
 
 - `case_title`, `case_priority`, `case_suite_id` are **snapshots** taken when the
-  item is created (PRD Open question Q3); `case_display_id` is the case's
+  item is created (PRD decision 3, 2026-10-26); `case_display_id` is the case's
   `C####` at creation. The ordered steps snapshot is returned only by
   `GET /runs/:id/items/:itemId` (the result drawer needs them), not in lists.
 - `status` is the latest result's status, or `untested`; `latest_result` is

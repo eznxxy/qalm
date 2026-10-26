@@ -1,6 +1,7 @@
 # PRD — Test Plans & Runs (MVP)
 
-Status: **DRAFT — awaiting approval (Arif)**
+Status: **Approved — Arif, 2026-10-26** (all ten proposals accepted as written;
+see Decisions below)
 Owner: Daedalus
 Slice: 3 (next after `PRD-suites-cases.md`; see `docs/README.md` "Later slices")
 API contracts: `docs/api-runs.md`, `docs/api-plans.md`; shared rules in
@@ -48,10 +49,10 @@ remaining MVP slice (milestones, dashboards/reports, CSV export) reads from.
 - Per-project membership (out of scope since slice 1): a run item's assignee is
   any active user holding `admin`, `lead` or `tester`.
 - External file storage / S3. Attachments are stored on the API server's disk
-  (see Open questions Q5); this keeps the slice self-contained and adds no paid
+  (see decision 5); this keeps the slice self-contained and adds no paid
   service.
 - Result versioning beyond an append-only history (no field-level audit like
-  cases; see Open questions Q4).
+  cases; see decision 4).
 
 ## Data model (product level)
 
@@ -81,7 +82,7 @@ remaining MVP slice (milestones, dashboards/reports, CSV export) reads from.
 | Field | Rules |
 |---|---|
 | `case_id` | Required; a live case in the same project. One item per case per run (no duplicates). |
-| `case_title` | **Snapshot** of the case title at the moment the item is created (see Open questions Q3). |
+| `case_title` | **Snapshot** of the case title at the moment the item is created (see decision 3). |
 | `case_steps` | **Snapshot** of the case's ordered steps at item creation, so a later case edit does not rewrite what the tester was asked to run. |
 | `case_priority` / `case_suite_id` | Snapshot of priority and suite, for the run's Suite filter and sorting. |
 | `assignee_id` | Optional; an active `admin`/`lead`/`tester`. |
@@ -95,7 +96,7 @@ remaining MVP slice (milestones, dashboards/reports, CSV export) reads from.
 |---|---|
 | `run_item_id` | Required. |
 | `status` | One of `passed`, `failed`, `blocked`, `retest`, `skipped`. |
-| `comment` | Optional ≤ 4,000 chars — **required when `status = failed`**. Markdown-lite (see Open questions Q4). |
+| `comment` | Optional ≤ 4,000 chars — **required when `status = failed`**. Markdown-lite (see decision 4). |
 | `elapsed_minutes` | Optional integer 0–10,080. |
 | `defect_url` | Optional; an `http(s)` URL ≤ 500 chars. |
 | `attachments` | 0–5 files (see below). |
@@ -114,7 +115,7 @@ result, so re-testing a case is just recording another result (that is what the
 | `size_bytes` | ≤ 10 MB each. |
 | `created_by`, `created_at` | Who uploaded it, when. |
 
-Files live outside the database (Open questions Q5). Download is always
+Files live outside the database (decision 5). Download is always
 **authenticated**; a bare file path is never served.
 
 ## Roles
@@ -131,8 +132,8 @@ they are assigned to; read all projects/suites/cases.*
 | Record a result on **any** item | ✔ | ✔ | – | – |
 | Edit a result's comment/defect/time/attachments | ✔ | ✔ | ✔ (own) | – |
 
-"their own item" = an item whose `assignee_id` is that Tester (Open questions
-Q2). Viewers get `403` on every write.
+"their own item" = an item whose `assignee_id` is that Tester (decision 2).
+Viewers get `403` on every write.
 
 ## Lifecycle & delete semantics
 - **Close run** sets `completed_at`; the run becomes `completed` and the items
@@ -143,15 +144,15 @@ Q2). Viewers get `403` on every write.
 - **Delete run** — soft delete (`deleted_at`): the run disappears from lists and
   from a case's Linked runs, but its results are kept (consistent with slice 2's
   "deleting a case keeps results"). The UI confirm names the consequence. Only
-  Admin/Lead. A `completed` run can be deleted too (Open questions Q6).
+  Admin/Lead. A `completed` run can be deleted too (decision 6).
 - **Delete plan** — removes the plan only; its runs are **detached**, never
-  deleted (Open questions Q7). The confirm says so ("Its 3 runs will be kept,
+  deleted (decision 7). The confirm says so ("Its 3 runs will be kept,
   without a plan.").
 - **Remove item** — allowed only while the item has **no results**; once a
   result exists the item stays (clear the assignee instead). Prevents silent
   loss of recorded evidence.
 - **Delete result** — not offered (append-only). A mistake is corrected by a new
-  result (Open questions Q4).
+  result (decision 4).
 - **Project archived** — writes to plans/runs/results return `409 CONFLICT`
   ("project is archived"); reads keep working for Admins and are `404` for
   everyone else (`docs/api-projects.md`).
@@ -196,41 +197,35 @@ Q2). Viewers get `403` on every write.
 14. Runs list filters by `Open`/`Completed` and shows name, plan, status bar,
     `% complete`, assignee(s) and due date (§4.3).
 
-## Open questions (need approval)
-Proposed answers are inline; the contracts are written to match the proposal.
+## Decisions (Arif, 2026-10-26)
+All ten proposals were accepted as written; the contracts already implement
+them.
 1. **Scope — one slice.** Plans and runs ship together (plans are a thin
-   container over runs), milestones stay the next slice. *Proposed: yes.*
+   container over runs); milestones stay the next slice.
 2. **Assignment & Tester rights.** Assignment is per run item, to any active
    `admin`/`lead`/`tester`; a Tester records results only on items assigned to
-   them. *Proposed: yes* (matches "runs they are assigned to" in PRD-auth).
-   Alternative: any Tester may record on any item in an open run.
+   them (matches "runs they are assigned to" in PRD-auth).
 3. **Case snapshot.** A run item snapshots the case's title and steps at
    creation, so editing a case later does not rewrite an old run.
-   *Proposed: yes.* Alternative: always read the live case (simpler, less
-   faithful history).
 4. **Result editing.** Results are append-only; to fix a status you record a new
    result. The **comment, defect link, elapsed time and attachments** of the
    most recent result may be edited by its author or a writer; the `status` is
    immutable. Comment is stored as plain text with line breaks and links
    auto-detected ("markdown-lite"), not a full markdown renderer.
-   *Proposed: yes.*
-5. **Attachment storage — needs your OK.** Files go on the **API server's local
-   disk** under a configured storage directory, with metadata rows in Postgres;
-   served only through an authenticated endpoint. Limits: 5 files/result,
-   ≤ 10 MB each, allow-list of types. This adds no external or paid service and
-   no secrets. *Proposed: yes.*
+5. **Attachment storage.** Files go on the **API server's local disk** under a
+   configured storage directory, with metadata rows in Postgres; served only
+   through an authenticated endpoint. Limits: 5 files/result, ≤ 10 MB each,
+   allow-list of types. No external or paid service and no secrets.
 6. **Deleting a run** is a soft delete that keeps results (a completed run may
-   also be deleted). *Proposed: yes.* Alternative: block delete once any result
-   exists (close it instead).
+   also be deleted).
 7. **Deleting a plan** detaches its runs rather than blocking or cascading.
-   *Proposed: yes.*
 8. **Milestone deferred.** Runs and plans get a plain `due_date` now; the
    `milestone_id` link and the milestone column land with the milestones slice
-   as an additive change. *Proposed: yes.*
+   as an additive change.
 9. **Case → Linked runs** endpoint ships in this slice (`GET /cases/:id/runs`)
-   to fill the drawer tab. *Proposed: yes.*
+   to fill the drawer tab.
 10. **Result fields** `elapsed_minutes` and `defect_url` are in MVP (DESIGN
-    §4.4 lists them). *Proposed: yes* — both optional.
+    §4.4 lists them) — both optional.
 
 ## Phasing (for the task breakdown, after approval)
 - **Phase 1 — contracts** (Daedalus): this PRD + `docs/api-runs.md` +
