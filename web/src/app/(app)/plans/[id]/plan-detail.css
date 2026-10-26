@@ -1,0 +1,141 @@
+/*
+ * Plan detail (backlog card 3.3). Self-contained `pd-*` names, tokens only;
+ * shares no classes with the plans list or the run detail screens.
+ */
+
+.pd-back {
+  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.pd-back a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.pd-back a:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.pd-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.pd-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pd-due {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.pd-subtitle {
+  margin: var(--space-2) 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.pd-description {
+  margin: var(--space-2) 0 0;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pd-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin: var(--space-3) 0 var(--space-5);
+}
+
+.pd-headline {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-section h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+/* Run status chip (open/completed) — StatusBadge only takes result statuses. */
+.pd-run-status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--border);
+  background: var(--canvas);
+  color: var(--ink-700);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pd-run-open {
+  background: var(--brand-tint);
+  color: var(--ink-900);
+}
+
+.pd-run-completed {
+  color: var(--ink-500);
+}
+
+.plan-detail-page .pd-col-status,
+.plan-detail-page .pd-col-due {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.plan-detail-page .pd-col-progress {
+  min-width: 10rem;
+}
+
+.pd-run-link {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.pd-run-link:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.pd-hint {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pd-hint a {
+  color: var(--accent);
+}

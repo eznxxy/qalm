@@ -210,10 +210,34 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   `markdown-lite`; full web suite 488 unit green (33 suites), `tsc`/`lint`/`build`
   clean. Only `/wip/plans` → `/plans` and the cases↔runs wiring remain (3.3, 3.4).
 
-### Card 3.3 — Plans screen (medium) — PENDING
+### Card 3.3 — Plans screen (medium) — DONE 2026-10-26
 - Route `/plans` replacing `/wip/plans`; plans table with an aggregate status
   bar; plan detail listing its runs (reuses the runs table); New/Edit/Delete
   plan (delete confirm names the "runs will be kept" consequence).
+- Notes: new `app/(app)/plans/page.tsx` (+ `plans.css`), `app/(app)/plans/[id]/
+  page.tsx` (+ `plan-detail.css`, all `pd-*` classes — no shared class names with
+  the runs screens), `components/plans/PlanFormDialog.tsx`,
+  `lib/plan-url.ts`, `lib/plan-permissions.ts`. Three decisions worth recording:
+  (1) plan detail is a **route** (`/plans/[id]`), not a drawer; (2) the detail's
+  runs list is a compact **read-only** table, deliberately not an extraction of
+  the runs screen's table — that table stays private to the runs screen until a
+  third caller needs it; (3) there is **no status filter** (a plan is a
+  container, not a run) and **no milestone column** (the contract has no
+  `milestone_id`), so the columns are Name (sortable), Runs, Status
+  (`StatusBar`, or "No runs" at 0 items), % complete, Due date (sortable),
+  Actions. URL-as-state is `?project`, `?query`, `?sort` (default `-created_at`)
+  and `?page`; a search change resets the page. Writes are Admin/Lead
+  (`canWritePlans`) and archived projects are read-only for everyone. The dialog
+  is dual-mode and always submits all three fields, so an emptied input sends
+  `null`; `isDateOnly()` is exported and unit-tested (`2026-02-30` is rejected).
+  Delete confirms with "Its runs are kept…" (PRD decision 7), then refetches —
+  stepping back a page if the deleted row was the only one on a page > 1. Runs
+  on the detail screen come from `GET /projects/:id/runs?plan_id=…` (the contract
+  does not embed them). Sidebar and `g p` now point at `/plans`; the help
+  dialog already said `g p`. Tests: 17 for `plan-url`, 8 dialog, 8 list page, 4
+  detail; full web suite 525 unit green (37 suites), `tsc`/`lint`/`build` clean
+  with `/plans` and `/plans/[id]`. Flagged for 3.4: `/wip/[slug]` still maps
+  `plans`, now unreachable from the nav.
 
 ### Card 3.4 — Cases ↔ runs integration (small/medium) — PENDING
 - Cases bulk bar: wire **Add to run** (§4.2) to `POST /runs/:id/items`.

@@ -392,6 +392,22 @@ export interface PlanListQuery {
   limit?: number;
 }
 
+/** POST /projects/:projectId/plans (docs/api-plans.md § Validation). */
+export interface CreatePlanInput {
+  name: string;
+  /** Omit or `null` for none. */
+  description?: string | null;
+  /** Plain `YYYY-MM-DD`; omit or `null` for none. */
+  due_date?: string | null;
+}
+
+/** PATCH /plans/:id — any non-empty subset; `null` clears an optional field. */
+export interface UpdatePlanInput {
+  name?: string;
+  description?: string | null;
+  due_date?: string | null;
+}
+
 /** A run is `open` until it is closed; `completed_at` drives the status. */
 export type RunStatus = "open" | "completed";
 

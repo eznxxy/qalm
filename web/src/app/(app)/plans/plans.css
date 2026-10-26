@@ -1,0 +1,89 @@
+/*
+ * Plans list (docs/DESIGN.md §4.3, backlog card 3.3). Tokens only — every
+ * colour and spacing step comes from styles/tokens.css; no hard-coded values.
+ * The detail screen has its own `pd-*` stylesheet so the two evolve apart.
+ */
+
+.plans-heading {
+  margin-bottom: var(--space-4);
+}
+
+.plans-subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.plans-readonly {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* The name cell opens the plan; it borrows the link look of the runs table. */
+.plan-title-link {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.plan-title-link:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+/* Short, fixed-shape columns shrink to their content (width:1% + nowrap is the
+ * auto-layout shrink-to-fit idiom); Name and Status share the spare width. */
+.plans-page .plan-col-runs,
+.plans-page .plan-col-percent,
+.plans-page .plan-col-due,
+.plans-page .plan-col-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.plans-page .plan-col-status {
+  min-width: 10rem;
+}
+
+.plans-page .plan-col-actions {
+  min-width: 8.5rem;
+}
+
+.plan-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.plan-row-actions button {
+  height: var(--control-height-small);
+  padding: 0 var(--space-2);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* ---- plan dialog ---- */
+
+.plan-dialog .field-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.plan-dialog textarea,
+.plan-dialog input[type="date"] {
+  width: 100%;
+}

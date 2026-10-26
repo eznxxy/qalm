@@ -209,7 +209,7 @@ describe("sidebar navigation", () => {
       ["Overview", "/wip/overview"],
       ["Test cases", "/cases"],
       ["Test runs", "/runs"],
-      ["Test plans", "/wip/plans"],
+      ["Test plans", "/plans"],
       ["Milestones", "/wip/milestones"],
       ["Reports", "/wip/reports"],
       ["Settings", "/settings"],

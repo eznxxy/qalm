@@ -18,6 +18,8 @@ import {
   CreateSuiteInput,
   CreateUserInput,
   CreateCaseInput,
+  CreatePlanInput,
+  UpdatePlanInput,
   LinkedRun,
   LinkedRunQuery,
   LoginInput,
@@ -249,6 +251,21 @@ export const api = {
         },
       }
     ),
+
+  getPlan: (id: string) =>
+    client.apiFetch<Plan>(`/plans/${encodeURIComponent(id)}`),
+
+  createPlan: (projectId: string, input: CreatePlanInput) =>
+    client.apiFetch<Plan>(
+      `/projects/${encodeURIComponent(projectId)}/plans`,
+      opts("POST", input)
+    ),
+
+  updatePlan: (id: string, input: UpdatePlanInput) =>
+    client.apiFetch<Plan>(`/plans/${encodeURIComponent(id)}`, opts("PATCH", input)),
+
+  deletePlan: (id: string) =>
+    client.apiFetch<void>(`/plans/${encodeURIComponent(id)}`, opts("DELETE")),
 
   // ---- runs (docs/api-runs.md) ----
   listRuns: (projectId: string, query: RunListQuery = {}) =>

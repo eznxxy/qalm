@@ -166,7 +166,7 @@ describe("§7 shortcuts", () => {
     fireEvent.keyDown(window, { key: "g" });
     fireEvent.keyDown(window, { key: "p" });
     await waitFor(() =>
-      expect(mockRouterState.push).toHaveBeenCalledWith("/wip/plans?project=p-2")
+      expect(mockRouterState.push).toHaveBeenCalledWith("/plans?project=p-2")
     );
 
     // An unpaired trailing key arms nothing: a bare "c" is not a shortcut.

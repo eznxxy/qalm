@@ -38,7 +38,7 @@ import {
 const GOTO_ROUTES: Record<string, string> = {
   c: "/cases",
   r: "/runs",
-  p: "/wip/plans",
+  p: "/plans",
 };
 
 /** How long the armed `g` chord waits for its second key. */
@@ -82,7 +82,7 @@ function navGroups(isAdmin: boolean): ReadonlyArray<ReadonlyArray<{ href: string
       { href: "/wip/overview", label: "Overview", icon: <NavIcon icon="overview" /> },
       { href: "/cases", label: "Test cases", icon: <NavIcon icon="cases" /> },
       { href: "/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
-      { href: "/wip/plans", label: "Test plans", icon: <NavIcon icon="plans" /> },
+      { href: "/plans", label: "Test plans", icon: <NavIcon icon="plans" /> },
       { href: "/wip/milestones", label: "Milestones", icon: <NavIcon icon="milestones" /> },
       { href: "/wip/reports", label: "Reports", icon: <NavIcon icon="reports" /> },
     ],
