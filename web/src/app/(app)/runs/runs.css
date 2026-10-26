@@ -34,18 +34,38 @@
   text-decoration: underline;
 }
 
-/* Short, fixed-shape columns shrink to their content (width:1% + nowrap is the
- * auto-layout shrink-to-fit idiom); Name and Plan share the spare width. */
-.runs-page .run-col-status,
-.runs-page .run-col-percent,
-.runs-page .run-col-assignees,
-.runs-page .run-col-due {
-  width: 1%;
-  white-space: nowrap;
+/* Column widths are a fixed layout, not an auto one: with `table-layout: auto`
+ * the table hands every spare pixel to the widest columns, so a short run name
+ * ends up floating in a half-empty cell. Fixed widths pin the Name column to a
+ * share of the table and let a long name wrap inside its cell. The shares must
+ * total 100% and leave each non-text column room for its header and its widest
+ * fixed-shape value (a status bar, or `Oct 28, 2026`). */
+.runs-page .dt-table {
+  table-layout: fixed;
+}
+
+.runs-page .run-col-name {
+  width: 28%;
+}
+
+.runs-page .run-col-plan {
+  width: 13%;
 }
 
 .runs-page .run-col-status {
-  min-width: 10rem;
+  width: 19%;
+}
+
+.runs-page .run-col-percent {
+  width: 12%;
+}
+
+.runs-page .run-col-assignees {
+  width: 13%;
+}
+
+.runs-page .run-col-due {
+  width: 15%;
 }
 
 /* ---- New run dialog ---- */

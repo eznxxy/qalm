@@ -385,6 +385,7 @@ export default function RunsPage() {
       key: "name",
       header: "Name",
       sortable: true,
+      className: "run-col-name",
       sortValue: (row) => row.name,
       render: (row) => (
         <button
@@ -400,6 +401,7 @@ export default function RunsPage() {
     {
       key: "plan",
       header: "Plan",
+      className: "run-col-plan",
       render: (row) =>
         row.plan_id ? (planNames.get(row.plan_id) ?? "—") : "—",
     },
