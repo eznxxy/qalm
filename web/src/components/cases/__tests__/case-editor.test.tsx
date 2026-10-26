@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import type { CaseDetail, SuiteNode } from "@/lib/api-types";
 
@@ -165,6 +165,52 @@ describe("CaseEditor", () => {
       expect.objectContaining({ display_id: "C9" }),
       "create"
     );
+  });
+
+  it("filters the suite tree and saves the case into the chosen suite", async () => {
+    mockApi.updateCase.mockResolvedValue({ ...DETAIL, suite_id: "s-2" });
+    await renderEditor({ detail: DETAIL });
+
+    const suiteField = screen.getByLabelText("Suite");
+    expect(suiteField).toHaveValue("Checkout");
+
+    fireEvent.focus(suiteField);
+    fireEvent.change(suiteField, { target: { value: "pay" } });
+    // Only the matching child remains, and Enter commits it.
+    expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(
+      1
+    );
+    fireEvent.keyDown(suiteField, { key: "Enter" });
+    expect(suiteField).toHaveValue("Payments");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(mockApi.updateCase).toHaveBeenCalledWith("c-1", {
+        suite_id: "s-2",
+      })
+    );
+  });
+
+  it("flags the suite field when a case is saved without one", async () => {
+    const { onSaved } = await renderEditor({ defaultSuiteId: "" });
+
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Missing its suite" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add case" }));
+
+    expect(screen.getByText("Choose a suite.")).toBeInTheDocument();
+    const suiteField = screen.getByLabelText("Suite");
+    expect(suiteField).toHaveAttribute("aria-invalid", "true");
+    expect(suiteField).toHaveAttribute(
+      "aria-describedby",
+      expect.stringContaining("case-suite-error")
+    );
+    // The submit focuses the first invalid field — id must reach the input.
+    await waitFor(() => expect(document.activeElement).toBe(suiteField));
+    expect(mockApi.createCase).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
   it("prefills in edit mode and refuses an unchanged save", async () => {

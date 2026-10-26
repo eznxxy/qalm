@@ -47,10 +47,10 @@ import {
   type CaseFormValues,
   type CaseStepErrors,
 } from "@/lib/case-form";
-import { suiteOptions } from "@/lib/suites";
+import { flattenSuites } from "@/lib/suites";
 import { api } from "@/lib/endpoints";
 import { isSessionDead } from "@/components/require-auth";
-import { DisabledHint } from "@/components/ui";
+import { Combobox, DisabledHint } from "@/components/ui";
 import "./CaseEditor.css";
 
 export interface CaseEditorProps {
@@ -86,7 +86,17 @@ export function CaseEditor({
   onDirtyChange,
 }: CaseEditorProps) {
   const mode = detail ? "edit" : "create";
-  const options = useMemo(() => suiteOptions(suites), [suites]);
+  // The suite picker filters on the plain name, so the tree's depth travels
+  // alongside it rather than as a pre-indented label.
+  const options = useMemo(
+    () =>
+      flattenSuites(suites).map(({ node }) => ({
+        id: node.id,
+        label: node.name,
+        depth: node.depth,
+      })),
+    [suites]
+  );
   // The state the form opened with, captured once — the baseline the dirty
   // check compares against. Both states share the same lazy initial value, so
   // the baseline is real state (safe to read during render) rather than a ref.
@@ -298,23 +308,19 @@ export function CaseEditor({
 
       <div className="field">
         <label htmlFor={`case-suite-${formId}`}>Suite</label>
-        <select
+        <Combobox
           id={`case-suite-${formId}`}
           value={values.suite_id}
-          onChange={(event) => update({ suite_id: event.target.value })}
+          options={options}
+          onChange={(suiteId) => update({ suite_id: suiteId })}
           onBlur={() => touch("suite_id")}
-          aria-invalid={fieldError("suite_id") ? true : undefined}
-          aria-describedby={
+          placeholder="Search suites…"
+          emptyMessage="No suites match."
+          invalid={Boolean(fieldError("suite_id"))}
+          describedBy={
             fieldError("suite_id") ? `case-suite-error-${formId}` : undefined
           }
-        >
-          <option value="">Choose a suite</option>
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        />
         {fieldError("suite_id") && (
           <p className="field-error" id={`case-suite-error-${formId}`}>
             {fieldError("suite_id")}
