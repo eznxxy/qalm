@@ -541,7 +541,6 @@ export default function RunsPage() {
     <div className="page runs-page">
       <div className="runs-heading">
         <h1>Test runs</h1>
-        <p className="runs-subtitle">{project?.name ?? "Project"}</p>
         {readOnlyReason && <p className="runs-readonly">{readOnlyReason}</p>}
       </div>
 
@@ -659,7 +658,6 @@ function RunsSkeleton() {
     <div className="page runs-page" aria-busy="true">
       <div className="runs-heading">
         <h1>Test runs</h1>
-        <p className="runs-subtitle">Loading project…</p>
       </div>
       <TableSkeleton rows={6} columns={6} label="Loading test runs" />
     </div>

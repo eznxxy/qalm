@@ -7,13 +7,6 @@
   margin: 0;
 }
 
-.runs-subtitle {
-  margin: var(--space-1) 0 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 16px;
-}
-
 .runs-readonly {
   margin: var(--space-2) 0 0;
   color: var(--text-muted);
