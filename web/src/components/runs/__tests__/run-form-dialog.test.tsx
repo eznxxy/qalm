@@ -128,6 +128,33 @@ describe("RunFormDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("does not flag the empty name while the dialog opens", async () => {
+    // StrictMode re-runs the mount effect once, and its cleanup returns focus
+    // to whatever was focused before the dialog (the "New run" trigger). That
+    // momentary blur must not count as the user touching the field.
+    const trigger = document.createElement("button");
+    trigger.textContent = "New run";
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const { RunFormDialog } = await import("@/components/runs/RunFormDialog");
+    render(
+      <React.StrictMode>
+        <RunFormDialog
+          projectId="p-1"
+          suites={SUITES}
+          plans={PLANS}
+          onSubmit={jest.fn()}
+          onCancel={jest.fn()}
+        />
+      </React.StrictMode>
+    );
+
+    expect(screen.queryByText("Name is required.")).toBeNull();
+    expect(screen.getByLabelText("Name")).toHaveFocus();
+    trigger.remove();
+  });
+
   it("submits the run fields with no selection by default", async () => {
     const onSubmit = jest.fn();
     await renderDialog(onSubmit);

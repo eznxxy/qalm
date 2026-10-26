@@ -146,7 +146,12 @@ export function PlanFormDialog({
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      previous?.focus();
+      // Restore focus only when the dialog is really leaving the document: in
+      // dev, StrictMode tears this effect down once while the dialog stays on
+      // screen, and moving focus back to the trigger then would blur the
+      // auto-focused Name field — which marks it touched and flashes "Name is
+      // required." before the user has typed anything.
+      if (!dialog?.isConnected) previous?.focus();
     };
   }, []);
 
