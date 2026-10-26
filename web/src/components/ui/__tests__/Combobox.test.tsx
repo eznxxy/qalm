@@ -23,6 +23,8 @@ interface HarnessProps {
   placeholder?: string;
   emptyMessage?: string;
   invalid?: boolean;
+  disabled?: boolean;
+  openOnFocus?: boolean;
   describedBy?: string;
 }
 
@@ -34,6 +36,8 @@ function Harness({
   placeholder = "Search suites…",
   emptyMessage,
   invalid,
+  disabled,
+  openOnFocus,
   describedBy,
 }: HarnessProps) {
   const [value, setValue] = useState(initial);
@@ -47,6 +51,8 @@ function Harness({
         placeholder={placeholder}
         emptyMessage={emptyMessage}
         invalid={invalid}
+        disabled={disabled}
+        openOnFocus={openOnFocus}
         describedBy={describedBy}
         onChange={(next) => {
           setValue(next);
@@ -244,6 +250,36 @@ describe("Combobox", () => {
 
     expect(field()).toHaveAttribute("aria-invalid", "true");
     expect(field()).toHaveAttribute("aria-describedby", "suite-error");
+  });
+
+  it("locks the field and never opens it while disabled", () => {
+    render(<Harness disabled />);
+
+    expect(field()).toBeDisabled();
+    fireEvent.focus(field());
+    fireEvent.click(field());
+    fireEvent.keyDown(field(), { key: "ArrowDown" });
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("with openOnFocus=false keeps the list shut on focus but opens on ArrowDown", () => {
+    render(<Harness openOnFocus={false} />);
+
+    // A dialog focuses this field on mount; the popover must not spring open
+    // over the dialog's own actions.
+    fireEvent.focus(field());
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    fireEvent.keyDown(field(), { key: "ArrowDown" });
+    const listbox = screen.getByRole("listbox");
+    expect(listbox).toBeInTheDocument();
+
+    // A click still opens it, like the select it replaces.
+    fireEvent.keyDown(field(), { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.click(field());
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
   });
 
   it("shows a custom empty message and ignores Enter with no matches", () => {

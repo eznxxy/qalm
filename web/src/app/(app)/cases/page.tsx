@@ -50,7 +50,7 @@ import {
   findSuitePath,
   moveDestinations,
   siblingsOf,
-  suiteOptions,
+  suiteSearchOptions,
   type SuiteMoveRequest,
 } from "@/lib/suites";
 import {
@@ -813,9 +813,11 @@ export default function CasesPage() {
         label: destination.label,
       }))
     : [];
-  const bulkSuiteOptions = suiteOptions(suites).map((option) => ({
+  const bulkSuiteOptions = suiteSearchOptions(suites).map((option) => ({
     value: option.id,
     label: option.label,
+    depth: option.depth,
+    path: option.path,
   }));
   const bulkInitialSuite =
     selectedSuiteId && findSuiteById(suites, selectedSuiteId)
@@ -1311,6 +1313,7 @@ export default function CasesPage() {
           initialValue={bulkInitialSuite}
           confirmLabel="Move cases"
           busy={bulkMoveBusy}
+          searchable
           onConfirm={(value) => void runBulkMove(value)}
           onCancel={() => setBulkMoveOpen(false)}
         />

@@ -47,7 +47,7 @@ import {
   type CaseFormValues,
   type CaseStepErrors,
 } from "@/lib/case-form";
-import { findSuitePath, flattenSuites } from "@/lib/suites";
+import { suiteSearchOptions } from "@/lib/suites";
 import { api } from "@/lib/endpoints";
 import { isSessionDead } from "@/components/require-auth";
 import { Combobox, DisabledHint } from "@/components/ui";
@@ -86,21 +86,10 @@ export function CaseEditor({
   onDirtyChange,
 }: CaseEditorProps) {
   const mode = detail ? "edit" : "create";
-  // The suite picker filters on the plain name, so the tree's depth travels
-  // alongside it rather than as a pre-indented label. Searching drops the
-  // indent, so each option also carries its ancestor names for the muted trail.
-  const options = useMemo(
-    () =>
-      flattenSuites(suites).map(({ node }) => ({
-        id: node.id,
-        label: node.name,
-        depth: node.depth,
-        path: findSuitePath(suites, node.id)
-          .slice(0, -1)
-          .map((ancestor) => ancestor.name),
-      })),
-    [suites]
-  );
+  // The suite picker filters on the plain name; the tree's depth and each
+  // option's ancestor trail travel alongside it rather than as a pre-indented
+  // label, so search can flatten the list and show where a match lives.
+  const options = useMemo(() => suiteSearchOptions(suites), [suites]);
   // The state the form opened with, captured once — the baseline the dirty
   // check compares against. Both states share the same lazy initial value, so
   // the baseline is real state (safe to read during render) rather than a ref.

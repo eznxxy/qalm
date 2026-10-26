@@ -131,14 +131,22 @@ export function moveDestinations(
   return out;
 }
 
-/** Indented option labels for the case editor's suite picker. */
-export function suiteOptions(
+/**
+ * Options for the searchable suite pickers (`ui/Combobox`, shared by the case
+ * editor and the move dialog): the plain name the query matches, the tree
+ * depth for the indented browse view, and the ancestor names for the muted
+ * trail the control shows once a search hides the tree.
+ */
+export function suiteSearchOptions(
   nodes: readonly SuiteNode[]
-): Array<{ id: string; label: string; depth: number }> {
+): Array<{ id: string; label: string; depth: number; path: string[] }> {
   return flattenSuites(nodes).map(({ node }) => ({
     id: node.id,
-    label: `${"— ".repeat(node.depth - 1)}${node.name}`,
+    label: node.name,
     depth: node.depth,
+    path: findSuitePath(nodes, node.id)
+      .slice(0, -1)
+      .map((ancestor) => ancestor.name),
   }));
 }
 

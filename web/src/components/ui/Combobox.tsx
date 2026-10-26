@@ -51,6 +51,15 @@ export interface ComboboxProps {
   emptyMessage?: string;
   /** Paints the border like the other invalid inputs (aria-invalid=true). */
   invalid?: boolean;
+  /** Locks the field and suppresses the list (e.g. while a move is in flight). */
+  disabled?: boolean;
+  /**
+   * Whether focusing the field opens the list (default true — the case
+   * editor's contract). Set false where the host focuses the field on mount
+   * (a dialog) so the popover does not spring open over the dialog's own
+   * actions; a click or ArrowDown still opens it.
+   */
+  openOnFocus?: boolean;
   describedBy?: string;
 }
 
@@ -84,6 +93,8 @@ export function Combobox({
   placeholder,
   emptyMessage = "No matches.",
   invalid = false,
+  disabled = false,
+  openOnFocus = true,
   describedBy,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
@@ -108,7 +119,7 @@ export function Combobox({
    * typing never appends to the previously selected label.
    */
   function openList(): void {
-    if (open) return;
+    if (disabled || open) return;
     setQuery("");
     setActiveIndex(selectedIndex(options, value));
     setOpen(true);
@@ -227,7 +238,7 @@ export function Combobox({
       : undefined;
 
   return (
-    <div className="combobox" data-open={open} ref={wrapRef}>
+    <div className="combobox" data-open={open} data-disabled={disabled} ref={wrapRef}>
       <div className="combobox-field">
         <input
           ref={inputRef}
@@ -245,8 +256,9 @@ export function Combobox({
           aria-describedby={describedBy}
           placeholder={placeholder}
           value={open ? query : (selected?.label ?? "")}
+          disabled={disabled}
           onChange={(event) => onInputChange(event.target.value)}
-          onFocus={openList}
+          onFocus={openOnFocus ? openList : undefined}
           onClick={openList}
           onBlur={() => {
             closeList();

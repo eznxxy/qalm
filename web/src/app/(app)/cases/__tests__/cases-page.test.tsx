@@ -507,6 +507,71 @@ describe("cases screen", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("1 case moved.");
   });
 
+  it("searches the move-to-suite picker with a flat list and an ancestor trail", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    const bulk = screen.getByRole("region", { name: "Selected cases" });
+    fireEvent.click(within(bulk).getByRole("button", { name: "Move…" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Move cases" });
+    const field = within(dialog).getByLabelText("Destination suite");
+    expect(field).toHaveValue("Checkout");
+    // The dialog focuses the field on mount; the list must stay shut.
+    expect(within(dialog).queryByRole("listbox")).toBeNull();
+
+    fireEvent.click(field);
+    // Browse view: tree order, indented by depth, no trail.
+    expect(
+      within(dialog)
+        .getAllByRole("option")
+        .map((option) => option.getAttribute("data-depth"))
+    ).toEqual(["1", "2", "1"]);
+
+    fireEvent.change(field, { target: { value: "pay" } });
+    const matches = within(dialog).getAllByRole("option");
+    expect(matches).toHaveLength(1);
+    // Filtered: flush left, with the ancestor trail in place of the indent.
+    expect(matches[0]).toHaveAttribute("data-depth", "1");
+    expect(
+      matches[0].querySelector(".combobox-option-label")?.textContent
+    ).toBe("Payments");
+    expect(
+      matches[0].querySelector(".combobox-option-path")?.textContent
+    ).toBe("Checkout");
+
+    // The first Escape closes only the list — the modal stays, value unchanged.
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(within(dialog).queryByRole("listbox")).toBeNull();
+    expect(field).toHaveValue("Checkout");
+    expect(screen.getByRole("dialog", { name: "Move cases" })).toBeInTheDocument();
+
+    // Reopen, filter, and commit the match with Enter.
+    fireEvent.click(field);
+    fireEvent.change(field, { target: { value: "pay" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(field).toHaveValue("Payments");
+
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Move cases" })).getByRole(
+        "button",
+        { name: "Move cases" }
+      )
+    );
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url]) =>
+        String(url).includes("/cases/bulk-move")
+      );
+      expect(JSON.parse((call?.[1] as { body: string }).body)).toEqual({
+        case_ids: ["c-1"],
+        suite_id: "s-2",
+      });
+    });
+  });
+
   it("is read-only for a Tester", async () => {
     mockApi({ role: "tester" });
     await renderPage();

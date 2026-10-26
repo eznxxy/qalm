@@ -10,6 +10,15 @@
   position: relative;
 }
 
+/* Busy/read-only: mirror the button disabled treatment (§5, globals.css). */
+.combobox[data-disabled="true"] {
+  opacity: 0.55;
+}
+
+.combobox[data-disabled="true"] .combobox-input {
+  cursor: not-allowed;
+}
+
 .combobox-field {
   position: relative;
   display: flex;

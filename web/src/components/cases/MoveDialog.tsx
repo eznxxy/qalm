@@ -13,11 +13,16 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { DisabledHint } from "@/components/ui";
+import { Combobox, DisabledHint } from "@/components/ui";
+import { isTypingTarget } from "@/lib/keymap";
 
 export interface MoveDialogOption {
   value: string;
   label: string;
+  /** 1-based depth for the searchable picker's indented browse view. */
+  depth?: number;
+  /** Ancestor names for the searchable picker's muted trail while filtered. */
+  path?: readonly string[];
 }
 
 export interface MoveDialogProps {
@@ -28,8 +33,23 @@ export interface MoveDialogProps {
   initialValue: string;
   confirmLabel: string;
   busy?: boolean;
+  /**
+   * Render the destination as the searchable `ui/Combobox` (used for the case
+   * move, where a project's suite tree can be long) instead of the native
+   * select. Options must then carry their `depth`/`path`.
+   */
+  searchable?: boolean;
   onConfirm: (value: string) => void;
   onCancel: () => void;
+}
+
+/** True when the key's target is an expanded combobox (its list is open). */
+function isExpandedCombobox(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    target.getAttribute("role") === "combobox" &&
+    target.getAttribute("aria-expanded") === "true"
+  );
 }
 
 export function MoveDialog({
@@ -40,6 +60,7 @@ export function MoveDialog({
   initialValue,
   confirmLabel,
   busy = false,
+  searchable = false,
   onConfirm,
   onCancel,
 }: MoveDialogProps) {
@@ -50,35 +71,44 @@ export function MoveDialog({
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    dialogRef.current?.querySelector<HTMLElement>("select, button")?.focus();
+    dialogRef.current
+      ?.querySelector<HTMLElement>("input, select, button")
+      ?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" && event.key !== "Tab") {
-        event.stopPropagation();
-        return;
-      }
       if (event.key === "Escape") {
+        // An open destination list owns the first Escape — the combobox keeps
+        // focus and reports expansion on the input — so only a second Escape
+        // dismisses the dialog.
+        if (isExpandedCombobox(event.target)) return;
         event.stopPropagation();
         onCancel();
         return;
       }
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusables = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          "select, button:not(:disabled), input:not(:disabled)"
-        )
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0]!;
-      const last = focusables[focusables.length - 1]!;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
+      if (event.key === "Tab") {
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        const focusables = Array.from(
+          dialog.querySelectorAll<HTMLElement>(
+            "select, button:not(:disabled), input:not(:disabled)"
+          )
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0]!;
+        const last = focusables[focusables.length - 1]!;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
       }
+      // Shield the shell's global shortcuts while the modal is open, but never
+      // swallow keys bound for a form field — the destination picker is a text
+      // input, and those keystrokes belong to it.
+      if (!isTypingTarget(event.target)) event.stopPropagation();
     }
 
     document.addEventListener("keydown", onKeyDown, true);
@@ -109,18 +139,36 @@ export function MoveDialog({
           <div id={bodyId}>{description}</div>
           <div className="field">
             <label htmlFor="move-dialog-target">{label}</label>
-            <select
-              id="move-dialog-target"
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              disabled={busy}
-            >
-              {options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {searchable ? (
+              <Combobox
+                id="move-dialog-target"
+                value={value}
+                options={options.map((option) => ({
+                  id: option.value,
+                  label: option.label,
+                  depth: option.depth,
+                  path: option.path,
+                }))}
+                onChange={setValue}
+                placeholder="Search suites…"
+                emptyMessage="No suites match."
+                disabled={busy}
+                openOnFocus={false}
+              />
+            ) : (
+              <select
+                id="move-dialog-target"
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                disabled={busy}
+              >
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="button-row dialog-actions">
             <DisabledHint
