@@ -6,8 +6,6 @@
  */
 export const RUN_NAME_MAX = 120;
 export const RUN_DESCRIPTION_MAX = 1_000;
-export const PLAN_NAME_MAX = 120;
-export const PLAN_DESCRIPTION_MAX = 1_000;
 
 /** `YYYY-MM-DD` — a calendar date with no time or zone. */
 export const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -48,10 +46,6 @@ export const RUN_SORT_PATTERN = /^-?(created_at|updated_at|due_date|name)$/;
 export const ITEM_SORTS = ['position', 'case_display_id', 'status', 'updated_at'] as const;
 export type ItemSortKey = (typeof ITEM_SORTS)[number];
 export const ITEM_SORT_PATTERN = /^-?(position|case_display_id|status|updated_at)$/;
-
-export const PLAN_SORTS = ['created_at', 'updated_at', 'name', 'due_date'] as const;
-export type PlanSortKey = (typeof PLAN_SORTS)[number];
-export const PLAN_SORT_PATTERN = /^-?(created_at|updated_at|name|due_date)$/;
 
 /** Attachments (PRD decision 5, docs/api-runs.md § Resource: Result). */
 export const ATTACHMENT_MAX_PER_RESULT = 5;

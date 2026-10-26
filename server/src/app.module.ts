@@ -5,6 +5,7 @@ import { CasesModule } from './cases/cases.module';
 import { ConfigModule } from './config.module';
 import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
+import { PlansModule } from './plans/plans.module';
 import { ProjectsModule } from './projects/projects.module';
 import { RunsModule } from './runs/runs.module';
 import { SuitesModule } from './suites/suites.module';
@@ -22,6 +23,7 @@ import { SuitesModule } from './suites/suites.module';
     SuitesModule,
     CasesModule,
     RunsModule,
+    PlansModule,
     AdminUsersModule,
   ],
   controllers: [HealthController],

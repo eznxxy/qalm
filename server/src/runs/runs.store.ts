@@ -96,6 +96,24 @@ export interface UserRef {
   is_active: boolean;
 }
 
+/** Minimal live-case lookup for the Linked runs feed (§4.2). */
+export interface CaseRef {
+  id: string;
+  project_id: string;
+}
+
+/** One row of `GET /cases/:id/runs` (docs/api-runs.md § Linked runs). */
+export interface CaseRunRow {
+  run_id: string;
+  run_name: string;
+  run_status: 'open' | 'completed';
+  plan_id: string | null;
+  item_id: string;
+  status: ItemStatus;
+  /** The item's `updated_at` — bumped on every result write on the case. */
+  updated_at: Date;
+}
+
 export interface RunListFilter {
   projectId: string;
   /** `null` = any plan; the literal `'none'` = runs with no plan; else a plan id. */
@@ -252,8 +270,9 @@ function itemColumns(alias: string, withSteps: boolean): string {
  * The latest result of an item, plus its attachment count. Ordered by
  * `(created_at desc, id desc)` — the contract's tiebreaker — and never stored
  * on `run_items`, so appending a result can never desync a denormalised column.
+ * Exported so the plan rollup counts items by the same "newest result" rule.
  */
-const LATEST_RESULT_JOIN = `
+export const LATEST_RESULT_JOIN = `
 LEFT JOIN LATERAL (
   SELECT res.id, res.status, res.comment, res.elapsed_minutes, res.defect_url,
          res.created_by, res.created_at,
@@ -1177,5 +1196,52 @@ export class RunsStore {
   async deleteAttachment(id: string, q: Queryable = this.db): Promise<boolean> {
     const result = await q.query('DELETE FROM result_attachments WHERE id = $1', [id]);
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // --- case → linked runs -------------------------------------------------
+
+  /** Live case lookup for the Linked runs feed; deleted cases are 404. */
+  async findCaseRef(caseId: string, q: Queryable = this.db): Promise<CaseRef | null> {
+    const result = await q.query<CaseRef>(
+      'SELECT id, project_id FROM cases WHERE id = $1 AND deleted_at IS NULL',
+      [caseId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async countCaseRuns(caseId: string): Promise<number> {
+    const result = await this.db.query<{ count: string }>(
+      `SELECT count(*) AS count
+         FROM run_items i
+         JOIN runs r ON r.id = i.run_id
+        WHERE i.case_id = $1 AND r.deleted_at IS NULL`,
+      [caseId],
+    );
+    return Number(result.rows[0]?.count ?? '0');
+  }
+
+  /**
+   * Every live run containing the case, newest run first, with the case's
+   * derived status and the item's `updated_at` (bumped on each result write).
+   * Soft-deleted runs are excluded.
+   */
+  async listCaseRuns(caseId: string, limit: number, offset: number): Promise<CaseRunRow[]> {
+    const result = await this.db.query<CaseRunRow>(
+      `SELECT r.id AS run_id,
+              r.name AS run_name,
+              CASE WHEN r.completed_at IS NULL THEN 'open' ELSE 'completed' END AS run_status,
+              r.plan_id,
+              i.id AS item_id,
+              ${ITEM_STATUS_EXPR} AS status,
+              i.updated_at
+         FROM run_items i
+         JOIN runs r ON r.id = i.run_id
+         ${LATEST_RESULT_JOIN}
+        WHERE i.case_id = $1 AND r.deleted_at IS NULL
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT $2 OFFSET $3`,
+      [caseId, limit, offset],
+    );
+    return result.rows;
   }
 }

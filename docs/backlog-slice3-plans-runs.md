@@ -101,7 +101,7 @@ statuses, external file storage.
   lists only the latest-only and archived 409s). 420 unit / 227 e2e green, with
   a stored file surviving the request and streaming back byte-for-byte.
 
-### Card 2.3 — Plans, rollups & linked runs (medium) — PENDING
+### Card 2.3 — Plans, rollups & linked runs (medium) — DONE 2026-10-26
 - **Endpoints**: `GET/POST /projects/:projectId/plans`,
   `GET/PATCH/DELETE /plans/:id`.
 - Plan delete detaches its runs (`plan_id = null`) in the same transaction.
@@ -111,6 +111,19 @@ statuses, external file storage.
   soft-deleted runs (fills the drawer's Linked runs tab).
 - Tests: `plans.service.spec.ts` (unique name, detach-on-delete, rollup),
   `test/plans.e2e-spec.ts`, `test/case-runs.e2e-spec.ts`.
+- Notes: a new `PlansModule` (`plans.constants.ts`, `plans.store.ts`,
+  `plans.types.ts`, `dto.ts`, `plans.service.ts`, `plans.controller.ts`) plus the
+  case→runs additions to the runs store/service/controller (`GET /cases/:id/runs`
+  in a `CaseRunsController`). `LATEST_RESULT_JOIN` is now exported from
+  `runs.store.ts` and reused by `plans.store.ts` so both rollups derive the item
+  status identically; a plan's `counts`/`run_count` are a grouped aggregate per
+  page (a completed run still counts, a soft-deleted run does not), and create
+  returns the zeroed `barePlanDto` (a brand-new plan has no runs). Plan delete
+  detaches runs with a literal `UPDATE runs SET plan_id = null WHERE plan_id = $1`
+  in the same transaction as the soft delete (PRD decision 7). Duplicate plan
+  name → 409 `CONFLICT` naming `name`; list default sort `-created_at`, null
+  `due_date` last; linked-runs `updated_at` is the item's `updated_at` (bumped by
+  `touchItem` on every result write). 438 unit / 256 e2e green.
 
 ---
 

@@ -14,6 +14,7 @@ import {
   AddRunItemsDto,
   AssignRunItemsDto,
   CreateRunDto,
+  ListCaseRunsQuery,
   ListRunItemsQuery,
   ListRunsQuery,
   RunSelectionDto,
@@ -27,7 +28,16 @@ import {
   RunListFilter,
   RunsStore,
 } from './runs.store';
-import { RunDto, RunItemDetailDto, RunItemDto, toRunDto, toRunItemDetailDto, toRunItemDto } from './runs.types';
+import {
+  CaseRunDto,
+  RunDto,
+  RunItemDetailDto,
+  RunItemDto,
+  toCaseRunDto,
+  toRunDto,
+  toRunItemDetailDto,
+  toRunItemDto,
+} from './runs.types';
 
 function validationError(field: string, issue: string): ApiError {
   return new ApiError('VALIDATION_ERROR', 'Request validation failed.', [{ field, issue }]);
@@ -185,6 +195,26 @@ export class RunsService {
       if (!row) throw runNotFound();
       await this.store.softDeleteRun(id, caller.id, client);
     });
+  }
+
+  /**
+   * Every live run that contains one case, with the case's status in each — the
+   * case drawer's Linked runs feed (§4.2). Newest run first; soft-deleted runs
+   * are absent.
+   */
+  async caseRuns(
+    caller: AuthUser,
+    caseId: string,
+    query: ListCaseRunsQuery,
+  ): Promise<{ data: CaseRunDto[]; meta: ListMeta }> {
+    const ref = await this.store.findCaseRef(caseId);
+    if (!ref) throw new ApiError('NOT_FOUND', 'Case not found.');
+    await this.requireProject(ref.project_id, caller, 'read');
+    const page = query.page ?? DEFAULT_PAGE;
+    const limit = query.limit ?? DEFAULT_LIMIT;
+    const total = await this.store.countCaseRuns(caseId);
+    const rows = await this.store.listCaseRuns(caseId, limit, (page - 1) * limit);
+    return { data: rows.map(toCaseRunDto), meta: buildListMeta(total, page, limit) };
   }
 
   // --- run items ----------------------------------------------------------

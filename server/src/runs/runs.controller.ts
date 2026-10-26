@@ -17,6 +17,7 @@ import {
   AddRunItemsDto,
   AssignRunItemsDto,
   CreateRunDto,
+  ListCaseRunsQuery,
   ListRunItemsQuery,
   ListRunsQuery,
   UpdateRunDto,
@@ -173,5 +174,26 @@ export class RunsController {
   @Delete(':id')
   async remove(@CurrentUser() caller: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     await this.runs.remove(caller, id);
+  }
+}
+
+/**
+ * The case drawer's Linked runs feed, docs/api-runs.md § Linked runs:
+ *   GET /cases/:id/runs  any authenticated role
+ * Lives with runs (not cases) because it reads `run_items`/`runs`; the case is
+ * only the lookup key (its project drives the archived-project rule).
+ */
+@UseGuards(AuthGuard)
+@Controller('cases')
+export class CaseRunsController {
+  constructor(private readonly runs: RunsService) {}
+
+  @Get(':id/runs')
+  async list(
+    @CurrentUser() caller: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListCaseRunsQuery,
+  ) {
+    return this.runs.caseRuns(caller, id, query);
   }
 }

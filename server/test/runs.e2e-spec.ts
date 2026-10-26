@@ -62,7 +62,7 @@ const bodyKeys = (res: request.Response): string[] =>
  * real scratch database (migrations applied) through the production HTTP wiring.
  * Covers the slice-3 acceptance criteria for selection, rollups, the item table,
  * assignment/reordering, close/reopen, soft delete and the archived-project and
- * role rules. Results/attachments endpoints arrive in card 2.2, so the one
+ * role rules. The results/attachments API lives in its own spec, so the one
  * "item already has a result" case seeds a result row directly.
  */
 describe('Runs API (integration)', () => {
@@ -148,7 +148,7 @@ describe('Runs API (integration)', () => {
     return res.body.data as { id: string; case_number: number; display_id: string };
   };
 
-  /** Inserts a plan directly: the plans endpoints arrive in card 2.3. */
+  /** Inserts a plan directly so this spec stays independent of the plans API. */
   const insertPlan = async (targetProjectId: string, name: string): Promise<string> => {
     const res = await test.db.query<{ id: string }>(
       `INSERT INTO plans (project_id, name, created_by, updated_by)

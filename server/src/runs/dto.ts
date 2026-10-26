@@ -457,3 +457,22 @@ export class ListResultsQuery {
   @Max(MAX_LIMIT)
   limit?: number;
 }
+
+/**
+ * GET /cases/:id/runs — the case drawer's Linked runs feed (docs/api-runs.md
+ * § Linked runs). The order is fixed (newest run first), so there is no `sort`.
+ */
+export class ListCaseRunsQuery {
+  @IsOptional()
+  @transformToNumber()
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @transformToNumber()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_LIMIT)
+  limit?: number;
+}

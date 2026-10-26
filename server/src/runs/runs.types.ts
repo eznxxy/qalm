@@ -1,6 +1,6 @@
 import { ItemStatus, ResultStatus } from './runs.constants';
 import { StatusCounts, percentComplete } from './run-counts';
-import { AttachmentRow, ResultRow, RunItemDetailRow, RunItemRow, RunWithCountsRow } from './runs.store';
+import { AttachmentRow, CaseRunRow, ResultRow, RunItemDetailRow, RunItemRow, RunWithCountsRow } from './runs.store';
 
 /** One ordered step of an item's snapshot — api-runs.md § Resource: Run item. */
 export interface RunItemStepDto {
@@ -210,5 +210,28 @@ export function toResultDto(row: ResultRow, attachments: AttachmentRow[]): Resul
     attachments: attachments.map(toAttachmentDto),
     created_by: row.created_by,
     created_at: row.created_at.toISOString(),
+  };
+}
+
+/** One entry of the case's Linked runs feed — docs/api-runs.md § Linked runs. */
+export interface CaseRunDto {
+  run_id: string;
+  run_name: string;
+  run_status: 'open' | 'completed';
+  plan_id: string | null;
+  item_id: string;
+  status: ItemStatus;
+  updated_at: string;
+}
+
+export function toCaseRunDto(row: CaseRunRow): CaseRunDto {
+  return {
+    run_id: row.run_id,
+    run_name: row.run_name,
+    run_status: row.run_status,
+    plan_id: row.plan_id,
+    item_id: row.item_id,
+    status: row.status,
+    updated_at: row.updated_at.toISOString(),
   };
 }
