@@ -340,7 +340,7 @@ export function DataTable<T>({
           <tr>
             {selectable && (
               <th scope="col" className="dt-select-all">
-                <span className="dt-checkbox">
+                <label className="dt-checkbox">
                   <input
                     ref={headerCheckboxRef}
                     type="checkbox"
@@ -353,7 +353,7 @@ export function DataTable<T>({
                         : `Select all ${rows.length} rows`
                     }
                   />
-                </span>
+                </label>
               </th>
             )}
             {columns.map((col) => {
@@ -478,7 +478,7 @@ export function DataTable<T>({
                 <tr key={id} className={rowClassNameList}>
                   {selectable && (
                     <td className="dt-select-cell">
-                      <span className="dt-checkbox">
+                      <label className="dt-checkbox">
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -486,7 +486,7 @@ export function DataTable<T>({
                           disabled={disabled}
                           aria-label={`Select row ${index + 1}`}
                         />
-                      </span>
+                      </label>
                     </td>
                   )}
                   {columns.map((col) => {

@@ -203,6 +203,22 @@ describe("DataTable selection", () => {
     expect(rowCheckboxes).toHaveLength(3);
   });
 
+  it("keeps a 32px target around the 20px box: clicking the label toggles it", () => {
+    // The drawn checkbox is 20px (DataTable.css), but the wrapper is a <label>
+    // sized to the 32px §8 target, so a click anywhere in that square — not
+    // just on the 20px box — toggles the row. Swapping the label back to a
+    // plain <span> leaves that ring dead and fails here.
+    const { container } = render(<SelectionHarness />);
+    const target = container.querySelector(
+      "tbody td.dt-select-cell .dt-checkbox"
+    ) as HTMLElement;
+    expect(target.tagName).toBe("LABEL");
+    fireEvent.click(target);
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+    fireEvent.click(target);
+    expect(screen.getByTestId("count")).toHaveTextContent("0");
+  });
+
   it("header checkbox: unchecked -> all -> none", () => {
     render(<SelectionHarness />);
     const header = screen.getByLabelText("Select all 3 rows");

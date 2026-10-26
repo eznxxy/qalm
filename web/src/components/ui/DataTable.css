@@ -188,7 +188,7 @@ th.dt-head-number .dt-header-label {
   padding: 0;
 }
 
-/* The 32px checkbox box sits centred inside the 40px cell (4px either side)
+/* The 32px target sits centred inside the 40px cell (4px either side)
  * instead of hugging the left edge of the body cell's 12px padding. */
 .dt-table th.dt-select-all .dt-checkbox,
 .dt-table tbody td.dt-select-cell .dt-checkbox {
@@ -196,20 +196,26 @@ th.dt-head-number .dt-header-label {
 }
 
 .dt-checkbox {
-  /* flex (not inline-flex): a block-level box adds no baseline strut, so
-     the cell content height is exactly 32px and every row density holds */
+  /* The hit target, not the drawn box: a 32px square that satisfies the §8
+     floor ("touch targets at least 32px") at every row density (32/36/44).
+     It is a <label>, so the whole square toggles the control even though the
+     native box the user sees inside it is only 20px (`.dt-checkbox input`).
+     flex (not inline-flex): a block-level box adds no baseline strut, so the
+     cell content height is exactly 32px. */
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
-  margin: 0; /* 32px target fits every row density: 32/36/44 (§8) */
+  margin: 0;
 }
 
 .dt-checkbox input {
+  /* 20px visual box, centred in the 32px label above. The focus ring (2px at
+     2px offset = 24px) stays inside the target instead of overflowing it. */
   margin: 0;
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
 }
 
