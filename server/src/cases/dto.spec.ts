@@ -241,10 +241,18 @@ describe('cases DTOs', () => {
     });
 
     it('validates the sort whitelist including the descending prefix', async () => {
-      for (const sort of ['case_number', 'updated_at', 'title', '-updated_at', '-title']) {
+      for (const sort of [
+        'case_number',
+        'updated_at',
+        'title',
+        'priority',
+        '-updated_at',
+        '-title',
+        '-priority',
+      ]) {
         expect(await fieldsOf(ListCasesQuery, { sort })).toEqual([]);
       }
-      expect(await fieldsOf(ListCasesQuery, { sort: 'priority' })).toContain('sort');
+      expect(await fieldsOf(ListCasesQuery, { sort: 'type' })).toContain('sort');
       expect(await fieldsOf(ListCasesQuery, { sort: '--title' })).toContain('sort');
     });
 

@@ -19,9 +19,22 @@ export const CASE_TYPES = ['functional', 'regression', 'smoke', 'exploratory', '
 export type CaseType = (typeof CASE_TYPES)[number];
 
 /** List sort keys; a leading `-` reverses the order (docs/api-cases.md). */
-export const CASE_SORTS = ['case_number', 'updated_at', 'title'] as const;
+export const CASE_SORTS = ['case_number', 'updated_at', 'title', 'priority'] as const;
 export type CaseSortKey = (typeof CASE_SORTS)[number];
-export const CASE_SORT_PATTERN = /^-?(case_number|updated_at|title)$/;
+export const CASE_SORT_PATTERN = /^-?(case_number|updated_at|title|priority)$/;
+
+/**
+ * Severity ranks for `sort=priority`: ascending puts critical first (1),
+ * then high, medium, low — the order testers expect, not the alphabetical
+ * one. Kept next to CASE_PRIORITIES so a new priority cannot silently rank
+ * last.
+ */
+export const CASE_PRIORITY_RANK: Record<CasePriority, number> = {
+  critical: 1,
+  high: 2,
+  medium: 3,
+  low: 4,
+};
 
 /** Upper bound for one bulk-move request. */
 export const BULK_MOVE_MAX = 200;

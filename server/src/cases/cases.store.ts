@@ -2,7 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ApiError } from '../errors';
 import { DbService } from '../db/db.service';
 import { Queryable } from '../db/queryable';
-import { CaseAction, CasePriority, CaseSortKey, CaseType } from './cases.constants';
+import {
+  CASE_PRIORITIES,
+  CASE_PRIORITY_RANK,
+  CaseAction,
+  CasePriority,
+  CaseSortKey,
+  CaseType,
+} from './cases.constants';
 
 /**
  * DB row shapes (migration 20261025000002). snake_case columns; the API
@@ -119,6 +126,10 @@ const SORT_COLUMNS: Record<CaseSortKey, string> = {
   case_number: 'c.case_number',
   updated_at: 'c.updated_at',
   title: 'lower(c.title)',
+  // Severity order (critical first), not the enum's declaration order.
+  priority: `CASE c.priority ${CASE_PRIORITIES.map(
+    (priority) => `WHEN '${priority}' THEN ${CASE_PRIORITY_RANK[priority]}`,
+  ).join(' ')} END`,
 };
 
 /**

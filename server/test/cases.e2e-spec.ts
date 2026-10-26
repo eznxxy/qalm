@@ -577,6 +577,35 @@ describe('Cases API (integration)', () => {
       expect(listData(newest)[0]!.id).toBe(first.id);
     });
 
+    it('sorts by priority severity in both directions', async () => {
+      const medium = await createOk({ title: 'medium case', priority: 'medium' });
+      const critical = await createOk({ title: 'critical case', priority: 'critical' });
+      const low = await createOk({ title: 'low case', priority: 'low' });
+      const high = await createOk({ title: 'high case', priority: 'high' });
+
+      const ascending = await listCases('viewer', { sort: 'priority' });
+      expect(listData(ascending).map((row) => row.priority)).toEqual([
+        'critical',
+        'high',
+        'medium',
+        'low',
+      ]);
+      expect(listData(ascending).map((row) => row.id)).toEqual([
+        critical.id,
+        high.id,
+        medium.id,
+        low.id,
+      ]);
+
+      const descending = await listCases('viewer', { sort: '-priority' });
+      expect(listData(descending).map((row) => row.priority)).toEqual([
+        'low',
+        'medium',
+        'high',
+        'critical',
+      ]);
+    });
+
     it('never returns soft-deleted cases', async () => {
       const created = await createOk();
       expect((await deleteCase('admin', created.id)).status).toBe(204);
@@ -588,7 +617,7 @@ describe('Cases API (integration)', () => {
 
     it('400s malformed query values', async () => {
       for (const query of [
-        { sort: 'priority' },
+        { sort: 'type' },
         { page: '0' },
         { limit: '101' },
         { priority: 'urgent' },

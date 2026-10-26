@@ -18,7 +18,7 @@ import {
   CaseWriteRow,
 } from './cases.store';
 import { CreateCaseDto, UpdateCaseDto } from './dto';
-import { CasePriority, CaseType } from './cases.constants';
+import { CASE_PRIORITY_RANK, CasePriority, CaseType } from './cases.constants';
 
 /**
  * Decision-logic tests for CasesService over an in-memory fake of the cases
@@ -301,6 +301,7 @@ class FakeStore {
     let primary: number;
     if (key === 'title') primary = a.title.toLowerCase().localeCompare(b.title.toLowerCase());
     else if (key === 'updated_at') primary = a.updated_at.getTime() - b.updated_at.getTime();
+    else if (key === 'priority') primary = CASE_PRIORITY_RANK[a.priority] - CASE_PRIORITY_RANK[b.priority];
     else primary = a.case_number - b.case_number;
     if (primary !== 0) return descending ? -primary : primary;
     return a.case_number - b.case_number;
@@ -502,6 +503,35 @@ describe('CasesService (unit, in-memory cases)', () => {
 
       const newest = await service.list(AS('viewer'), 'p-1', { sort: '-updated_at' });
       expect(newest.data.map((row) => row.case_number)).toEqual([4, 3, 2, 1]);
+    });
+
+    it('sorts by priority severity (critical first), not alphabetically', async () => {
+      const priorities: CasePriority[] = ['low', 'high', 'critical', 'medium', 'high'];
+      priorities.forEach((priority, index) =>
+        store.addCase({ title: `case ${index + 1}`, caseNumber: index + 1, priority }),
+      );
+
+      const ascending = await service.list(AS('viewer'), 'p-1', { sort: 'priority' });
+      expect(ascending.data.map((row) => row.priority)).toEqual([
+        'critical',
+        'high',
+        'high',
+        'medium',
+        'low',
+      ]);
+      // Equal priorities keep case_number ascending as the tiebreaker.
+      expect(ascending.data.map((row) => row.case_number)).toEqual([3, 2, 5, 4, 1]);
+
+      const descending = await service.list(AS('viewer'), 'p-1', { sort: '-priority' });
+      expect(descending.data.map((row) => row.priority)).toEqual([
+        'low',
+        'medium',
+        'high',
+        'high',
+        'critical',
+      ]);
+      // The tiebreaker stays ascending even when the primary key reverses.
+      expect(descending.data.map((row) => row.case_number)).toEqual([1, 4, 2, 5, 3]);
     });
 
     it('404s an unknown project and hides an archived one from non-Admins', async () => {
