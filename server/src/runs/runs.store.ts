@@ -6,8 +6,9 @@ import { ItemStatus, ItemSortKey, ResultStatus, RunSortKey } from './runs.consta
 import { statusRankSql } from './run-counts';
 
 /**
- * DB row shapes for runs (migration 20261026000001). `due_date` is selected as
- * text so it is a plain `YYYY-MM-DD` string, never a timezone-shifted Date.
+ * DB row shapes for runs (migrations 20261026000001 + 20261027000001).
+ * `start_date`/`due_date` are selected as text so they are plain `YYYY-MM-DD`
+ * strings, never a timezone-shifted Date.
  */
 export interface RunRow {
   id: string;
@@ -15,6 +16,7 @@ export interface RunRow {
   plan_id: string | null;
   name: string;
   description: string | null;
+  start_date: string | null;
   due_date: string | null;
   completed_at: Date | null;
   completed_by: string | null;
@@ -137,6 +139,7 @@ export interface RunUpdateFields {
   name?: string;
   description?: string | null;
   plan_id?: string | null;
+  start_date?: string | null;
   due_date?: string | null;
   updated_by: string;
 }
@@ -228,6 +231,7 @@ const RUN_FIELDS = [
   'plan_id',
   'name',
   'description',
+  'start_date',
   'due_date',
   'completed_at',
   'completed_by',
@@ -238,11 +242,13 @@ const RUN_FIELDS = [
   'updated_at',
 ] as const;
 
-/** `due_date` is always cast to text so the API sees `YYYY-MM-DD`. */
+/** `start_date`/`due_date` are always cast to text so the API sees `YYYY-MM-DD`. */
 export function runColumns(alias = ''): string {
   const prefix = alias === '' ? '' : `${alias}.`;
   return RUN_FIELDS.map((field) =>
-    field === 'due_date' ? `${prefix}due_date::text AS due_date` : `${prefix}${field}`,
+    field === 'due_date' || field === 'start_date'
+      ? `${prefix}${field}::text AS ${field}`
+      : `${prefix}${field}`,
   ).join(', ');
 }
 
@@ -500,16 +506,25 @@ export class RunsStore {
       plan_id: string | null;
       name: string;
       description: string | null;
+      start_date: string | null;
       due_date: string | null;
       created_by: string;
     },
     q: Queryable = this.db,
   ): Promise<RunRow> {
     const result = await q.query<RunRow>(
-      `INSERT INTO runs (project_id, plan_id, name, description, due_date, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $6)
+      `INSERT INTO runs (project_id, plan_id, name, description, start_date, due_date, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
        RETURNING ${runColumns()}`,
-      [row.project_id, row.plan_id, row.name, row.description, row.due_date, row.created_by],
+      [
+        row.project_id,
+        row.plan_id,
+        row.name,
+        row.description,
+        row.start_date,
+        row.due_date,
+        row.created_by,
+      ],
     );
     const created = result.rows[0];
     if (!created) throw new ApiError('INTERNAL', 'Run creation failed.');
@@ -530,6 +545,7 @@ export class RunsStore {
     if (fields.name !== undefined) assign('name', fields.name);
     if (fields.description !== undefined) assign('description', fields.description);
     if (fields.plan_id !== undefined) assign('plan_id', fields.plan_id);
+    if (fields.start_date !== undefined) assign('start_date', fields.start_date);
     if (fields.due_date !== undefined) assign('due_date', fields.due_date);
     assign('updated_by', fields.updated_by);
 

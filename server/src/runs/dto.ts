@@ -238,6 +238,10 @@ export class CreateRunDto {
   @IsDateOnly()
   due_date?: string | null;
 
+  @IsOptional()
+  @IsDateOnly()
+  start_date?: string | null;
+
   /** Omit for an empty run; items can be added later. */
   @IsOptional()
   @ValidateNested()
@@ -268,6 +272,11 @@ export class UpdateRunDto {
   @IsOptional()
   @IsDateOnly()
   due_date?: string | null;
+
+  /** Explicit null clears the start date; may not land after `due_date`. */
+  @IsOptional()
+  @IsDateOnly()
+  start_date?: string | null;
 }
 
 /** GET /projects/:projectId/runs (docs/api-runs.md § Endpoints). */

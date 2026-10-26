@@ -85,6 +85,13 @@ describe('runs DTOs', () => {
       );
     });
 
+    it('accepts a YYYY-MM-DD start_date or null, rejecting other shapes', async () => {
+      expect(await issuesFor(CreateRunDto, validCreate({ start_date: '2026-11-01' }))).toEqual([]);
+      expect(await issuesFor(CreateRunDto, validCreate({ start_date: null }))).toEqual([]);
+      expect(await fieldsOf(CreateRunDto, validCreate({ start_date: '2026-11-01T00:00:00Z' })))
+        .toContain('start_date');
+    });
+
     it('validates the nested selection and defaults include_descendants', async () => {
       const dto = await transform(CreateRunDto, validCreate({
         selection: { case_ids: [UUID], suite_id: OTHER_UUID },
@@ -133,10 +140,15 @@ describe('runs DTOs', () => {
       expect(dto.name).toBe('Final');
     });
 
-    it('accepts null for description, plan_id and due_date (clears/detaches)', async () => {
+    it('accepts null for description, plan_id, start_date and due_date (clears/detaches)', async () => {
       expect(await issuesFor(UpdateRunDto, { description: null })).toEqual([]);
       expect(await issuesFor(UpdateRunDto, { plan_id: null })).toEqual([]);
+      expect(await issuesFor(UpdateRunDto, { start_date: null })).toEqual([]);
       expect(await issuesFor(UpdateRunDto, { due_date: null })).toEqual([]);
+    });
+
+    it('rejects a malformed start_date', async () => {
+      expect(await fieldsOf(UpdateRunDto, { start_date: '01-11-2026' })).toContain('start_date');
     });
   });
 

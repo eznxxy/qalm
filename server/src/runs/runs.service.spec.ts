@@ -203,6 +203,7 @@ class FakeStore {
     plan_id: string | null;
     name: string;
     description: string | null;
+    start_date: string | null;
     due_date: string | null;
     created_by: string;
   }): Promise<RunRow> {
@@ -213,6 +214,7 @@ class FakeStore {
       plan_id: row.plan_id,
       name: row.name,
       description: row.description,
+      start_date: row.start_date,
       due_date: row.due_date,
       completed_at: null,
       completed_by: null,
@@ -232,6 +234,7 @@ class FakeStore {
     if (fields.name !== undefined) row.name = fields.name;
     if (fields.description !== undefined) row.description = fields.description;
     if (fields.plan_id !== undefined) row.plan_id = fields.plan_id;
+    if (fields.start_date !== undefined) row.start_date = fields.start_date;
     if (fields.due_date !== undefined) row.due_date = fields.due_date;
     row.updated_by = fields.updated_by;
     row.updated_at = this.tick();
@@ -598,6 +601,7 @@ class FakeStore {
     planId?: string | null;
     name?: string;
     description?: string | null;
+    startDate?: string | null;
     dueDate?: string | null;
     completedAt?: Date | null;
     deleted?: boolean;
@@ -610,6 +614,7 @@ class FakeStore {
       plan_id: overrides.planId ?? null,
       name: overrides.name ?? 'Run',
       description: overrides.description ?? null,
+      start_date: overrides.startDate ?? null,
       due_date: overrides.dueDate ?? null,
       completed_at: overrides.completedAt ?? null,
       completed_by: overrides.completedAt ? 'u-admin' : null,
@@ -892,6 +897,41 @@ describe('RunsService (unit, in-memory runs)', () => {
       await expectCode(service.create(AS('admin'), 'p-arch', { name: 'Nope' }), 'CONFLICT');
     });
 
+    it('stores an optional start_date and rejects one that lands after the due date', async () => {
+      const run = await service.create(AS('lead'), 'p-1', {
+        name: 'Dated',
+        start_date: '2026-11-01',
+        due_date: '2026-11-14',
+      });
+      expect(run).toMatchObject({ start_date: '2026-11-01', due_date: '2026-11-14' });
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Backwards',
+          start_date: '2026-11-20',
+          due_date: '2026-11-14',
+        }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'start_date', issue: 'must be on or before due_date' }],
+      });
+      expect(store.runs).toHaveLength(1);
+    });
+
+    it('accepts a start_date with no due date, and a due date alone', async () => {
+      const startOnly = await service.create(AS('lead'), 'p-1', {
+        name: 'Starts only',
+        start_date: '2026-11-01',
+      });
+      expect(startOnly).toMatchObject({ start_date: '2026-11-01', due_date: null });
+
+      const dueOnly = await service.create(AS('lead'), 'p-1', {
+        name: 'Due only',
+        due_date: '2026-11-14',
+      });
+      expect(dueOnly).toMatchObject({ start_date: null, due_date: '2026-11-14' });
+    });
+
     it('400s a selection larger than the 2,000-item cap and commits nothing', async () => {
       store.addCase({ caseNumber: 1, suiteId: 's-root' });
       const many = Array.from({ length: 2_001 }, (_, index) => `c-${index + 2}`);
@@ -968,6 +1008,48 @@ describe('RunsService (unit, in-memory runs)', () => {
     it('409s writes in an archived project', async () => {
       const run = store.addRun({ projectId: 'p-arch' });
       await expectCode(service.update(AS('admin'), run.id, { name: 'X' }), 'CONFLICT');
+    });
+
+    it('sets and clears the start date; null clears both dates', async () => {
+      const run = store.addRun({ name: 'Run', dueDate: '2026-11-14' });
+
+      const dated = await service.update(AS('lead'), run.id, { start_date: '2026-11-01' });
+      expect(dated).toMatchObject({ start_date: '2026-11-01', due_date: '2026-11-14' });
+
+      const cleared = await service.update(AS('lead'), run.id, {
+        start_date: null,
+        due_date: null,
+      });
+      expect(cleared).toMatchObject({ start_date: null, due_date: null });
+    });
+
+    it('400s a start date after an existing due date, and a due date before an existing start', async () => {
+      const run = store.addRun({ name: 'Run', startDate: '2026-11-01', dueDate: '2026-11-14' });
+
+      await expect(
+        service.update(AS('lead'), run.id, { start_date: '2026-11-20' }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'start_date', issue: 'must be on or before due_date' }],
+      });
+      await expect(
+        service.update(AS('lead'), run.id, { due_date: '2026-10-01' }),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+
+      // The rejected patches wrote nothing.
+      expect(await service.detail(AS('lead'), run.id)).toMatchObject({
+        start_date: '2026-11-01',
+        due_date: '2026-11-14',
+      });
+    });
+
+    it('allows moving both dates together, including to an earlier window', async () => {
+      const run = store.addRun({ name: 'Run', startDate: '2026-11-01', dueDate: '2026-11-14' });
+      const moved = await service.update(AS('lead'), run.id, {
+        start_date: '2026-10-01',
+        due_date: '2026-10-15',
+      });
+      expect(moved).toMatchObject({ start_date: '2026-10-01', due_date: '2026-10-15' });
     });
   });
 

@@ -32,6 +32,7 @@ export interface RunDto {
   name: string;
   description: string | null;
   status: 'open' | 'completed';
+  start_date: string | null;
   due_date: string | null;
   completed_at: string | null;
   completed_by: string | null;
@@ -99,6 +100,7 @@ export function toRunDto(row: RunWithCountsRow): RunDto {
     name: row.name,
     description: row.description,
     status: row.completed_at === null ? 'open' : 'completed',
+    start_date: row.start_date,
     due_date: row.due_date,
     completed_at: row.completed_at === null ? null : row.completed_at.toISOString(),
     completed_by: row.completed_by,

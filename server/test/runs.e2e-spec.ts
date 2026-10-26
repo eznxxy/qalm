@@ -17,6 +17,7 @@ interface RunData {
   name: string;
   description: string | null;
   status: 'open' | 'completed';
+  start_date: string | null;
   due_date: string | null;
   completed_at: string | null;
   completed_by: string | null;
@@ -336,6 +337,36 @@ describe('Runs API (integration)', () => {
       expect(run.assignee_ids).toEqual([]);
     });
 
+    it('stores start_date as a plain date and 400s a start date after the due date', async () => {
+      const run = await createOk({
+        name: 'Dated',
+        start_date: '2026-11-01',
+        due_date: '2026-11-14',
+      });
+      expect(run).toMatchObject({ start_date: '2026-11-01', due_date: '2026-11-14' });
+
+      const detail = await getRun('viewer', run.id);
+      expect(detail.body.data).toMatchObject({
+        start_date: '2026-11-01',
+        due_date: '2026-11-14',
+      });
+
+      const backwards = await createRun('lead', {
+        name: 'Backwards',
+        start_date: '2026-11-20',
+        due_date: '2026-11-14',
+      });
+      expect(backwards.status).toBe(400);
+      expect(backwards.body.error).toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'start_date', issue: 'must be on or before due_date' }],
+      });
+
+      const malformed = await createRun('lead', { name: 'Bad', start_date: '01/11/2026' });
+      expect(malformed.status).toBe(400);
+      expect(malformed.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
     it('400s an unknown selection suite, 400s a foreign plan_id and 409s an archived project', async () => {
       const badSuite = await createRun('admin', {
         name: 'Bad',
@@ -444,6 +475,21 @@ describe('Runs API (integration)', () => {
       const empty = await patchRun('lead', run.id, {});
       expect(empty.status).toBe(400);
       expect(empty.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('patches the start date, clears it with null and 400s a start after the due date', async () => {
+      const run = await createOk({ name: 'Dated', due_date: '2026-11-14' });
+
+      const dated = await patchRun('lead', run.id, { start_date: '2026-11-01' });
+      expect(dated.status).toBe(200);
+      expect(dated.body.data).toMatchObject({ start_date: '2026-11-01', due_date: '2026-11-14' });
+
+      const backwards = await patchRun('lead', run.id, { start_date: '2026-12-01' });
+      expect(backwards.status).toBe(400);
+      expect(backwards.body.error.code).toBe('VALIDATION_ERROR');
+
+      const cleared = await patchRun('lead', run.id, { start_date: null });
+      expect(cleared.body.data).toMatchObject({ start_date: null, due_date: '2026-11-14' });
     });
 
     it('closes and reopens, 409ing a repeat', async () => {

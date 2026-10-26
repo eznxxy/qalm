@@ -271,6 +271,7 @@ class FakeStore {
       plan_id: null,
       name: 'Run',
       description: null,
+      start_date: null,
       due_date: null,
       completed_at: overrides.completedAt ?? null,
       completed_by: null,

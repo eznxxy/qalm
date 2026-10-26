@@ -51,6 +51,17 @@ function itemNotFound(): ApiError {
   return new ApiError('NOT_FOUND', 'Run item not found.');
 }
 
+/**
+ * `start_date` and `due_date` are independent optional dates, except that a run
+ * may not start after it is due (docs/api-runs.md § Validation). Both are plain
+ * `YYYY-MM-DD` strings, so a lexical comparison is a date comparison.
+ */
+function assertDateOrder(startDate: string | null, dueDate: string | null): void {
+  if (startDate === null || dueDate === null) return;
+  if (startDate <= dueDate) return;
+  throw validationError('start_date', 'must be on or before due_date');
+}
+
 function conflict(message: string, field = 'run_id'): ApiError {
   return new ApiError('CONFLICT', message, [{ field, issue: message.toLowerCase() }]);
 }
@@ -113,6 +124,9 @@ export class RunsService {
     await this.requireProject(projectId, caller, 'write');
     return this.store.transaction(async (client) => {
       const planId = await this.resolvePlan(projectId, dto.plan_id, client);
+      const startDate = dto.start_date ?? null;
+      const dueDate = dto.due_date ?? null;
+      assertDateOrder(startDate, dueDate);
       const snapshots = await this.materializeSelection(projectId, dto.selection, client);
       if (snapshots.length > MAX_RUN_ITEMS) {
         throw validationError(
@@ -126,7 +140,8 @@ export class RunsService {
           plan_id: planId ?? null,
           name: dto.name,
           description: blankToNull(dto.description),
-          due_date: dto.due_date ?? null,
+          start_date: startDate,
+          due_date: dueDate,
           created_by: caller.id,
         },
         client,
@@ -155,6 +170,9 @@ export class RunsService {
       const row = await this.store.findLiveByIdForUpdate(id, client);
       if (!row) throw runNotFound();
       const planId = await this.resolvePlan(row.project_id, dto.plan_id, client);
+      const startDate = dto.start_date === undefined ? row.start_date : dto.start_date;
+      const dueDate = dto.due_date === undefined ? row.due_date : dto.due_date;
+      assertDateOrder(startDate, dueDate);
       await this.store.updateRun(
         id,
         {
@@ -162,6 +180,7 @@ export class RunsService {
           description:
             dto.description === undefined ? undefined : blankToNull(dto.description),
           plan_id: planId,
+          start_date: dto.start_date,
           due_date: dto.due_date,
           updated_by: caller.id,
         },
@@ -532,11 +551,12 @@ export class RunsService {
       dto.name !== undefined ||
       dto.description !== undefined ||
       dto.plan_id !== undefined ||
+      dto.start_date !== undefined ||
       dto.due_date !== undefined
     ) {
       return;
     }
-    const fields = ['name', 'description', 'plan_id', 'due_date'];
+    const fields = ['name', 'description', 'plan_id', 'start_date', 'due_date'];
     throw new ApiError(
       'VALIDATION_ERROR',
       'Provide at least one field to update.',
