@@ -47,7 +47,7 @@ total * 100)`, and is `0` when `total = 0`.
 | `description` | optional, ≤ 1,000 chars; `null` clears it |
 | `due_date` | optional `YYYY-MM-DD`; `null` clears it |
 | `runs` | **required on create**, 1–20 entries (a plan needs at least one run) |
-| `runs[].name` | required, trimmed 1–120 chars; run names are not unique |
+| `runs[].name` | required, trimmed 1–120 chars; unique per project (case-insensitive), exactly like a standalone run — including across the runs of one request |
 | `runs[].description` | optional, ≤ 1,000 chars |
 | `runs[].start_date`, `runs[].due_date` | optional `YYYY-MM-DD`; `start_date` may not be after `due_date` |
 | `runs[].plan_id` | not accepted — every run inherits the new plan's id |
@@ -89,21 +89,25 @@ one request, with at least one run.
 ```
 - `201` → `{ "data": { ...plan } }` with `run_count` equal to the number of runs
   created and zeroed `counts` (each new run has no items).
-- `400` `VALIDATION_ERROR`; `409` `CONFLICT` — duplicate name in the project,
-  or project archived; `403` for Tester and Viewer.
+- `400` `VALIDATION_ERROR`; `409` `CONFLICT` — duplicate plan name in the
+  project, a run name already in use in the project (or repeated inside this
+  request), or project archived; `403` for Tester and Viewer.
 
 #### Atomicity
 The plan and all of its runs are inserted in **one transaction**. If any run is
-rejected — bad field, `start_date` after `due_date`, a plan-name conflict — the
-whole request rolls back: no plan and no runs. Retrying the same request is
-safe because nothing was written.
+rejected — bad field, `start_date` after `due_date`, a plan-name or run-name
+conflict — the whole request rolls back: no plan and no runs. Retrying the same
+request is safe because nothing was written.
 
 #### Validation details
 - Errors are reported per field, including the index:
   `runs` (missing, empty, more than 20), `runs[0].name`,
   `runs[1].start_date`, and so on.
-- A plan's `name` uniqueness is checked once per request; run names are free to
-  repeat (runs have no uniqueness rule, here or in `docs/api-runs.md`).
+- A plan's `name` uniqueness is checked once per request, and each embedded
+  run's name is checked too: it must not match a live run already in the
+  project, nor an earlier run in the same request. Both are `409` with the
+  offending index (`runs[1].name`), so the dialog can point at that run; the
+  plan is not created.
 
 #### "At least one run" applies to create only
 Runs can be deleted (`DELETE /runs/:id`) or detached

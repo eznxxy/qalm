@@ -577,6 +577,67 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.9 — One live run per name per project (review feedback, small) — DONE 2026-10-27
+- **The request, verbatim:** "add rule that test run name cannot be duplicate"
+  — review feedback right after 3.8, so it applies to plain runs, renames, and
+  the runs created inside a plan.
+- **Contract first.** `docs/api-runs.md` changes `name` from "**not** unique" to
+  "unique per project, case-insensitive, among live runs", adds the `409` to
+  create and to rename (with the own-case exception), and documents the partial
+  unique index in the implementation notes. `docs/api-plans.md` gives
+  `runs[].name` the same rule — including a repeat inside one request — and
+  keeps the atomicity promise: a clashing run rolls the whole plan back.
+  `docs/PRD-plans-runs.md` gains decision 11; DESIGN §4.3 says what the user
+  sees.
+- **Decision.** Same shape plans already use: `(project_id, lower(name)) where
+  deleted_at is null`. A soft-deleted run frees its name; renaming a run to a
+  different case of its own name is allowed. The error is `409 CONFLICT`,
+  message "A run with this name already exists.", detail field `name` — or
+  `runs[i].name` for a run created with a plan, which is what the dialog keys on.
+- **Existing data.** `20261027000002_runs_name_unique` renames every live
+  duplicate before creating the index: oldest by `created_at, id` keeps the
+  name, later ones get ` (2)`, ` (3)`, … (the loop checks candidates against
+  every live name, and 114 + " (999)" stays inside the 120-char limit). Nothing
+  is deleted and no result or attachment moves. `down` drops the index only —
+  the renames are not reversed. Applied to the dev DB: 5 duplicate rows → 0,
+  index present; in Webshop QA `AABS` stayed with the 05:29 run and the 07:38
+  one became `AABS (2)`, `Run October` stayed with the 2026-10-26 run and the
+  two 10-27 runs became `Run October (2)` and `Run October (3)`.
+- **Server.** `runs/run-name.ts` owns the one conflict error plus
+  `isRunNameConflict` (the plan path re-keys the store's field with it).
+  `RunsStore.findIdByNameIgnoreCase(projectId, name, excludeId?, q?)` does the
+  lookup inside the caller's transaction; `insertRun`/`updateRun` map a
+  `23505` on `runs_project_name_unique` to the same 409 so a concurrent insert
+  loses the race with a clean message instead of a 500 — that branch is
+  defensive and not reproducible in a test, because both paths pre-check first.
+  `RunsService.create`
+  and `update` pre-check (the update excludes its own id); `PlansService.create`
+  keeps a `Set` of the request's names and checks each run against it and
+  against the project, re-keying the conflict to `runs[i].name`.
+- **Web.** `PlanWithRunsDialog` refuses two of its own runs with the same name
+  (case-insensitive, trimmed): the first run keeps the name and the later one
+  shows "Run name is already used by Run 1." and blocks submit, so that case
+  never reaches the API. A clash with a run that already exists still comes
+  back from the server and lands on the Name field of the New run dialog
+  (`already in use`), with nothing in the form-level slot.
+- Verified: server `tsc`/`eslint` clean, jest **464** (28 suites); web
+  `tsc`/`eslint` clean, jest **577** (40 suites); the full e2e run is green —
+  **269** tests across 11 suites (the `results` suite needed the same unique
+  fixture names and was rerun after that fix). New coverage: `runs.service`
+  (duplicate create, deleted-name reuse, per-project scope, duplicate rename,
+  own-case rename), `plans.service` (embedded duplicate → `runs[1].name`,
+  in-request duplicate, cross-project), `runs` e2e (create/rename duplicates,
+  other project, deleted-name reuse), `plans` e2e (embedded duplicate names
+  `runs[1].name`, in-request duplicate, nothing written), the dialog
+  duplicate-name test and the runs page's 409-on-Name-field test. The `plans`,
+  `runs` and `case-runs` e2e suites also needed unique fixture run names now
+  that names collide. **Gap:** the writer-only UI (New run dialog, plan dialog)
+  still cannot be exercised in the Tess Tester session, so the visible 409 and
+  the inline duplicate message are covered by tests only and need the
+  reviewer's Admin/Lead pass before card 4.1.
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING

@@ -69,7 +69,7 @@ remaining MVP slice (milestones, dashboards/reports, CSV export) reads from.
 ### Test run
 | Field | Rules |
 |---|---|
-| `name` | Required, trimmed 1–120 chars. **Not** unique (two runs may share a name). |
+| `name` | Required, trimmed 1–120 chars, unique per project (case-insensitive). A deleted run frees its name. |
 | `description` | Optional, ≤ 1,000 chars. |
 | `plan_id` | Optional; the plan this run belongs to (same project). `null` = stand-alone run. |
 | `status` | `open` or `completed`. Derived from `completed_at`. |
@@ -233,6 +233,11 @@ them.
    to fill the drawer tab.
 10. **Result fields** `elapsed_minutes` and `defect_url` are in MVP (DESIGN
     §4.4 lists them) — both optional.
+11. **Run names are unique per project** (review feedback, 2026-10-27). A
+    duplicate — case-insensitive, among live runs — is a `409` on `name` (or on
+    the indexed `runs[i].name` when a plan is created with its runs), the same
+    rule plan names already follow. A deleted run frees its name, and renaming
+    a run to a different case of its own name stays allowed.
 
 ## Phasing (for the task breakdown, after approval)
 - **Phase 1 — contracts** (Daedalus): this PRD + `docs/api-runs.md` +

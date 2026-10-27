@@ -207,6 +207,12 @@ assignee, start date, due date. Filter by Open / Completed.
   The runs screen stays where it is after a save. There is no plans list: the
   runs list's Plan column and the plan detail screen are the way to a plan,
   which carries its rollup and its Edit/Delete actions.
+- **One live run per name per project.** A run name another live run in the
+  project already uses — ignoring case — is refused on create and rename, with
+  the message on the Name field and nothing saved. A deleted run stops holding
+  its name, and changing only the case of a run's own name is allowed. The New
+  plan dialog catches a repeat among its own run rows before sending, so that
+  case never reaches the API.
 
 ### 4.4 Run detail (the most-used screen)
 

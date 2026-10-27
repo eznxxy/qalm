@@ -54,7 +54,7 @@ Cases referenced here are defined in `docs/api-cases.md`.
 ### Validation
 | Field | Rules |
 |---|---|
-| `name` | required, trimmed 1–120 chars; **not** unique |
+| `name` | required, trimmed 1–120 chars; **unique per project, case-insensitive**, among live runs — a soft-deleted run frees its name (enforced on create and rename) |
 | `description` | optional, ≤ 1,000 chars; `null` clears |
 | `plan_id` | optional UUID of a plan in the same project; `null` detaches |
 | `due_date` | optional `YYYY-MM-DD`; `null` clears |
@@ -171,8 +171,9 @@ Paginated list for the runs screen (§4.3).
 - `201` → `{ "data": { ...run } }` with `counts.total` = items created.
 - `400` `VALIDATION_ERROR` — bad fields, unknown suite, `start_date` after
   `due_date`, or more than 2,000 items.
-- `404` — project or referenced case/suite unknown; `409` — project archived or
-  duplicate plan name is irrelevant here; `403` — non-writer.
+- `409` `CONFLICT` — the project is archived, or a live run in the project
+  already has this name (case-insensitive; details name the field `name`).
+- `404` — project or referenced case/suite unknown; `403` — non-writer.
 
 ### `GET /api/v1/runs/:id` — any authenticated role
 - `200` → `{ "data": { ...run } }` (with `counts`). Items come from the items
@@ -186,7 +187,9 @@ Paginated list for the runs screen (§4.3).
 ```
 - `200` → `{ "data": { ...run } }`
 - `400` `VALIDATION_ERROR` — including a `start_date` that would land after the
-  run's (existing or new) `due_date`; `404`; `409` — project archived; `403`.
+  run's (existing or new) `due_date`; `404`; `409` — project archived, or the
+  new `name` is already used by another live run in the project (renaming a run
+  to a different case of its own name is allowed); `403`.
 
 ### `POST /api/v1/runs/:id/close` — Admin, Lead
 Sets `completed_at`/`completed_by`. Items may be left untested (the status bar
@@ -388,6 +391,11 @@ Backs the case drawer's **Linked runs** tab (§4.2). Newest run first.
      `created_by`/`updated_by uuid fk → users`, `deleted_at timestamptz null`,
      `created_at`/`updated_at timestamptz`.
      Indexes: `(project_id, deleted_at, created_at)`, `(plan_id)`.
+     Uniqueness: partial unique index on `(project_id, lower(name))` where
+     `deleted_at is null` — one live run per name per project, ignoring case
+     (same rule as plan names). Added by `20261027000002_runs_name_unique`,
+     which first renames any live duplicate by appending ` (2)`, ` (3)`, … so
+     existing data satisfies the index.
      `start_date` was added by the follow-up migration
      `20261027000001_runs_start_date` (additive, nullable, no backfill), which
      keeps existing rows valid.
