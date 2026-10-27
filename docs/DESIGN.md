@@ -199,8 +199,14 @@ cases."
 
 ### 4.3 Test runs list
 
-Columns: name, plan, status bar (the memorable element), % complete,
-assignee, start date, due date. Filter by Open / Completed.
+Columns: name, plan, milestone, status bar (the memorable element),
+% complete, assignee, start date, due date. Filter by Open / Completed.
+
+- **The Milestone column** sits between Plan and Status, as originally drawn,
+  and shows the milestone's name as a link or `—`. It comes from the run's own
+  `milestone_id`/`milestone_name`, so the column needs no second fetch. The plan
+  detail's Runs table shows it too (that table only drops the Plan column); the
+  milestone detail's table drops Milestone instead (§4.5).
 
 - **The toolbar creates both things, and a plan is created with its runs.** A
   plan with no runs is an empty folder, so "New plan" opens one dialog that
@@ -340,7 +346,35 @@ own screen shows the plan's fields, the aggregate rollup, the Edit/Delete pair
 (Admin/Lead, read-only when archived) and a table of its runs — the runs list's
 columns minus Plan, sorted by the server.
 
-Milestone: name, due date, progress bar, linked runs, days left.
+Milestone: a project-scoped, dated checkpoint over runs (`docs/PRD-milestones.md`).
+Its list is the "what is coming up" screen: Name, Runs, Status, `% complete`
+with the status bar, Due date, Days left, Actions — sorted by due date by
+default, undated last, with a name search and an Open/Completed filter. The
+screen's primary action is **New milestone**; the dialog collects name,
+description and due date, and a milestone is allowed to have no runs yet.
+
+- **Detail** — the milestone's fields, its rollup (status bar, exact per-status
+  counts, `% complete`), due date and days left, the Edit/Delete pair
+  (Admin/Lead, read-only when the project is archived) and its runs in the runs
+  table: the Plan column included, the Milestone column dropped because every
+  row would repeat the page title. A row opens the run.
+- **Add runs** lists live runs of the project that have **no** milestone, each
+  with its status and progress; attaching is per row and a save attaches the
+  ticked ones. **Remove from milestone** on a run detaches it and keeps it —
+  the confirm says so. A run can be in one milestone, and a run already in
+  another is not offered.
+- **Completion is derived, not a button**: a milestone reads **Completed** when
+  it has at least one run and every run is completed, and returns to **Open**
+  when a run is reopened or an open run is attached. There is no Close
+  milestone action.
+- **Days left** is the countdown to `due_date`: "12 days left", "Due today",
+  "3 days late"; no due date means no countdown. It is computed in the web from
+  the plain calendar date (§9), never by the API.
+- **Deleting a milestone detaches its runs** and deletes nothing; the confirm
+  names that ("Its 3 runs will be kept, without a milestone.").
+- A milestone is never chosen on a plan. The run's own form carries the optional
+  Milestone field, the run detail names it with a link, and the runs table shows
+  it (see §4.3).
 
 ### 4.6 Reports and dashboard
 
@@ -409,9 +443,9 @@ Do not add a UI library without Daedalus's approval.
   expands (120 ms), toast appears. No page-load animations, no hover animations
   on rows or cards.
 - Respect `prefers-reduced-motion`: replace motion with instant changes.
-- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`
-  go to cases, runs, `n` new, `Ctrl+Enter` save, `P F B R S` set status
-  in a result form, `j`/`k` move between rows, `Esc` close.
+- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`/`m`
+  go to cases, runs, milestones, `n` new, `Ctrl+Enter` save, `P F B R S` set
+  status in a result form, `j`/`k` move between rows, `Esc` close.
 
 ---
 
