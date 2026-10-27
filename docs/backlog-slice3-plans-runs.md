@@ -705,6 +705,34 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.11 — New plan: an attached run alone must not ask for a new-run name (review feedback, small) — DONE 2026-10-27
+- **The bug, as reported:** "it says run name is required but i already attach
+  2 test run". With a plan name filled in and two runs attached, Create plan
+  refused with "Run name is required." under the untouched default "Run 1"
+  row, so the attach-only flow could only be finished by deleting that row
+  first.
+- **Cause.** The dialog required a name for every row in `runs`, including the
+  blank starter row it creates on open, and always sent every row. Now that
+  attached runs can satisfy the contract's "at least one run", an empty new-run
+  row is a placeholder rather than a missing field.
+- **Fix (web only, no contract change).** `hasRunContent()` in
+  `PlanWithRunsDialog` defines a blank row (name, description and both dates
+  empty). Attaching a run drops blank rows (a row the user has typed into
+  stays), and once a run is attached any remaining blank row is skipped by
+  validation and left out of the payload, so the server receives exactly
+  `runs: []` + `run_ids`. With nothing attached the starter row keeps its name
+  prompt, so an empty dialog still says what is missing. The counter, the
+  20-run cap and the zero-run guard still count rows on screen; rows are only
+  appended after the starter row is dropped, so `runs[i]` server errors keep
+  pointing at the right row.
+- Verified: web jest **589** (40 suites) — new dialog tests for the reported
+  attach-only save (no name typed, no row removed), for keeping a typed row
+  when a run is attached, and for ignoring an empty row added after attaching;
+  the runs-page attach tests no longer delete the placeholder row. `tsc` and
+  `eslint` clean. Nothing pushed.
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING

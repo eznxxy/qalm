@@ -214,7 +214,9 @@ assignee, start date, due date. Filter by Open / Completed.
   unplanned runs are offered — a run already in another plan is not listed and
   the API refuses it — so a save never moves work out of someone else's plan.
   The "at least one run, at most 20" rule counts new and attached runs
-  together, and a rejected request points at the offending row.
+  together, and a rejected request points at the offending row. The untouched
+  first run row is a placeholder: attaching a run drops it, so a plan built
+  only from existing runs can be saved without filling in a new-run name.
 - **One live run per name per project.** A run name another live run in the
   project already uses — ignoring case — is refused on create and rename, with
   the message on the Name field and nothing saved. A deleted run stops holding
