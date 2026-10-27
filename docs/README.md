@@ -38,7 +38,7 @@ exists and is approved (see `/AGENTS.md`).
 ## Slice 5 (project overview) — status: proposed, awaiting approval
 - `PRD-project-overview.md` / `api-project-overview.md` — the project page gains
   a tab strip (Overview / Milestones / Test runs / Test cases live, Reports
-  disabled), a 14-day results trend backed by the new
+  disabled), a results trend over a 1/7/14/30-day window backed by the new
   `GET /projects/:projectId/reports/trend`, a Milestones card and a Test Runs
   card, and moves the description into Overview. One new read-only endpoint and
   one index; no existing resource changes.

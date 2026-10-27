@@ -408,9 +408,9 @@ below them, a tab strip; below that, the Overview tab's content.
 │ Overview │ Milestones │ Test runs │ Test cases │ Reports│
 ├────────────────────────────────────┬────────────────────┤
 │ Results recorded, last 14 days     │ Milestones         │
-│  ▁▂▅▃▆▂▁  ▲ 81.6%      [as table]  │ Release 2.4        │
+│  ▁▂▅▃▆▂▁  ▲ 81.6%  [1d│7d│14d│30d]│ Release 2.4        │
 │  ● Passed ● Failed ● Blocked       │ 14 Nov · 12 days   │
-│  ● Retest ● Skipped                │ ▓▓▓▓▓▓░░░ 71%      │
+│  ● Retest ● Skipped      [as table]│ ▓▓▓▓▓▓░░░ 71%      │
 │                                    │ Release 2.5        │
 ├────────────────────────────────────┴────────────────────┤
 │ Test runs                                  View all →    │
@@ -429,25 +429,38 @@ state.
 **Grid.** 12 columns, 16px gutters (§4.6): trend card 8, Milestones card 4,
 Test Runs card 12. One column below 1024px, in that order.
 
-**Results trend card.** Title names the insight and its source: "Results
-recorded, last 14 days" (generated from the window, never hard-coded). Two
-series on one plot: stacked daily columns of recorded results by status (left
-axis, counts) and the daily pass rate as a line (right axis, 0–100%). Status
-colours are the only colours used (§2.2) and the legend spells out every status
-in text. Days with no results draw no column and **break** the pass-rate line —
-never a point at 0%. A day with no verdicts labels `—`, not `0%`. The window
-footer states "UTC days" so the buckets are unambiguous.
+**Results trend card.** Title names the insight and its source, generated from
+the resolved window: "Results recorded, last 14 days", "… last 7 days", "… last
+30 days", and "… today" for 1 day. Two series on one plot: stacked daily columns
+of recorded results by status (left axis, counts) and the daily pass rate as a
+line (right axis, 0–100%). Status colours are the only colours used (§2.2) and
+the legend spells out every status in text. Days with no results draw no column
+and **break** the pass-rate line — never a point at 0%. A day with no verdicts
+labels `—`, not `0%`. The window footer states "UTC days" so the buckets are
+unambiguous.
 
+- **Range selector**: a segmented control in the card header, `1d · 7d · 14d ·
+  30d`, 14 default, selected option marked with `aria-pressed` and a filled
+  background (not colour alone). It is a labelled group ("Trend window"), the
+  four buttons are 32px touch targets, and the choice lives in the URL
+  (`/projects/:id?days=30`) so refresh and sharing keep it; an unsupported value
+  falls back to 14 silently. Changing it refetches only this card.
+- **Loading on change**: keep the previous plot, mark the card `aria-busy="true"`
+  and announce "Updating…" politely; never flash the skeleton after the first
+  load. On failure, show the card error + Retry with the chosen range still
+  selected.
 - Hover/focus a day: tooltip with date, per-status counts, total and pass rate.
   Keyboard: the plot is a single `role="img"` with an `aria-label` summarising
   the window, total and pass rate; the day detail is reachable through the table
   view, which is the accessible path.
 - **View as table** toggle (§4.6), a real button with `aria-expanded`: Date,
-  Passed, Failed, Blocked, Retest, Skipped, Total, Pass rate — exactly the 14
-  rows, `—` for a null rate. Toggling does not refetch.
+  Passed, Failed, Blocked, Retest, Skipped, Total, Pass rate — one row per
+  selected day, `—` for a null rate. Toggling does not refetch.
+- One day selected: a single stacked column and a single pass-rate **point**, no
+  line; one table row.
 - Empty window: keep the axes and legend, put "No results recorded in the last
-  14 days." in the plot area with a link to Test runs. Never an empty frame
-  alone.
+  14 days." (or "… today.") in the plot area with a link to Test runs. Never an
+  empty frame alone.
 
 **Milestones card.** Up to 5, sorted by due date ascending with undated last
 (the milestones screen's default), each with name, due date, days left (or

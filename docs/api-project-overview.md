@@ -88,6 +88,10 @@ entries there, and `totals` covers all of them.
   `to - (days - 1)`. Both are echoed so the client can label the axis without
   recomputing a date or re-deriving "today" in the browser's timezone.
 - `days` — the window length actually used (the resolved `days` query param).
+  The web's presets are 1, 7, 14 and 30 days with 14 as the default; the
+  endpoint is deliberately wider (1–90) so the reports slice needs no contract
+  change. The client titles the card and picks its empty-state copy from this
+  echoed value, never from its own copy of the request.
 - `buckets` — **exactly `days` entries**, oldest first, one per UTC calendar day
   from `from` to `to` inclusive, zero-filled. A day with no results is present
   with all-zero `status_counts`, `total: 0` and `pass_rate: null`; days are never
@@ -141,7 +145,7 @@ and it is bucketed by `(results.created_at AT TIME ZONE 'UTC')::date`.
 
 | Query param | Rules |
 |---|---|
-| `days` | optional integer, `1–90`, default `14`. Anything else (`0`, `91`, `abc`, `1.5`, repeated) is `400` on `days` |
+| `days` | optional integer, `1–90`, default `14`. Anything else (`0`, `91`, `abc`, `1.5`, repeated) is `400` on `days`. The overview screen only ever sends the presets `1`, `7`, `14`, `30`; the wider range is for the reports slice |
 
 - `200` → `{ "data": { ...trend } }` as above.
 - `400` `VALIDATION_ERROR` — `days` is not an integer in `1–90`; `details` names
@@ -167,6 +171,7 @@ Reading a trend is reading results, which every signed-in role may already do
 |---|---|
 | `days=14` | 14 buckets, `from` = today − 13 days (UTC) |
 | `days=1` | 1 bucket, `from = to` = today (UTC) |
+| `days=7` / `days=30` | 7 / 30 buckets; the web's other two presets |
 | `days=90` | 90 buckets |
 | `days=0`, `days=91`, `days=1.5`, `days=abc` | `400`, `details: [{ "field": "days", "issue": "must be an integer between 1 and 90" }]` |
 | `days` omitted | 14 |
@@ -271,7 +276,8 @@ export function passRate(counts: Record<RecordedStatus, number>): number | null
 
 ### Tests (Hephaestus)
 Unit: bucket assembly (14 zero rows for an empty project; exact `from`/`to` for
-`days=1`, `14`, `90`), pass-rate rounding and `null`, `totals` recomputation.
+`days=1`, `7`, `14`, `30`, `90`), pass-rate rounding and `null`, `totals`
+recomputation.
 e2e: the boundary cases in "Errors and edge cases" above, project scoping,
 soft-deleted run exclusion, `skipped` excluded from the rate but present in
 counts, `days` validation, role matrix, archived project (`200` Admin / `404`
