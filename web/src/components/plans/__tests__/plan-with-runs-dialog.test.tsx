@@ -297,7 +297,7 @@ describe("PlanWithRunsDialog", () => {
 
   // ---- existing runs (card 3.10) ----
 
-  it("attaches an unplanned run and sends just its id", () => {
+  it("attaches an unplanned run and drops the empty starter row", () => {
     const { onSubmit } = renderDialog({ unplannedRuns: UNPLANNED });
 
     // The picker lists every unplanned run with its facts, so a run can be
@@ -310,23 +310,16 @@ describe("PlanWithRunsDialog", () => {
     fireEvent.change(screen.getByLabelText("Plan name"), {
       target: { value: "Release 2.5" },
     });
-    // Drop the new-run row first: an attached run alone still satisfies the
-    // contract's "at least one run" floor.
-    fireEvent.click(screen.getByRole("button", { name: "Remove run 1" }));
-    expect(
-      screen.getByText("A plan needs at least one run before it can be saved.")
-    ).toBeInTheDocument();
+    // The untouched "Run 1" row is a placeholder: attaching answers which runs
+    // the plan has, so the row goes away instead of demanding a name.
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
 
     fireEvent.click(pick);
 
-    expect(
-      screen.queryByText("A plan needs at least one run before it can be saved.")
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(
       screen.getByText(`0 new · 1 attached · 1 of ${PLAN_RUNS_MAX} runs`)
     ).toBeInTheDocument();
-    // Attached runs are read-only here: no Name field was added for it.
-    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Create plan" }));
 
@@ -338,6 +331,61 @@ describe("PlanWithRunsDialog", () => {
       runs: [],
       runIds: ["run-nightly"],
     });
+    // The regression this covers: a blank starter row used to block the save
+    // with "Run name is required." even though two runs were attached.
+    expect(screen.queryByText("Run name is required.")).not.toBeInTheDocument();
+  });
+
+  it("keeps a run row the user started when a run is attached", () => {
+    const { onSubmit } = renderDialog({ unplannedRuns: UNPLANNED });
+
+    fireEvent.change(screen.getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Release 2.5 smoke" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Attach Nightly checkout" })
+    );
+
+    expect(screen.getByLabelText("Name")).toHaveValue("Release 2.5 smoke");
+    expect(
+      screen.getByText(`1 new · 1 attached · 2 of ${PLAN_RUNS_MAX} runs`)
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create plan" }));
+
+    const values = onSubmit.mock.calls[0]?.[0] as PlanWithRunsValues;
+    expect(values.runs).toEqual([
+      {
+        name: "Release 2.5 smoke",
+        description: "",
+        startDate: "",
+        dueDate: "",
+      },
+    ]);
+    expect(values.runIds).toEqual(["run-nightly"]);
+  });
+
+  it("ignores an empty run row added after attaching", () => {
+    const { onSubmit } = renderDialog({ unplannedRuns: UNPLANNED });
+
+    fireEvent.change(screen.getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Attach Nightly checkout" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add run" }));
+
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create plan" }));
+
+    const values = onSubmit.mock.calls[0]?.[0] as PlanWithRunsValues;
+    expect(values.runs).toEqual([]);
+    expect(values.runIds).toEqual(["run-nightly"]);
+    expect(screen.queryByText("Run name is required.")).not.toBeInTheDocument();
   });
 
   it("offers an attached run again once it is removed", () => {
@@ -357,19 +405,30 @@ describe("PlanWithRunsDialog", () => {
     expect(
       screen.getByRole("button", { name: "Attach Nightly checkout" })
     ).toBeInTheDocument();
+    // The starter row went away when the run was attached and is not
+    // resurrected by a removal; the empty state asks for a run instead.
     expect(
-      screen.getByText(`1 new · 0 attached · 1 of ${PLAN_RUNS_MAX} runs`)
+      screen.getByText(
+        "A plan needs at least one run before it can be saved."
+      )
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(`0 new · 0 attached · 0 of ${PLAN_RUNS_MAX} runs`)
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add run" }));
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
   });
 
   it("counts attached runs toward the cap of 20", () => {
     renderDialog({ unplannedRuns: UNPLANNED });
 
+    // Attaching drops the placeholder row, so 19 added rows reach the cap
+    // together with the attached run.
     fireEvent.click(
       screen.getByRole("button", { name: "Attach Nightly checkout" })
     );
-    // One attached + one new is 2, so 18 more new runs reach the cap.
-    for (let i = 2; i < PLAN_RUNS_MAX; i += 1) {
+    for (let i = 1; i < PLAN_RUNS_MAX; i += 1) {
       fireEvent.click(screen.getByRole("button", { name: "Add run" }));
     }
 

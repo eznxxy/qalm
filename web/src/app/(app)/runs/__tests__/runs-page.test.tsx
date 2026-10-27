@@ -764,8 +764,8 @@ describe("runs list", () => {
       target: { value: "Release 2.5" },
     });
     fireEvent.click(attach);
-    // The default new-run row goes away: one attached run is enough.
-    fireEvent.click(within(dialog).getByRole("button", { name: "Remove run 1" }));
+    // The untouched "Run 1" row is a placeholder: attaching answers which runs
+    // the plan has, so no new run is created and none is required.
     fireEvent.click(within(dialog).getByRole("button", { name: "Create plan" }));
 
     await waitFor(() => expect(planPosts()).toHaveLength(1));
@@ -801,8 +801,8 @@ describe("runs list", () => {
         name: "Attach Ad-hoc checkout",
       })
     );
-    // No new run is needed: the attached one alone satisfies the contract.
-    fireEvent.click(within(dialog).getByRole("button", { name: "Remove run 1" }));
+    // The attached run alone satisfies the contract; the empty starter row
+    // went away with the attach.
     fireEvent.click(within(dialog).getByRole("button", { name: "Create plan" }));
 
     // `run_ids[0]` is an inline field, so it lands on the attached row rather

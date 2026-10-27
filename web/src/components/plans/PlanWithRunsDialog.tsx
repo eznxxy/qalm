@@ -98,6 +98,20 @@ function emptyRun(key: number): RunDraft {
   return { key, name: "", description: "", startDate: "", dueDate: "" };
 }
 
+/**
+ * A run row the user has not filled in at all. It is a placeholder, not a run:
+ * once an existing run is attached it must not block Save with "Run name is
+ * required", and nothing is sent for it.
+ */
+function hasRunContent(run: PlanRunValues): boolean {
+  return Boolean(
+    run.name.trim() ||
+      run.description.trim() ||
+      run.startDate ||
+      run.dueDate
+  );
+}
+
 /** Local validation keys: plan fields by name, run fields as `0.name`. */
 type LocalErrors = Record<string, string>;
 
@@ -137,6 +151,29 @@ export function PlanWithRunsDialog({
   const dueDateId = useId();
   const runFieldId = useId();
 
+  // ---- existing runs to attach (docs/api-plans.md § Attaching existing runs) ----
+  const unplannedById = new Map((unplannedRuns ?? []).map((run) => [run.id, run]));
+  // Keep the tick order; a run that vanished from the page's list still has an
+  // id to send, so only drop rows we cannot label.
+  const attachedRuns = attachedIds.flatMap((id) => {
+    const run = unplannedById.get(id);
+    return run ? [run] : [];
+  });
+  const availableRuns = (unplannedRuns ?? []).filter(
+    (run) => !attachedIds.includes(run.id)
+  );
+  const totalRuns = runs.length + attachedRuns.length;
+  // An untouched new-run row is a placeholder once there is something else to
+  // save: attaching a run says the plan's runs are already known, so the empty
+  // row neither blocks Save nor goes up. Rows are added after the empty starter
+  // row is dropped in `attachRun`, so the rows that are sent stay a prefix of
+  // the list and index-based error keys still line up with the request body.
+  const submittedRuns =
+    attachedRuns.length > 0 ? runs.filter(hasRunContent) : runs;
+  const submittedKeys = new Set(submittedRuns.map((run) => run.key));
+  const atMaxRuns = totalRuns >= PLAN_RUNS_MAX;
+  const zeroRuns = totalRuns === 0;
+
   // ---- validation ----
   const localErrors: LocalErrors = {};
   const trimmedName = values.name.trim();
@@ -153,6 +190,9 @@ export function PlanWithRunsDialog({
 
   const seenRunNames = new Map<string, number>();
   for (const [index, run] of runs.entries()) {
+    // Placeholder rows (an empty "New runs" row next to attached runs) are
+    // not part of the request, so they are not validated either.
+    if (!submittedKeys.has(run.key)) continue;
     const runName = run.name.trim();
     if (!runName) localErrors[`${index}.name`] = "Run name is required.";
     else if (runName.length > RUN_NAME_MAX) {
@@ -193,21 +233,6 @@ export function PlanWithRunsDialog({
         "Start date must be on or before the due date.";
     }
   }
-
-  // ---- existing runs to attach (docs/api-plans.md § Attaching existing runs) ----
-  const unplannedById = new Map((unplannedRuns ?? []).map((run) => [run.id, run]));
-  // Keep the tick order; a run that vanished from the page's list still has an
-  // id to send, so only drop rows we cannot label.
-  const attachedRuns = attachedIds.flatMap((id) => {
-    const run = unplannedById.get(id);
-    return run ? [run] : [];
-  });
-  const availableRuns = (unplannedRuns ?? []).filter(
-    (run) => !attachedIds.includes(run.id)
-  );
-  const totalRuns = runs.length + attachedRuns.length;
-  const atMaxRuns = totalRuns >= PLAN_RUNS_MAX;
-  const zeroRuns = totalRuns === 0;
 
   /**
    * Server error for `field`, else the local one once it has been earned.
@@ -286,6 +311,10 @@ export function PlanWithRunsDialog({
   function attachRun(id: string): void {
     if (totalRuns >= PLAN_RUNS_MAX || attachedIds.includes(id)) return;
     setAttachedIds((current) => [...current, id]);
+    // The default empty run row is a placeholder — adopting an existing run
+    // answers "which runs does this plan have". A row with anything typed in
+    // it stays, because that is a run the user has started to describe.
+    setRuns((current) => current.filter(hasRunContent));
   }
 
   function detachRun(id: string): void {
@@ -303,7 +332,7 @@ export function PlanWithRunsDialog({
       name: trimmedName,
       description: values.description.trim(),
       dueDate: values.dueDate,
-      runs: runs.map((run) => ({
+      runs: submittedRuns.map((run) => ({
         name: run.name.trim(),
         description: run.description.trim(),
         startDate: run.startDate,
