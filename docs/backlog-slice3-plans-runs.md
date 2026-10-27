@@ -2,9 +2,11 @@
 
 Status: **slice complete and merged** (`55ccd70`, 2026-10-27). Phase 1
 contracts are approved (`docs/PRD-plans-runs.md`, `docs/api-runs.md`,
-`docs/api-plans.md`); Phases 2–4 are done, with the QA pass (card 4.1)
-reporting 22 pass / 0 fail / 1 not-run, and its five follow-ups (3.14–3.18)
-are **DONE 2026-10-27** on `feature/slice3-qa-followups`.
+`docs/api-plans.md`); Phases 2–5 are done, with the QA pass (card 4.1)
+reporting 22 pass / 0 fail / 1 not-run, its five follow-ups (3.14–3.18)
+**DONE 2026-10-27** on `feature/slice3-qa-followups`, and the re-verification
+(card 4.2) reporting **7 pass / 0 fail / 0 not-run** after the one defect it
+found was fixed in `6c521fe`.
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus
 (QA). Spec source: `docs/PRD-plans-runs.md` + `docs/api-runs.md` +
 `docs/api-plans.md` + `docs/DESIGN.md` §4.3/§4.4/§4.5 (and §5, §6, §8, §9).
@@ -838,6 +840,58 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 - Tool artifact: `.playwright-mcp/` at the repo root (page snapshots plus the
   rejected `qa-bad.txt` upload) is safe to delete; no QA evidence lives there.
 
+### Card 4.2 — Re-verify the follow-ups + the two unrun role boundaries (medium) — DONE 2026-10-27
+- **Result: 7 PASS, 0 FAIL, 0 NOT RUN**, with four open findings below
+  (2 and 3 pre-existing, 4 and 5 contract-conformant) and no regression from
+  this slice. Report and 38 screenshots:
+  `shots/qa-4.2/REPORT.md`. Ran after Phase 5 landed, on
+  `feature/slice3-qa-followups` @ `fb7e282`, with the 3.18 recheck on
+  `6c521fe`; same method as 4.1 — UI end-to-end only, expectations from
+  `/docs`, a dedicated QA admin (`qa.argus@qalm.local`) plus `qa.lead@`,
+  `tester@` and `viewer@` for the role passes, all writes inside three new
+  throwaway projects, and `john@`/`johnlead@` never used.
+- **What passed, in short:** 3.14 (a rejected New run in project A, Cancel,
+  switch to B, reopen — empty Name, no stale "already in use"); 3.15 (no
+  "Edit result"/"Add attachment" on a closed run, both back after Reopen);
+  3.16 (`by Argus QA`, `by Tess Tester` — real display names, matching the
+  Users screen, not the uuids 4.1 saw); 3.17 (all items vs. 2
+  ticked items, selection cleared after the write, the same on a one-row Lead
+  variant, no checkbox column for Viewer or Tester); 3.18 (both detail screens
+  and a collection page, after the fix); the **Lead boundary** (no Users entry,
+  `/users` forbidden, can create project/suite/cases/run, record, close/reopen,
+  assign on a run that already has people) and the **Tester-on-someone-else's-
+  item** block that 4.1 could not exercise.
+- **One new defect, found and fixed inside the pass.** 3.18's plan branch
+  pushed `/plans?project=…`, a route that does not exist — the switcher landed
+  on the app's 404. `6c521fe` makes both detail routes push `/runs?project=…`
+  (plans are listed on the runs screen); rechecked on the running app, no 404.
+  The 3.18 card's fix line is superseded by this.
+- **Open findings, not fixed here.**
+  - **2 and 3 share one root: `GET /users` is Admin-only.** A Lead sees
+    truncated uuids (`06627ecb…`) in the Assignee column and the Assign dialog,
+    and on a run with no assignees the dropdown holds only "Unassign", so a
+    Lead cannot staff a new run without an Admin. Flagged in card 3.2 and
+    visible in the contract, not a slice-3 regression — closing it needs a
+    product decision on a non-Admin name list (a scoped `GET /users` that
+    returns id + name would serve both), then a contract change.
+  - **4 — a Lead cannot edit a project it created.** `PATCH /projects/:id` is
+    Admin-only in `api-projects.md` (decision 2026-10-07), so the UI is
+    conformant. Reopen only if that decision changes.
+  - **5 — Archive is offered to a Lead on projects it does not own.**
+    `POST /projects/:id/archive` is Admin+Lead in the contract, so this is
+    conformant too; whether a Lead should archive a project it did not create
+    is the same ownership question as 4. Not clicked, to avoid mutating data
+    outside the pass.
+- **Gaps.** The id-in-a-tooltip sub-item of 3.16 is unverified (no tooltip in
+  the accessibility tree, and DOM attributes are out of bounds); the
+  delete-project ownership boundary stays unverifiable because no Delete
+  control exists for Admin or Lead; error/retry and skeleton states still need
+  network manipulation; one browser (Chromium), mouse-driven, 1440×900.
+- **Data left behind:** the three 4.2 projects (`QAA42` `9d07536e-…`, `QAO42`
+  `29f68c99-…`, `QAL42` `826f6abe-…`) and the two 4.1 leftovers. All throwaway;
+  deleting them needs the owner's approval. `.playwright-mcp/` also still holds
+  the session's tool snapshots (untracked, not evidence).
+
 ---
 
 ## Phase 5 — QA follow-ups (from card 4.1) — DONE 2026-10-27
@@ -937,12 +991,13 @@ than a QA failure round. Order is by user impact.
   that parameter and rewrites it back to the entity's project, so the change was
   a no-op by construction, not a rendering bug.
 - **Fix (web only).** From a detail URL (`/runs/<id>`, `/plans/<id>`) the
-  switcher now pushes the picked project's collection —
-  `/runs?project=…` or `/plans?project=…`; collection pages keep the cheap query
-  replace. Assumption: navigating beats explaining — the run in A is not
-  readable in B, and a banner on a page whose content cannot change would be
-  noise. `/plans/<id>` was checked and had the same behaviour, so both are
-  covered.
+  switcher now pushes the picked project's runs list, `/runs?project=…`;
+  collection pages keep the cheap query replace. Assumption: navigating beats
+  explaining — the run in A is not readable in B, and a banner on a page whose
+  content cannot change would be noise. `/plans/<id>` was checked and had the
+  same behaviour, so both are covered. **Superseded:** the first cut pushed
+  `/plans?project=…` for the plan branch, a route that does not exist; QA 4.2
+  found the 404 and `6c521fe` made both branches target `/runs`.
 - Verified: web jest **600** (40 suites) — two new app-shell tests assert the
   push to each collection and that `replace` is not called; `tsc`/`eslint` clean.
   Nothing pushed.
@@ -966,9 +1021,9 @@ than a QA failure round. Order is by user impact.
 | 1 — contracts | 1 (docs) | done |
 | 2 — backend | 3 (2 large, 1 medium) | ~5–7h |
 | 3 — frontend | 4 + 9 review-feedback cards (3.5–3.13) | ~6–8h, done |
-| 4 — QA | 1 | done (22 pass, 0 fail) |
+| 4 — QA | 2 (4.1, 4.2) | done (22 + 7 pass, 0 fail) |
 | 5 — QA follow-ups | 5 (3.14–3.18) | done (~3–5h) |
-| **Total** | **22 cards** | **~15–22h agent time** |
+| **Total** | **23 cards** | **~15–22h agent time** |
 
 Phases 2 and 3 overlap: Iris builds the runs list and plans screen against the
 frozen contract while Hephaestus finishes results/attachments. Card 3.2 (run
