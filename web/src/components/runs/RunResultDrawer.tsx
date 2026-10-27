@@ -195,6 +195,52 @@ function RemoveIcon() {
   );
 }
 
+/**
+ * Glyphs for the two actions under a kept result (eighth review pass: the
+ * links became buttons). 12px, decorative — the label carries the name.
+ */
+function PencilIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="12"
+      height="12"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M2.5 13.5h3l7-7-3-3-7 7v3zM10 3.5l3 3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PaperclipIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="12"
+      height="12"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M10.6 4.9 5.4 10a2 2 0 0 0 2.9 2.8l5.3-5.3a3.4 3.4 0 0 0-4.8-4.8L3.5 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function RunResultDrawer({
   runId,
   itemId,
@@ -1112,14 +1158,25 @@ function HistoryRow({
 
       {canEdit && !editing && (
         <div className="rd-history-actions">
-          <button type="button" className="linklike" onClick={onEdit}>
+          <button
+            type="button"
+            className="rd-action-btn"
+            onClick={onEdit}
+            title="Edit this result's comment, time and defect link"
+          >
+            <PencilIcon />
             Edit result
           </button>
           <label
-            className="rd-attach-add"
+            className={
+              busy === null
+                ? "rd-action-btn rd-attach-add"
+                : "rd-action-btn rd-attach-add is-busy"
+            }
             title={`Allowed: ${ATTACHMENT_ALLOWED} · up to ${ATTACHMENT_MAX_PER_RESULT} files, 10 MB each`}
           >
-            <span className="linklike">Add attachment</span>
+            <PaperclipIcon />
+            Add attachment
             <input
               type="file"
               multiple

@@ -205,6 +205,24 @@ describe("RunResultDrawer", () => {
     expect(screen.queryByRole("button", { name: "Save result" })).toBeNull();
   });
 
+  it("shows the kept-result actions as compact buttons, not links", async () => {
+    mockApi.listItemResults.mockResolvedValue({
+      data: [result({ comment: "old" })],
+      meta: { page: 1, limit: 25, total: 1, total_pages: 1 },
+    });
+    await renderDrawer();
+
+    const edit = await screen.findByRole("button", { name: "Edit result" });
+    expect(edit).toHaveClass("rd-action-btn");
+    expect(edit).not.toHaveClass("linklike");
+
+    // "Add attachment" is still a label over the hidden input, so restyling it
+    // must not cost the control its accessible name.
+    const add = screen.getByText("Add attachment").closest("label");
+    expect(add).toHaveClass("rd-action-btn");
+    expect(add).toContainElement(screen.getByLabelText("Add attachment"));
+  });
+
   it("edits the latest result but never its status", async () => {
     mockApi.listItemResults.mockResolvedValue({
       data: [result({ comment: "old" })],

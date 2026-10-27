@@ -613,18 +613,67 @@ button.rd-seg:focus-visible:not(:disabled):not(.is-active) {
   overflow-wrap: anywhere;
 }
 
+/* The two actions under a kept result are controls, not links (eighth review
+ * pass): compact secondary buttons with a 12px glyph, set off from the result
+ * body by a hairline so they read as the row's footer. */
 .rd-history-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
 }
 
-/* The "Add attachment" label borrows the link look and hides its file input. */
-.rd-attach-add {
+.rd-action-btn {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  color: var(--ink-700);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease,
+    color 120ms ease;
+}
+
+.rd-action-btn svg {
+  flex: 0 0 auto;
+}
+
+/* The `button.` prefix and the `:not(:disabled)` chain match the specificity
+ * of the global secondary-button hover in globals.css, so the brand preview
+ * wins by load order (run-detail.css comes after). */
+button.rd-action-btn:hover:not(:disabled),
+label.rd-action-btn:hover {
+  background: var(--brand-tint);
+  border-color: var(--brand);
+  color: var(--ink-900);
+}
+
+/* "Add attachment" is a label over a visually hidden file input, so the ring
+ * is drawn on the label while the input itself keeps focus. */
+.rd-attach-add {
+  position: relative;
+  cursor: pointer;
+}
+
+.rd-attach-add:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rd-action-btn.is-busy {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .rd-attach-add input {
@@ -637,12 +686,6 @@ button.rd-seg:focus-visible:not(:disabled):not(.is-active) {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
-}
-
-/* Focus ring via the label (the input is visually hidden). */
-.rd-attach-add:focus-within .linklike {
-  color: var(--accent-strong);
-  text-decoration: underline;
 }
 
 /* ---------- attachment viewer ---------- */
