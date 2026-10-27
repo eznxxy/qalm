@@ -8,6 +8,7 @@ import { HealthController } from './health/health.controller';
 import { MilestonesModule } from './milestones/milestones.module';
 import { PlansModule } from './plans/plans.module';
 import { ProjectsModule } from './projects/projects.module';
+import { ReportsModule } from './reports/reports.module';
 import { RunsModule } from './runs/runs.module';
 import { SuitesModule } from './suites/suites.module';
 
@@ -26,6 +27,7 @@ import { SuitesModule } from './suites/suites.module';
     RunsModule,
     PlansModule,
     MilestonesModule,
+    ReportsModule,
     AdminUsersModule,
   ],
   controllers: [HealthController],
