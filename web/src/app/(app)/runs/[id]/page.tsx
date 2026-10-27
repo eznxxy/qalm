@@ -70,7 +70,7 @@ import {
   DisabledHint,
   STATUS_LABELS,
   StatusBadge,
-  StatusBar,
+  StatusPie,
   TableSkeleton,
   type DataTableColumn,
   type DataTableSort,
@@ -112,16 +112,6 @@ type ItemsState =
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message || fallback : fallback;
-}
-
-/** "62% done · 31 passed · 4 failed · 2 blocked · 13 untested" (§4.4). */
-function runHeadline(counts: Run["counts"]): string {
-  const parts = [`${counts.percent_complete}% done`];
-  for (const status of ITEM_STATUSES) {
-    const count = counts[status];
-    if (count > 0) parts.push(`${count} ${STATUS_LABELS[status].toLowerCase()}`);
-  }
-  return parts.join(" · ");
 }
 
 export default function RunDetailPage() {
@@ -770,8 +760,7 @@ export default function RunDetailPage() {
       {readOnlyReason && <p className="rd-readonly">{readOnlyReason}</p>}
 
       <div className="rd-summary">
-        <StatusBar counts={run.counts} size="large" label={run.name} />
-        <p className="rd-headline">{runHeadline(run.counts)}</p>
+        <StatusPie counts={run.counts} label={run.name} />
       </div>
 
       {statusError && (

@@ -125,6 +125,30 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * A 10px "×" glyph for the icon-only remove buttons. Decorative: the button
+ * carries the accessible name ("Remove <filename>") and a native title.
+ */
+function RemoveIcon() {
+  return (
+    <svg
+      viewBox="0 0 10 10"
+      width="10"
+      height="10"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M1.5 1.5l7 7M8.5 1.5l-7 7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function RunResultDrawer({
   runId,
   itemId,
@@ -711,14 +735,16 @@ export function RunResultDrawer({
                                 </span>
                                 <button
                                   type="button"
-                                  className="linklike"
+                                  className="rd-icon-btn"
+                                  aria-label={`Remove ${file.name}`}
+                                  title="Remove"
                                   onClick={() =>
                                     setStaged((current) =>
                                       current.filter((f) => f !== file)
                                     )
                                   }
                                 >
-                                  Remove {file.name}
+                                  <RemoveIcon />
                                 </button>
                               </li>
                             ))}
@@ -954,16 +980,18 @@ function HistoryRow({
               {canEdit && (
                 <DisabledHint
                   hint={
-                    busy === attachment.id ? "Deleting — please wait" : null
+                    busy === attachment.id ? "Removing — please wait" : null
                   }
                 >
                   <button
                     type="button"
-                    className="linklike"
+                    className="rd-icon-btn"
+                    aria-label={`Remove ${attachment.filename}`}
+                    title="Remove"
                     disabled={busy === attachment.id}
                     onClick={() => onDeleteAttachment(attachment)}
                   >
-                    Delete {attachment.filename}
+                    <RemoveIcon />
                   </button>
                 </DisabledHint>
               )}

@@ -97,19 +97,7 @@
 }
 
 .rd-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex-wrap: wrap;
   margin: var(--space-3) 0 var(--space-4);
-}
-
-.rd-headline {
-  margin: 0;
-  color: var(--ink-700);
-  font-size: 13px;
-  line-height: 18px;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- filter bar ---------- */
@@ -349,7 +337,8 @@
 }
 
 .rd-seg:hover:not(:disabled) {
-  border-color: var(--ink-500);
+  background: var(--brand-tint);
+  border-color: var(--ink-700);
   color: var(--ink-900);
 }
 
@@ -392,6 +381,36 @@
   justify-content: space-between;
   gap: var(--space-2);
   overflow-wrap: anywhere;
+}
+
+/* Square "×" control for removing an attachment (review feedback, card 3.7):
+ * the file name beside it is the label, so the button itself stays icon-only
+ * with an aria-label and a native title. */
+.rd-icon-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-badge);
+  background: none;
+  color: var(--text-muted);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rd-icon-btn:hover:not(:disabled) {
+  border-color: var(--failed);
+  background: var(--failed-tint);
+  color: var(--failed);
+}
+
+.rd-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .rd-actions {

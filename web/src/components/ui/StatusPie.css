@@ -1,0 +1,149 @@
+/*
+ * StatusPie — stylesheet for web/src/components/ui/StatusPie.tsx.
+ *
+ * Colours are var() references into web/src/styles/tokens.css (status solids,
+ * §2.2 — tints stay reserved for badge backgrounds). The ring is drawn with
+ * stroke-dasharray on a circumference-100 circle, so fractions map 1:1 to
+ * percent (see RADIUS in the component).
+ */
+
+.stp-root {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.stp-figure {
+  position: relative;
+  flex: 0 0 auto;
+  width: 88px;
+  height: 88px;
+}
+
+.stp-chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Start the first slice at 12 o'clock, not 3 o'clock. */
+  transform: rotate(-90deg);
+}
+
+/* Track: what is left of the ring when every status is zero. */
+.stp-track {
+  fill: none;
+  stroke: var(--canvas);
+  stroke-width: 6;
+}
+
+.stp-slice {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 6;
+  stroke-linecap: butt;
+}
+
+/* Centre label: the one number the header leads with. */
+.stp-centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  pointer-events: none;
+}
+
+.stp-percent {
+  color: var(--ink-900);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.stp-percent-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.stp-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* A compact block beside the donut (3 × 2 at this width), not rows stretched
+   * across the whole header — a count 400px from its label is unreadable. */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  max-width: 24rem;
+  flex: 0 1 auto;
+}
+
+.stp-legend-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 6.5rem;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.stp-legend-row.is-zero {
+  color: var(--text-muted);
+}
+
+.stp-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.stp-legend-row.is-zero .stp-dot {
+  /* A zero status keeps its slot but not its emphasis. */
+  opacity: 0.35;
+}
+
+.stp-legend-label {
+  color: inherit;
+}
+
+.stp-legend-count {
+  margin-left: auto;
+  color: var(--ink-900);
+  font-weight: 500;
+}
+
+.stp-legend-row.is-zero .stp-legend-count {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ------------------------------------------------ solid per status */
+
+.stp-passed {
+  color: var(--passed);
+}
+
+.stp-retest {
+  color: var(--retest);
+}
+
+.stp-blocked {
+  color: var(--blocked);
+}
+
+.stp-failed {
+  color: var(--failed);
+}
+
+.stp-skipped {
+  color: var(--skipped);
+}
+
+.stp-untested {
+  color: var(--untested);
+}

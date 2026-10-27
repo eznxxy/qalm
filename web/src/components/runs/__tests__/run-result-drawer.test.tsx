@@ -215,6 +215,57 @@ describe("RunResultDrawer", () => {
     ).toBeDisabled();
   });
 
+  it("removes a staged file through the × button, not a text link", async () => {
+    await renderDrawer();
+
+    const input = await screen.findByLabelText("Attachments");
+    const file = new File(["hello"], "shot.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    const remove = await screen.findByRole("button", {
+      name: "Remove shot.png",
+    });
+    // The file name stays as text; only the control is icon-only.
+    expect(screen.getByText("shot.png")).toBeInTheDocument();
+
+    fireEvent.click(remove);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Remove shot.png" })
+      ).toBeNull()
+    );
+  });
+
+  it("removes an uploaded attachment through its × button", async () => {
+    mockApi.listItemResults.mockResolvedValue({
+      data: [
+        result({
+          attachments: [
+            {
+              id: "a-1",
+              filename: "report.pdf",
+              content_type: "application/pdf",
+              size_bytes: 2048,
+              created_at: "2026-10-25T09:00:00Z",
+            },
+          ],
+        }),
+      ],
+      meta: { page: 1, limit: 25, total: 1, total_pages: 1 },
+    });
+    mockApi.deleteAttachment.mockResolvedValue(undefined);
+    await renderDrawer();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove report.pdf" })
+    );
+
+    await waitFor(() =>
+      expect(mockApi.deleteAttachment).toHaveBeenCalledWith("a-1")
+    );
+  });
+
   it("does not render the result form when the item is read-only", async () => {
     await renderDrawer({ canRecord: false, recordHint: "This run is completed." });
 

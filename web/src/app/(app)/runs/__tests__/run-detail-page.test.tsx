@@ -377,6 +377,31 @@ describe("run detail", () => {
     expect(screen.getByText("Payments · Release 2.4")).toBeInTheDocument();
   });
 
+  it("rolls the run up as a pie with every status in the legend", async () => {
+    mockApi();
+    await renderPage();
+
+    const summary = await screen.findByRole("group", {
+      name: "Release 2.4 smoke results by status",
+    });
+    // Completion lives in the middle of the donut (2 passed + 1 failed of 4).
+    expect(within(summary).getByText("75%")).toBeInTheDocument();
+    // All six statuses are listed, zeros included.
+    for (const status of [
+      "Passed",
+      "Retest",
+      "Blocked",
+      "Failed",
+      "Skipped",
+      "Untested",
+    ]) {
+      expect(within(summary).getByText(status)).toBeInTheDocument();
+    }
+    expect(within(summary).getAllByText("0")).toHaveLength(3);
+    // The old progress bar is gone from this screen.
+    expect(summary.querySelector(".stb-root")).toBeNull();
+  });
+
   it("opens the result drawer through ?item in the URL", async () => {
     mockApi();
     await renderPage();
