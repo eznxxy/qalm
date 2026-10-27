@@ -242,6 +242,13 @@ assignee, due date. Filter by Open / Completed.
   Hovering or focusing a status button previews that status — its tint as the
   fill, its solid as the edge, ink label — so the choice is legible before the
   click; the chosen button is the only one filled solid.
+- **Attachments state their limits up front**: "Up to 5 files, 10 MB each.
+  Allowed: PNG, JPG, GIF, WebP, PDF, TXT, CSV, ZIP. Uploaded when you save." The
+  extensions are derived from the same allow-list the `accept` attribute and the
+  pick-time check use (PRD §Attachment), so the hint cannot drift from what the
+  server accepts; picking anything else fails inline ("<file>: that file type is
+  not allowed."). The history row's "Add attachment" link carries the same list
+  as a tooltip instead of a second hint line.
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
 - Failed results require a comment. Show the reason inline, not in a toast.
