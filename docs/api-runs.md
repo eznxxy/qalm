@@ -301,8 +301,14 @@ Edit the **most recent** result of an item. `status` is immutable (PRD Q4):
 `multipart/form-data`, one file per request, field name `file` (DESIGN §4.4
 drag-and-drop uploads one file at a time).
 - `201` → `{ "data": { ...attachment } }`
-- `400` `VALIDATION_ERROR` — missing file, disallowed `content_type`, file over
+- `400` `VALIDATION_ERROR` — missing file, a filename whose extension is not
+  one of `.png`, `.jpg`, `.jpeg`, `.webp`, `.pdf` (case-insensitive; the
+  extension alone decides — the part's `Content-Type` is ignored), file over
   10 MB, or the result already holds 5 attachments (field `file`).
+- The stored `content_type` is canonical: `image/png`, `image/jpeg`,
+  `image/webp`, `application/pdf`. Same rule on every OS, so a `.zip` or `.csv`
+  is refused everywhere rather than only where the OS happens to report an
+  allow-listed MIME string.
 - `403`; `404`; `409` — the result is not the item's latest, or the project is
   archived.
 

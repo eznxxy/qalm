@@ -378,18 +378,23 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   `aria-label="Remove <filename>"` and `title="Remove"`, so the file name stays
   as text beside it and the accessible name survives.
 - **The picker says what it accepts** (fifth review pass, the reviewer boxed the
-  hint line): "Up to 5 files, 10 MB each. Allowed: PNG, JPG, GIF, WebP, PDF,
-  TXT. Uploaded when you save." `ATTACHMENT_TYPES` became `{ mime, label,
-  listed }` entries, so one array drives `accept`, the hint and the pick-time
-  check — the three cannot drift. `listed: false` keeps `text/csv` and
-  `application/zip` accepted but out of the hint: Windows reports `.csv` as
-  `application/vnd.ms-excel` and `.zip` as `application/x-zip-compressed` (both
-  read from the registry, and it is the OS table the browser uses), so neither
-  uploads there — the first cut of the hint promised them and the reviewer hit
-  exactly that. They stay on the allow-list for macOS/Linux, where the canonical
-  types are sent. The history row's "Add attachment" link gets the same list as
-  a `title` rather than a second hint line (its row is a text link, a hint
-  paragraph would break the line).
+  hint line). First cut: "Allowed: PNG, JPG, GIF, WebP, PDF, TXT, CSV, ZIP."
+  Then the reviewer uploaded a `.zip` and it was refused: Windows reports `.zip`
+  as `application/x-zip-compressed` and `.csv` as `application/vnd.ms-excel`
+  (read from the registry, and it is the OS table the browser uses), neither on
+  the MIME allow-list, so both failed there while working on macOS/Linux. The
+  second cut dropped those two labels but kept them accepted. Final ruling
+  (sixth review pass): **the allow-list is exactly PNG, JPG, JPEG, WebP, PDF, on
+  every OS**. The check moved from MIME to the **filename extension**, which is
+  the same string on every platform; `accept` is now `.png,.jpg,.jpeg,.webp,.pdf`
+  and the server derives the stored `content_type` from that extension
+  (`.jpg`/`.jpeg` → `image/jpeg`), ignoring the part's own `Content-Type`. So
+  one array drives `accept`, the hint ("Allowed: PNG, JPG, JPEG, WebP, PDF.") and
+  the pick-time check, the three cannot drift, and `.zip`/`.csv`/`.gif`/`.txt`
+  are refused everywhere rather than only on some machines. The trade-off:
+  the name is trusted, not the bytes. The history row's "Add attachment" link
+  gets the same list as a `title` rather than a second hint line (its row is a
+  text link, a hint paragraph would break the line).
 - Verified: web `tsc`/`eslint` clean, jest **560** (39 suites) including seven
   new `StatusPie` tests, the two drawer removal tests (by role name, not text
   link) and the run-detail pie test. Live as Tester on `Run October` — header

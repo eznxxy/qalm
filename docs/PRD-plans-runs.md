@@ -110,8 +110,8 @@ result, so re-testing a case is just recording another result (that is what the
 | Field | Rules |
 |---|---|
 | `result_id` | Required. |
-| `filename` | Original name, trimmed 1–255 chars. |
-| `content_type` | One of an allow-list (`image/png`, `image/jpeg`, `image/gif`, `image/webp`, `application/pdf`, `text/plain`, `text/csv`, `application/zip`). |
+| `filename` | Original name, trimmed 1–255 chars; its extension is the allow-list (below), matched case-insensitively. |
+| `content_type` | **Derived from the extension, never from the browser's MIME guess**: `.png` → `image/png`, `.jpg` / `.jpeg` → `image/jpeg`, `.webp` → `image/webp`, `.pdf` → `application/pdf`. Those five extensions are the whole allow-list, on every OS. |
 | `size_bytes` | ≤ 10 MB each. |
 | `created_by`, `created_at` | Who uploaded it, when. |
 
@@ -184,8 +184,9 @@ Viewers get `403` on every write.
 9. Adding cases to an existing run appends items; removing an item that already
    has a result returns `409` naming the reason.
 10. Attachments: uploading a result's file stores it, it survives a reload, and
-    fetching its URL without a valid token returns `401`; disallowed types or
-    files over 10 MB are rejected with a field-level error.
+    fetching its URL without a valid token returns `401`; an extension outside
+    the five (PNG, JPG, JPEG, WebP, PDF) or a file over 10 MB is rejected with a
+    field-level error — on every OS, whatever MIME type the browser reports.
 11. A plan lists its runs with an aggregate status bar in the header that equals
     the sum of its runs' counts; deleting the plan detaches its runs, which
     remain visible and openable.
@@ -215,7 +216,10 @@ them.
 5. **Attachment storage.** Files go on the **API server's local disk** under a
    configured storage directory, with metadata rows in Postgres; served only
    through an authenticated endpoint. Limits: 5 files/result, ≤ 10 MB each,
-   allow-list of types. No external or paid service and no secrets.
+   allow-list of extensions (PNG, JPG, JPEG, WebP, PDF). The check is
+   extension-based, not MIME-based, so the same file is accepted on every OS;
+   the cost is that the name is trusted rather than the bytes. No external or
+   paid service and no secrets.
 6. **Deleting a run** is a soft delete that keeps results (a completed run may
    also be deleted).
 7. **Deleting a plan** detaches its runs rather than blocking or cascading.
