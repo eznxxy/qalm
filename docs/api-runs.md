@@ -120,9 +120,18 @@ A run may hold at most **2,000 items**; exceeding it is `400`.
     }
   ],
   "created_by": "018f1c2e-7b3a-7a10-9c2d-3f4a5b6c7d8e",
+  "created_by_name": "Tess Tester",
   "created_at": "2026-10-26T12:30:00Z"
 }
 ```
+
+- `created_by_name` is the author's current display name, resolved by a join on
+  `users` (added 2026-10-27, QA card 3.16). It is read-only, is not part of any
+  request body, and follows a later rename — the result records who wrote it,
+  not a frozen label. `created_by` stays the stable id (the edit and attachment
+  rules compare against it); clients show the name and keep the id for audit.
+  `updated_by`/`updated_by_name` are not exposed: results are append-only and
+  only the latest one's metadata is editable.
 
 ### Validation
 | Field | Rules |

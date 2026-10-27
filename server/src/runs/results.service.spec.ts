@@ -14,6 +14,7 @@ import {
   ProjectRef,
   ResultContextRow,
   ResultRow,
+  ResultRowWithAuthor,
   ResultUpdateFields,
   RunsStore,
   RunRow,
@@ -48,6 +49,20 @@ class FakeStore {
   private tick(): Date {
     this.clock += 1_000;
     return new Date(Date.UTC(2026, 9, 26, 9, 0, 0) + this.clock);
+  }
+
+  /**
+   * The real store joins `users.name`; the fake resolves the same way so the
+   * DTO's `created_by_name` is exercised (card 3.16).
+   */
+  private withAuthor(row: ResultRow): ResultRowWithAuthor {
+    const names: Record<string, string> = {
+      'u-admin': 'Admin',
+      'u-lead': 'Lead',
+      'u-tester': 'Tester',
+      'u-viewer': 'Viewer',
+    };
+    return { ...row, created_by_name: names[row.created_by] ?? row.created_by };
   }
 
   async transaction<T>(fn: (client: Queryable) => Promise<T>): Promise<T> {
@@ -139,7 +154,7 @@ class FakeStore {
     elapsed_minutes: number | null;
     defect_url: string | null;
     created_by: string;
-  }): Promise<ResultRow> {
+  }): Promise<ResultRowWithAuthor> {
     const created: ResultRow = {
       id: `res-${this.nextId++}`,
       run_item_id: row.run_item_id,
@@ -151,21 +166,26 @@ class FakeStore {
       created_at: this.tick(),
     };
     this.results.push(created);
-    return created;
+    return this.withAuthor(created);
   }
 
   async countResults(itemId: string): Promise<number> {
     return this.itemResultCount(itemId);
   }
 
-  async listResults(itemId: string, limit: number, offset: number): Promise<ResultRow[]> {
+  async listResults(
+    itemId: string,
+    limit: number,
+    offset: number,
+  ): Promise<ResultRowWithAuthor[]> {
     return this.results
       .filter((result) => result.run_item_id === itemId)
       .sort(
         (a, b) =>
           b.created_at.getTime() - a.created_at.getTime() || b.id.localeCompare(a.id),
       )
-      .slice(offset, offset + limit);
+      .slice(offset, offset + limit)
+      .map((row) => this.withAuthor(row));
   }
 
   async latestResultIdOf(itemId: string): Promise<string | null> {
@@ -178,8 +198,9 @@ class FakeStore {
     return row.id;
   }
 
-  async findResultById(id: string): Promise<ResultRow | null> {
-    return this.results.find((result) => result.id === id) ?? null;
+  async findResultById(id: string): Promise<ResultRowWithAuthor | null> {
+    const row = this.results.find((result) => result.id === id);
+    return row ? this.withAuthor(row) : null;
   }
 
   async findResultContextForUpdate(id: string): Promise<ResultContextRow | null> {
@@ -422,6 +443,7 @@ describe('ResultsService (unit, in-memory results)', () => {
         defect_url: null,
         attachments: [],
         created_by: 'u-admin',
+        created_by_name: 'Admin',
       });
       expect(store.results).toHaveLength(1);
       expect(store.items[0]!.updated_at.getTime()).toBeGreaterThan(itemBefore);
@@ -504,6 +526,8 @@ describe('ResultsService (unit, in-memory results)', () => {
         expect.objectContaining({ filename: 'boom.png', content_type: 'image/png' }),
       ]);
       expect(page.data[1]!.id).toBe(first.id);
+      // Card 3.16: history rows carry the author's display name, not just a id.
+      expect(page.data.map((row) => row.created_by_name)).toEqual(['Admin', 'Admin']);
       expect(page.meta).toEqual({ page: 1, limit: 25, total: 2, total_pages: 1 });
     });
 

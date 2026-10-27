@@ -597,6 +597,8 @@ export interface Result {
   defect_url: string | null;
   attachments: ResultAttachment[];
   created_by: string;
+  /** Author's current display name (joined from `users`; card 3.16). */
+  created_by_name: string;
   created_at: string;
 }
 

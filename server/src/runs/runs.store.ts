@@ -198,6 +198,15 @@ export interface ResultRow {
 }
 
 /**
+ * A result plus its author's display name — what the Result resource returns
+ * (docs/api-runs.md, QA card 3.16). The name is joined, never stored, so it
+ * follows a later rename.
+ */
+export interface ResultRowWithAuthor extends ResultRow {
+  created_by_name: string;
+}
+
+/**
  * A result joined to its item, run and project — everything the write rules
  * need (project archived, run completed, item assignee, result author).
  */
@@ -368,6 +377,18 @@ const RESULT_FIELDS = [
 
 function resultColumns(alias: string): string {
   return RESULT_FIELDS.map((field) => `${alias}.${field}`).join(', ');
+}
+
+/**
+ * The Result resource's columns: the row plus its author's name (card 3.16).
+ * Pairs with `RESULT_AUTHOR_JOIN`.
+ */
+function resultColumnsWithAuthor(alias: string): string {
+  return `${resultColumns(alias)}, u.name AS created_by_name`;
+}
+
+function RESULT_AUTHOR_JOIN(alias: string): string {
+  return `JOIN users u ON u.id = ${alias}.created_by`;
 }
 
 const ATTACHMENT_FIELDS = [
@@ -1168,11 +1189,18 @@ export class RunsStore {
       created_by: string;
     },
     q: Queryable = this.db,
-  ): Promise<ResultRow> {
-    const result = await q.query<ResultRow>(
-      `INSERT INTO results (run_item_id, status, comment, elapsed_minutes, defect_url, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING ${resultColumns('results')}`,
+  ): Promise<ResultRowWithAuthor> {
+    // A CTE so the inserted row and its author's name come back in one
+    // round-trip: RETURNING cannot join (docs/api-runs.md § Resource: Result).
+    const result = await q.query<ResultRowWithAuthor>(
+      `WITH inserted AS (
+         INSERT INTO results (run_item_id, status, comment, elapsed_minutes, defect_url, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING ${RESULT_FIELDS.join(', ')}
+       )
+       SELECT ${resultColumnsWithAuthor('inserted')}
+       FROM inserted
+       ${RESULT_AUTHOR_JOIN('inserted')}`,
       [
         row.run_item_id,
         row.status,
@@ -1228,10 +1256,11 @@ export class RunsStore {
     limit: number,
     offset: number,
     q: Queryable = this.db,
-  ): Promise<ResultRow[]> {
-    const result = await q.query<ResultRow>(
-      `SELECT ${resultColumns('res')}
+  ): Promise<ResultRowWithAuthor[]> {
+    const result = await q.query<ResultRowWithAuthor>(
+      `SELECT ${resultColumnsWithAuthor('res')}
        FROM results res
+       ${RESULT_AUTHOR_JOIN('res')}
        WHERE res.run_item_id = $1
        ORDER BY res.created_at DESC, res.id DESC
        LIMIT $2 OFFSET $3`,
@@ -1265,9 +1294,15 @@ export class RunsStore {
     return result.rows[0] ?? null;
   }
 
-  async findResultById(id: string, q: Queryable = this.db): Promise<ResultRow | null> {
-    const result = await q.query<ResultRow>(
-      `SELECT ${resultColumns('res')} FROM results res WHERE res.id = $1`,
+  async findResultById(
+    id: string,
+    q: Queryable = this.db,
+  ): Promise<ResultRowWithAuthor | null> {
+    const result = await q.query<ResultRowWithAuthor>(
+      `SELECT ${resultColumnsWithAuthor('res')}
+       FROM results res
+       ${RESULT_AUTHOR_JOIN('res')}
+       WHERE res.id = $1`,
       [id],
     );
     return result.rows[0] ?? null;

@@ -1,6 +1,6 @@
 import { ItemStatus, ResultStatus } from './runs.constants';
 import { StatusCounts, percentComplete } from './run-counts';
-import { AttachmentRow, CaseRunRow, ResultRow, RunItemDetailRow, RunItemRow, RunWithCountsRow } from './runs.store';
+import { AttachmentRow, CaseRunRow, ResultRowWithAuthor, RunItemDetailRow, RunItemRow, RunWithCountsRow } from './runs.store';
 
 /** One ordered step of an item's snapshot — api-runs.md § Resource: Run item. */
 export interface RunItemStepDto {
@@ -189,6 +189,8 @@ export interface ResultDto {
   defect_url: string | null;
   attachments: AttachmentDto[];
   created_by: string;
+  /** The author's current display name, joined from `users` (card 3.16). */
+  created_by_name: string;
   created_at: string;
 }
 
@@ -203,7 +205,7 @@ export function toAttachmentDto(row: AttachmentRow): AttachmentDto {
 }
 
 /** `attachments` are passed pre-grouped so a list never queries per result. */
-export function toResultDto(row: ResultRow, attachments: AttachmentRow[]): ResultDto {
+export function toResultDto(row: ResultRowWithAuthor, attachments: AttachmentRow[]): ResultDto {
   return {
     id: row.id,
     run_item_id: row.run_item_id,
@@ -213,6 +215,7 @@ export function toResultDto(row: ResultRow, attachments: AttachmentRow[]): Resul
     defect_url: row.defect_url,
     attachments: attachments.map(toAttachmentDto),
     created_by: row.created_by,
+    created_by_name: row.created_by_name,
     created_at: row.created_at.toISOString(),
   };
 }

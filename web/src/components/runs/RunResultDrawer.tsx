@@ -52,7 +52,6 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useGlobalShortcuts, type ShortcutDefinition } from "@/lib/keymap";
 import { canEditResult, canRecordOnItem } from "@/lib/run-permissions";
 import { describeTimestamp } from "@/lib/dates";
-import { shortActorId } from "@/lib/case-history";
 import { MarkdownLite } from "./MarkdownLite";
 import {
   AttachmentViewer,
@@ -1095,7 +1094,10 @@ function HistoryRow({
         </time>
       </div>
       <p className="rd-history-actor">
-        by <span title={result.created_by}>{shortActorId(result.created_by)}</span>
+        {/* The contract carries both the id (audit) and the display name
+            (card 3.16); the id stays in the tooltip as a fallback. */}
+        by{" "}
+        <span title={result.created_by}>{result.created_by_name}</span>
         {result.elapsed_minutes !== null && (
           <>
             {" · "}

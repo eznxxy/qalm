@@ -22,6 +22,7 @@ interface ResultData {
   defect_url: string | null;
   attachments: AttachmentData[];
   created_by: string;
+  created_by_name: string;
   created_at: string;
 }
 
@@ -286,6 +287,8 @@ describe('Results & attachments API (integration)', () => {
         defect_url: 'https://tracker.example.com/browse/BUG-1',
         attachments: [],
         created_by: userIds['admin'],
+        // Card 3.16: the author's display name comes back with the resource.
+        created_by_name: 'admin User',
       });
 
       // The item's derived status/counts now reflect the result.
@@ -369,6 +372,10 @@ describe('Results & attachments API (integration)', () => {
         expect.objectContaining({ filename: 'boom.png', content_type: 'image/png' }),
       ]);
       expect((page.body.data as ResultData[])[1]!.id).toBe(first.id);
+      expect((page.body.data as ResultData[]).map((row) => row.created_by_name)).toEqual([
+        'admin User',
+        'admin User',
+      ]);
 
       const limited = await listResults('admin', runId, itemId, { limit: 1, page: 2 });
       expect(limited.body.data).toHaveLength(1);

@@ -203,6 +203,7 @@ function result(overrides: Partial<Result> = {}): Result {
     defect_url: null,
     attachments: [],
     created_by: "u-1",
+    created_by_name: "Tess Tester",
     created_at: "2026-10-25T09:00:00Z",
     ...overrides,
   };
