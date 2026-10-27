@@ -243,36 +243,57 @@ describe("RunResultDrawer", () => {
     ).toBeDisabled();
   });
 
-  it("states the file types that actually upload, not the whole allow-list", async () => {
+  it("states the five extensions the picker accepts", async () => {
     await renderDrawer();
 
     const input = (await screen.findByLabelText("Attachments")) as HTMLInputElement;
-    // The hint advertises only what lands: ZIP and CSV are on the allow-list but
-    // Windows reports their MIME as x-zip-compressed / vnd.ms-excel, which is
-    // refused, so promising them would be a lie. See ATTACHMENT_TYPES.
     expect(
       screen.getByText(
-        "Up to 5 files, 10 MB each. Allowed: PNG, JPG, GIF, WebP, PDF, TXT. Uploaded when you save."
+        "Up to 5 files, 10 MB each. Allowed: PNG, JPG, JPEG, WebP, PDF. Uploaded when you save."
       )
     ).toBeInTheDocument();
-    // `accept` still offers all eight canonical types (macOS/Linux send them).
-    expect(input.accept.split(",")).toEqual([
-      "image/png",
-      "image/jpeg",
-      "image/gif",
-      "image/webp",
-      "application/pdf",
-      "text/plain",
-      "text/csv",
-      "application/zip",
-    ]);
-    // A type outside the allow-list is still refused on pick.
+    // `accept` offers the same five extensions, so the dialog filters on the
+    // same rule the check applies — no OS MIME table involved.
+    expect(input.accept.split(",")).toEqual([".png", ".jpg", ".jpeg", ".webp", ".pdf"]);
+
+    // The reviewer's bug: Windows reports `.zip` as application/x-zip-compressed
+    // and the old MIME check refused it (or, worse, the hint promised it).
+    fireEvent.change(input, {
+      target: { files: [new File(["PK"], "evidence.zip", { type: "application/x-zip-compressed" })] },
+    });
+    expect(
+      await screen.findByText("evidence.zip: that file type is not allowed.")
+    ).toBeInTheDocument();
+
+    fireEvent.change(input, {
+      target: { files: [new File(["GIF89a"], "anim.gif", { type: "image/gif" })] },
+    });
+    expect(
+      await screen.findByText("anim.gif: that file type is not allowed.")
+    ).toBeInTheDocument();
+
     fireEvent.change(input, {
       target: { files: [new File(["x"], "run.exe", { type: "application/x-msdownload" })] },
     });
     expect(
       await screen.findByText("run.exe: that file type is not allowed.")
     ).toBeInTheDocument();
+  });
+
+  it("accepts a valid file whatever MIME the OS reports", async () => {
+    await renderDrawer();
+
+    const input = await screen.findByLabelText("Attachments");
+    // Windows can report an empty type for a valid file; the extension is what
+    // counts, and it is matched case-insensitively.
+    fireEvent.change(input, {
+      target: { files: [new File(["x"], "Evidence.JPEG", { type: "" })] },
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "Remove Evidence.JPEG" })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/that file type is not allowed/)).toBeNull();
   });
 
   it("removes a staged file through the × button, not a text link", async () => {

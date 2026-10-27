@@ -57,31 +57,32 @@ import { MarkdownLite } from "./MarkdownLite";
 const ATTACHMENT_MAX_PER_RESULT = 5;
 const ATTACHMENT_MAX_BYTES = 10 * 1_048_576;
 /**
- * The allow-list (mirrors PRD §Attachment), paired with the extension users
- * recognise: `accept` and the pick-time check read every entry, so they cannot
- * drift from the server.
+ * The allow-list (mirrors PRD §Attachment and
+ * server/src/runs/runs.constants.ts): five extensions, matched
+ * case-insensitively on every OS.
  *
- * `listed: false` keeps a type accepted but out of the hint. ZIP and CSV are
- * accepted because macOS and Linux map them to `application/zip` and
- * `text/csv`, but Windows does not: the browser sends
- * `application/x-zip-compressed` and `application/vnd.ms-excel`, both off the
- * list, so a `.zip` or `.csv` picked there is refused. Advertising them would
- * promise an upload that always fails.
+ * The extension is checked instead of `file.type` because the browser's type
+ * string is OS data — Windows reports `.zip` as `application/x-zip-compressed`
+ * and `.csv` as `application/vnd.ms-excel` — while the filename is the same
+ * everywhere. One array drives `accept`, the hint and the pick-time check, so
+ * the three cannot drift. The server derives the stored `content_type` from the
+ * same extension, so the part's own type does not matter either.
  */
 const ATTACHMENT_TYPES = [
-  { mime: "image/png", label: "PNG", listed: true },
-  { mime: "image/jpeg", label: "JPG", listed: true },
-  { mime: "image/gif", label: "GIF", listed: true },
-  { mime: "image/webp", label: "WebP", listed: true },
-  { mime: "application/pdf", label: "PDF", listed: true },
-  { mime: "text/plain", label: "TXT", listed: true },
-  { mime: "text/csv", label: "CSV", listed: false },
-  { mime: "application/zip", label: "ZIP", listed: false },
+  { ext: ".png", label: "PNG" },
+  { ext: ".jpg", label: "JPG" },
+  { ext: ".jpeg", label: "JPEG" },
+  { ext: ".webp", label: "WebP" },
+  { ext: ".pdf", label: "PDF" },
 ] as const;
-const ATTACHMENT_ACCEPT = ATTACHMENT_TYPES.map((type) => type.mime).join(",");
-const ATTACHMENT_ALLOWED = ATTACHMENT_TYPES.filter((type) => type.listed)
-  .map((type) => type.label)
-  .join(", ");
+const ATTACHMENT_ACCEPT = ATTACHMENT_TYPES.map((type) => type.ext).join(",");
+const ATTACHMENT_ALLOWED = ATTACHMENT_TYPES.map((type) => type.label).join(", ");
+
+/** Lower-cased extension including the dot, or "" when the name has none. */
+function fileExtension(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot < 0 ? "" : name.slice(dot).toLowerCase();
+}
 
 const HISTORY_LIMIT = 25;
 
@@ -427,7 +428,7 @@ export function RunResultDrawer({
         error = `At most ${ATTACHMENT_MAX_PER_RESULT} attachments per result.`;
         break;
       }
-      if (!ATTACHMENT_TYPES.some((type) => type.mime === file.type)) {
+      if (!ATTACHMENT_TYPES.some((type) => type.ext === fileExtension(file.name))) {
         error = `${file.name}: that file type is not allowed.`;
         continue;
       }
