@@ -241,7 +241,12 @@ assignee, due date. Filter by Open / Completed.
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
   Hovering or focusing a status button previews that status — its tint as the
   fill, its solid as the edge, ink label — so the choice is legible before the
-  click; the chosen button is the only one filled solid.
+  click; the chosen button is the only one filled solid, and its label stays
+  `--text-on-brand` on hover and focus as well. The filled variant must carry
+  more specificity than the global un-filled `button:hover` rule, otherwise
+  hovering a status you already picked flips its label to ink on the navy fill
+  (`button.rd-seg.is-active:hover` with the same `:not(:disabled):not(.primary):
+  not(.danger)` chain as globals.css, i.e. 0,5,1).
 - **Attachments state their limits up front**: "Up to 5 files, 10 MB each.
   Allowed: PNG, JPG, JPEG, WebP, PDF. Uploaded when you save." Those five
   extensions are the whole allow-list (PRD §Attachment) and the same array

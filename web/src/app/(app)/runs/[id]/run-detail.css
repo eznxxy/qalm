@@ -411,16 +411,26 @@ button.rd-seg:focus-visible:not(:disabled):not(.is-active) {
   --seg-tint: var(--skipped-tint);
 }
 
+button.rd-seg.is-active,
 .rd-seg.is-active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
+  color: var(--text-on-brand);
 }
 
-.rd-seg.is-active:hover:not(:disabled) {
+/* The chosen status is the only filled button, so its label must survive hover.
+ * The global un-filled hover in globals.css
+ * (`button:hover:not(:disabled):not(.primary):not(.danger)`, specificity
+ * 0,4,1) sets `color: var(--ink-900)` and out-ranks a plain
+ * `button.rd-seg.is-active:hover` (0,4,0). That was a real bug: clicking a
+ * status and then pointing at it turned the label black on the navy fill.
+ * Mirroring the same `:not()` chain puts this at 0,5,1 and keeps the label on
+ * the brand fill white in both themes (`--text-on-brand`). */
+button.rd-seg.is-active:hover:not(:disabled):not(.primary):not(.danger),
+button.rd-seg.is-active:focus-visible:not(:disabled) {
   background: var(--accent-strong);
   border-color: var(--accent-strong);
-  color: #ffffff;
+  color: var(--text-on-brand);
 }
 
 .rd-row {
@@ -649,10 +659,13 @@ button.rd-seg:focus-visible:not(:disabled):not(.is-active) {
   flex: 0 0 auto;
 }
 
-/* The `button.` prefix and the `:not(:disabled)` chain match the specificity
- * of the global secondary-button hover in globals.css, so the brand preview
- * wins by load order (run-detail.css comes after). */
-button.rd-action-btn:hover:not(:disabled),
+/* The global un-filled button hover in globals.css is
+ * `button:hover:not(:disabled):not(.primary):not(.danger)` — (0,4,1), which
+ * out-ranks `button.rd-action-btn:hover:not(:disabled)` at (0,3,1) and would
+ * leave the Edit button with the muted ink-500 edge while the Add attachment
+ * label next to it turned brand. Mirroring the same `:not()` chain puts this at
+ * (0,5,1) so both buttons hover identically. */
+button.rd-action-btn:hover:not(:disabled):not(.primary):not(.danger),
 label.rd-action-btn:hover {
   background: var(--brand-tint);
   border-color: var(--brand);

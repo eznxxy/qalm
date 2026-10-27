@@ -419,6 +419,21 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   keeps its name and its keyboard path. Hover is the same brand tint + brand
   edge the status preview uses; the label goes `.is-busy` (55% opacity, not
   allowed) while an upload is in flight.
+- **The chosen status keeps its white label on hover** (ninth review pass: the
+  reviewer clicked a status and pointed at it — the label went black on the navy
+  fill). Cause was specificity, not colour: the global un-filled hover
+  `button:hover:not(:disabled):not(.primary):not(.danger)` is `(0,4,1)` and beat
+  `button.rd-seg.is-active:hover` at `(0,4,0)`, so globals' `color:
+  var(--ink-900)` won while the fill (`background`) stayed brand. The filled
+  variant now mirrors the same `:not()` chain — `(0,5,1)` — and restates
+  `--text-on-brand`; the hard-coded `#ffffff` became the token so dark mode
+  follows. The new action buttons had the same trap one step down (their hover
+  edge stayed `--ink-500` while the label beside it turned brand), so both now
+  use the mirrored chain too. Verified in the browser against the app's served
+  stylesheet with probe buttons on the run page: active at rest `#ffffff` on
+  `#263fa0`, active hovered `#ffffff` on `#1d3282`, unfilled hover
+  `#17202e` on `#e9edfa` with a `#263fa0` edge on both the button and the
+  label.
 - Verified: web `tsc`/`eslint` clean, jest **571** (40 suites) including seven
   new `StatusPie` tests, four drawer attachment tests (staged image viewer +
   revoke, uploaded PDF `iframe` after a fetch, icon-only removal, the actions as
