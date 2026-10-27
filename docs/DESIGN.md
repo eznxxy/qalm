@@ -204,7 +204,7 @@ assignee, due date. Filter by Open / Completed.
 
 ```
 ┌ Run: Release 2.4 smoke ──────────────────────── [Assign] [Close run]
-│ [██████████▓▓▓▓▒▒░░░░░░]  62% done · 31 passed · 4 failed · 2 blocked · 13 untested
+│ ◔ 62% done   Passed 31 · Retest 3 · Blocked 2 · Failed 4 · Skipped 0 · Untested 13
 │ [Status ▾] [Assignee ▾] [Section ▾]  Search…
 │ ┌───────┬─────────────────────────┬──────────┬────────────┬──────────────┐
 │ │ ID    │ Title                   │ Status   │ Assignee   │ Updated      │
@@ -214,6 +214,10 @@ assignee, due date. Filter by Open / Completed.
 └ Click a row → result drawer (480px): case steps, [Add result] form, history
 ```
 
+- **Header rollup** is a donut with completion (`done` = items with any result)
+  in the middle and a legend listing **every** status — zeros greyed, no slice,
+  so the full vocabulary stays visible on a half-run run. Slice order is the
+  fixed status order. The status bar stays the element for tables (§4.3, §4.5).
 - **Add result** form: status (segmented buttons with shortcuts P, F, B, R, S),
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
 - After saving a result, move focus to the next untested row ("Save and next",
@@ -257,7 +261,7 @@ Do not add a UI library without Daedalus's approval.
 |---|---|
 | **Button** | Primary (`--brand`), secondary (outline), ghost, danger. One primary per view. Label is a verb: "Save case", "Add result", never "Submit". |
 | **Status badge** | Tint background, `--ink-900` text, status-solid icon (untested icon uses `--ink-700`) — exact rules in §2.2. 4px radius, 22px high. Same markup everywhere. |
-| **Status bar** | Segmented horizontal bar, 8px high in tables, 16px on dashboards. Segment order: Passed, Retest, Blocked, Failed, Skipped, Untested. Hover shows counts. Include `role="img"` and an `aria-label` that spells out the numbers. |
+| **Status bar** | Segmented horizontal bar, 8px high in tables, 16px on dashboards. Segment order: Passed, Retest, Blocked, Failed, Skipped, Untested. Hover shows counts. Include `role="img"` and an `aria-label` that spells out the numbers. The run detail header uses the **pie** variant instead (§4.4): donut, completion in the middle, legend of all six statuses. |
 | **Data table** | Plain (non-sticky) header, sortable columns, column resize, row selection, row hover `--canvas`, selected row `--brand-tint`. Virtualise above 200 rows. Pagination or infinite scroll must keep scroll position. |
 | **Tree** | ARIA treeview, arrow-key navigation, counts right-aligned, drag handle on hover. |
 | **Tabs** | Underline style, active tab has a 2px `--brand` underline. |

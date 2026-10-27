@@ -314,6 +314,43 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.7 — Run detail: pie rollup, hover contrast, × remove (review feedback, small) — DONE 2026-10-27
+- Three notes from the same review pass on the run detail screen.
+- **Progress bar → pie.** New `web/src/components/ui/StatusPie.tsx` (+ CSS,
+  exported from `ui/index.ts`): a donut with completion in the middle and a
+  legend that lists **all six** statuses, zeros included (greyed, no slice) so a
+  half-run run still shows the full vocabulary of outcomes. Slice order is the
+  fixed `STATUS_ORDER` and slices use the status solids — tints stay reserved for
+  badges (§2.2). The ring is drawn with `stroke-dasharray` on a
+  circumference-100 circle, rotated to start at 12 o'clock; the SVG is
+  `aria-hidden` and the `role="group"` is named "`<run>` results by status",
+  with the legend carrying the numbers. `done` = total − untested, the same rule
+  as `percent_complete`, so the centre agrees with the API. The header now uses
+  `StatusPie` (`StatusBar` is untouched and still used by the runs list, plans
+  and plan detail); `runHeadline()` and `.rd-headline` were removed — the
+  percentage moved into the donut. The legend first rendered as full-width grid
+  rows (a count stretched 400px from its label) and was tightened to a compact
+  3 × 2 block beside the donut.
+- **Hover contrast on the result status buttons.** `.rd-seg:hover` used to change
+  only the border; it now also takes `--brand-tint` background, `--ink-700`
+  border and `--ink-900` label, and the active (brand) button deepens to
+  `--accent-strong`. Same tokens as the rest of the app — no new colours.
+- **`×` instead of "Remove <filename>".** Staged files and uploaded attachments
+  both render an icon-only `×` (`.rd-icon-btn`, 22px, destructive hover) with
+  `aria-label="Remove <filename>"` and `title="Remove"`, so the file name stays
+  as text beside it and the accessible name survives.
+- Verified: web `tsc`/`eslint` clean, jest **560** (39 suites) including seven
+  new `StatusPie` tests, the two drawer removal tests (by role name, not text
+  link) and the run-detail pie test. Live as Tester on `Run October` — header
+  group reads "Run October results by status", centre `33% done`, legend
+  `Passed 1 · Retest 0 · Blocked 0 · Failed 0 · Skipped 0 · Untested 2`.
+  **Not verified live:** the status-button hover and the `×` control need a
+  writer (Admin/Lead) session and the run's items are unassigned, so the result
+  form never renders for the Tester account; both are covered by unit tests
+  only until a writer login or screenshot is available.
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING
