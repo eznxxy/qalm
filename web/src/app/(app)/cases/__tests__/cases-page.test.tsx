@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import React from "react";
+import React, { Activity } from "react";
 import type {
   CaseDetail,
   CaseHistoryEntry,
@@ -608,6 +608,59 @@ describe("cases screen", () => {
     // The selection is spent, so the bulk bar gives way to the filters again.
     expect(screen.queryByRole("region", { name: "Selected cases" })).toBeNull();
     expect(screen.queryByRole("dialog", { name: "Add to run" })).toBeNull();
+  });
+
+  it("clears the bulk selection when the page is hidden and shown again", async () => {
+    mockApi();
+    const { default: CasesPage } = await import("@/app/(app)/cases/page");
+    const { RequireAuth } = await import("@/components/require-auth");
+    const { SessionProvider } = await import("@/lib/session");
+
+    /**
+     * How Cache Components treats a route the user navigated away from: kept
+     * mounted, hidden with <Activity>, and shown again on return. This is the
+     * reported bug — ticking cases, opening Test runs, then coming back left
+     * them ticked.
+     */
+    function RouteActivity() {
+      const [visible, setVisible] = React.useState(true);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setVisible((current) => !current)}
+          >
+            {visible ? "Hide cases" : "Show cases"}
+          </button>
+          <SessionProvider>
+            <RequireAuth>
+              <Activity mode={visible ? "visible" : "hidden"}>
+                <CasesPage />
+              </Activity>
+            </RequireAuth>
+          </SessionProvider>
+        </>
+      );
+    }
+
+    render(<RouteActivity />);
+    await screen.findByRole("button", { name: /Open C1/ });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    expect(
+      screen.getByRole("region", { name: "Selected cases" })
+    ).toHaveTextContent("1 selected");
+
+    // Leave the screen and come back: the page comes back, the selection does
+    // not.
+    fireEvent.click(screen.getByRole("button", { name: "Hide cases" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show cases" }));
+
+    await screen.findByRole("button", { name: /Open C1/ });
+    expect(screen.queryByRole("region", { name: "Selected cases" })).toBeNull();
+    expect(
+      screen.getByRole("checkbox", { name: "Select row 1" })
+    ).not.toBeChecked();
   });
 
   it("explains that there is no open run to add to", async () => {

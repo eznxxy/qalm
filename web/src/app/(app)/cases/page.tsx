@@ -16,6 +16,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -320,6 +321,20 @@ export default function CasesPage() {
     },
     [resultKey]
   );
+
+  /**
+   * A bulk selection is a step on the way to an action, not a view the user set
+   * up on purpose — so it must not be waiting when they come back. With Cache
+   * Components this route is hidden with React's <Activity>, not unmounted, so
+   * `selection` survives a trip to another page. Resetting in the cleanup drops
+   * it as the page is hidden (the documented Activity pattern), which also
+   * covers navigations this screen does not own, like the top nav or Back.
+   */
+  useLayoutEffect(() => {
+    return () => {
+      setSelection({ key: "", ids: EMPTY_SELECTION });
+    };
+  }, []);
 
   useEffect(() => {
     if (!projectId || effectiveSuite === undefined) return;
