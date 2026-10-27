@@ -38,6 +38,7 @@ export interface RunDto {
   completed_by: string | null;
   counts: StatusCounts;
   assignee_ids: string[];
+  suite_ids: string[];
   created_by: string;
   updated_by: string;
   created_at: string;
@@ -87,8 +88,8 @@ export function countsFromRunRow(row: RunWithCountsRow): StatusCounts {
   };
 }
 
-/** `json_agg` yields `null` when a run has no assigned items. */
-function toAssigneeIds(value: string[] | null): string[] {
+/** `json_agg` yields `null` when a run has no assigned items / no items. */
+function toIdList(value: string[] | null): string[] {
   return value ?? [];
 }
 
@@ -105,7 +106,8 @@ export function toRunDto(row: RunWithCountsRow): RunDto {
     completed_at: row.completed_at === null ? null : row.completed_at.toISOString(),
     completed_by: row.completed_by,
     counts: countsFromRunRow(row),
-    assignee_ids: toAssigneeIds(row.assignee_ids),
+    assignee_ids: toIdList(row.assignee_ids),
+    suite_ids: toIdList(row.suite_ids),
     created_by: row.created_by,
     updated_by: row.updated_by,
     created_at: row.created_at.toISOString(),

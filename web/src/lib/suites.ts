@@ -25,6 +25,22 @@ export function flattenSuites(nodes: readonly SuiteNode[]): FlatSuite[] {
   return out;
 }
 
+/**
+ * The run detail's Section filter options: only the suites the run has items
+ * from (`Run.suite_ids`), in tree order, keeping each suite's real depth so the
+ * `— ` indentation still shows how deep it sits. Order and selection come from
+ * the tree, not the id list, so the dropdown reads top-down like the suite
+ * tree rather than in whatever order the aggregate returned.
+ */
+export function suitesInRun(
+  nodes: readonly SuiteNode[],
+  suiteIds: readonly string[]
+): FlatSuite[] {
+  if (suiteIds.length === 0) return [];
+  const wanted = new Set(suiteIds);
+  return flattenSuites(nodes).filter((entry) => wanted.has(entry.node.id));
+}
+
 /** Root → suite (inclusive) trail for the cases header. */
 export function findSuitePath(
   nodes: readonly SuiteNode[],

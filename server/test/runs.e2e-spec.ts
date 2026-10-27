@@ -32,6 +32,8 @@ interface RunData {
     percent_complete: number;
   };
   assignee_ids: string[];
+  /** Distinct item `case_suite_id` snapshots (docs/api-runs.md). */
+  suite_ids: string[];
   created_by: string;
   updated_by: string;
   created_at: string;
@@ -316,6 +318,12 @@ describe('Runs API (integration)', () => {
         },
       });
 
+      // The Section filter's options come from here: one entry per touched
+      // suite, even though two items snapshot the root and its descendants.
+      expect([...res.body.data.suite_ids].sort()).toEqual(
+        [rootSuiteId, childSuiteId, grandSuiteId, otherSuiteId].sort(),
+      );
+
       const items = await listItems('lead', res.body.data.id as string);
       expect(itemData(items).map((row) => row.case_display_id)).toEqual(['C1', 'C2', 'C3', 'C4']);
       expect(itemData(items).map((row) => row.position)).toEqual([1, 2, 3, 4]);
@@ -335,6 +343,7 @@ describe('Runs API (integration)', () => {
       const run = await createOk({ selection: undefined });
       expect(run.counts.total).toBe(0);
       expect(run.assignee_ids).toEqual([]);
+      expect(run.suite_ids).toEqual([]);
     });
 
     it('stores start_date as a plain date and 400s a start date after the due date', async () => {
@@ -460,7 +469,7 @@ describe('Runs API (integration)', () => {
   });
 
   describe('run detail, update, close and delete', () => {
-    it('returns counts and assignees on detail for any role', async () => {
+    it('returns counts, assignees and suites on detail for any role', async () => {
       const c1 = await createCaseIn(rootSuiteId, 'One');
       const c2 = await createCaseIn(rootSuiteId, 'Two');
       const run = await createOk({ name: 'Smoke', selection: { case_ids: [c1.id, c2.id] } });
@@ -484,6 +493,7 @@ describe('Runs API (integration)', () => {
           percent_complete: 50,
         },
         assignee_ids: [userIds['tester']],
+        suite_ids: [rootSuiteId],
       });
     });
 

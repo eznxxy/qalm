@@ -585,6 +585,13 @@ class FakeStore {
           .map((item) => item.assignee_id as string),
       ),
     ];
+    const suites = [
+      ...new Set(
+        this.items
+          .filter((item) => item.run_id === run.id && item.case_suite_id !== null)
+          .map((item) => item.case_suite_id),
+      ),
+    ];
     return {
       ...run,
       total: counts.total,
@@ -595,6 +602,7 @@ class FakeStore {
       skipped: counts.skipped,
       untested: counts.untested,
       assignee_ids: assignees.length > 0 ? assignees : null,
+      suite_ids: suites.length > 0 ? suites : null,
     };
   }
 
@@ -760,7 +768,7 @@ describe('RunsService (unit, in-memory runs)', () => {
   });
 
   describe('list', () => {
-    it('returns live runs newest-first with rollups, assignees and pagination meta', async () => {
+    it('returns live runs newest-first with rollups, assignees, suites and pagination meta', async () => {
       const first = store.addRun({ name: 'Oldest', createdBy: 'u-admin' });
       store.addRun({ name: 'Newest', createdBy: 'u-admin' });
       store.addRun({ name: 'Deleted', deleted: true });
@@ -783,6 +791,10 @@ describe('RunsService (unit, in-memory runs)', () => {
       });
       expect(result.data[1]!.assignee_ids).toEqual(['u-tester']);
       expect(result.data[0]!.assignee_ids).toEqual([]);
+      // Both items snapshot the same suite, so it appears once; the empty run
+      // reports [] rather than null.
+      expect(result.data[1]!.suite_ids).toEqual(['s-root']);
+      expect(result.data[0]!.suite_ids).toEqual([]);
       expect(result.meta).toEqual({ page: 1, limit: 25, total: 2, total_pages: 1 });
     });
 
@@ -974,14 +986,25 @@ describe('RunsService (unit, in-memory runs)', () => {
   });
 
   describe('detail', () => {
-    it('returns a live run with counts and assignees', async () => {
+    it('returns a live run with counts, assignees and the suites it touches', async () => {
       const run = store.addRun({ name: 'Smoke' });
-      store.addItem(run.id, { assigneeId: 'u-tester' });
+      store.addItem(run.id, { assigneeId: 'u-tester', caseSuiteId: 's-root' });
+      store.addItem(run.id, { caseSuiteId: 's-child' });
+      store.addItem(run.id, { caseSuiteId: 's-root' });
 
       const detail = await service.detail(AS('viewer'), run.id);
       expect(detail.name).toBe('Smoke');
-      expect(detail.counts.total).toBe(1);
+      expect(detail.counts.total).toBe(3);
       expect(detail.assignee_ids).toEqual(['u-tester']);
+      // Distinct, so the repeated s-root is not offered twice in the filter.
+      expect(detail.suite_ids).toEqual(['s-root', 's-child']);
+    });
+
+    it('reports no suites for a run with no items', async () => {
+      const run = store.addRun({ name: 'Empty' });
+
+      const detail = await service.detail(AS('viewer'), run.id);
+      expect(detail.suite_ids).toEqual([]);
     });
 
     it('404s unknown and soft-deleted runs and hides archived from non-Admins', async () => {

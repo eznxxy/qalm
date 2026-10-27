@@ -63,7 +63,7 @@ import {
   type RunDetailUrlPatch,
 } from "@/lib/run-detail-url";
 import { describeTimestamp, formatDateOnly } from "@/lib/dates";
-import { flattenSuites } from "@/lib/suites";
+import { suitesInRun } from "@/lib/suites";
 import { shortActorId } from "@/lib/case-history";
 import {
   DataTable,
@@ -511,7 +511,13 @@ export default function RunDetailPage() {
     });
   }
 
-  const sectionOptions = useMemo(() => flattenSuites(suites), [suites]);
+  // The Section filter offers only the suites this run actually has items
+  // from (Run.suite_ids), in tree order. A suite with no items in the run
+  // cannot filter anything but to zero rows, so it is not offered.
+  const sectionOptions = useMemo(
+    () => suitesInRun(suites, run?.suite_ids ?? []),
+    [suites, run?.suite_ids]
+  );
   const sectionMissing =
     Boolean(url.suite) &&
     !sectionOptions.some((entry) => entry.node.id === url.suite);

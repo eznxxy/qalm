@@ -110,6 +110,16 @@ function suite(): SuiteNode {
   };
 }
 
+/** A project suite the run has no items from — the Section filter must hide it. */
+function otherSuite(): SuiteNode {
+  return {
+    ...suite(),
+    id: "s-2",
+    name: "Refunds",
+    position: 2,
+  };
+}
+
 function run(overrides: Partial<Run> = {}): Run {
   return {
     id: "r-1",
@@ -133,6 +143,7 @@ function run(overrides: Partial<Run> = {}): Run {
       percent_complete: 75,
     },
     assignee_ids: ["u-1"],
+    suite_ids: ["s-1"],
     created_by: "u-1",
     updated_by: "u-1",
     created_at: "2026-10-24T09:00:00Z",
@@ -208,6 +219,8 @@ interface ApiOptions {
   /** The single item GET /runs/:id/items/:itemId returns. */
   itemDetail?: RunItemDetail;
   results?: Result[];
+  /** The project's suite tree — wider than the run's suites on purpose. */
+  suites?: SuiteNode[];
 }
 
 function mockApi({
@@ -217,6 +230,7 @@ function mockApi({
   items = [item(), ITEM_2],
   itemDetail = detail(),
   results = [],
+  suites = [suite(), otherSuite()],
 }: ApiOptions = {}): void {
   const user = makeUser({ role });
   fetchMock.mockImplementation(
@@ -284,7 +298,7 @@ function mockApi({
         );
       }
       if (/\/projects\/[\w-]+\/suites$/.test(target) && method === "GET") {
-        return Promise.resolve(jsonResponse(200, { data: [suite()] }));
+        return Promise.resolve(jsonResponse(200, { data: suites }));
       }
       if (/\/users(\?|$)/.test(target) && method === "GET") {
         return Promise.resolve(
@@ -453,6 +467,34 @@ describe("run detail", () => {
     });
 
     await waitFor(() => expect(lastReplaceUrl()).toContain("status=failed"));
+  });
+
+  it("offers only the suites the run has items from in the Section filter", async () => {
+    // The project also has Refunds, but this run has no items from it, so
+    // filtering by it could only ever return zero rows.
+    mockApi({ run: run({ suite_ids: ["s-1"] }) });
+    await renderPage();
+
+    await screen.findByRole("table", { name: "Run items" });
+    await screen.findByRole("option", { name: "Checkout" });
+
+    const options = within(screen.getByLabelText("Section"))
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(options).toEqual(["All sections", "Checkout"]);
+  });
+
+  it("keeps a section already in the URL when the run has no items from it", async () => {
+    // e.g. an item was removed after the link was shared: the value must stay
+    // selectable, or the control would snap back to "All sections" silently.
+    mockApi({ run: run({ suite_ids: [] }) });
+    mockRouterState.search = "project=p-1&suite=s-9";
+    await renderPage();
+
+    await screen.findByRole("table", { name: "Run items" });
+    expect(
+      await screen.findByRole("option", { name: "Selected section" })
+    ).toBeInTheDocument();
   });
 
   it("hides the read-only chrome and assign/close for a Viewer", async () => {

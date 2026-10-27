@@ -37,6 +37,8 @@ export interface RunAggRow {
   skipped: number;
   untested: number;
   assignee_ids: string[] | null;
+  /** Distinct non-null item `case_suite_id` snapshots (docs/api-runs.md). */
+  suite_ids: string[] | null;
 }
 
 export type RunWithCountsRow = RunRow & RunAggRow;
@@ -610,7 +612,10 @@ export class RunsStore {
         COALESCE(agg.untested, 0)::int AS untested,
         (SELECT json_agg(DISTINCT ai.assignee_id)
            FROM run_items ai
-          WHERE ai.run_id = r.id AND ai.assignee_id IS NOT NULL) AS assignee_ids
+          WHERE ai.run_id = r.id AND ai.assignee_id IS NOT NULL) AS assignee_ids,
+        (SELECT json_agg(DISTINCT si.case_suite_id)
+           FROM run_items si
+          WHERE si.run_id = r.id AND si.case_suite_id IS NOT NULL) AS suite_ids
       FROM runs r
       LEFT JOIN (
         SELECT i.run_id,

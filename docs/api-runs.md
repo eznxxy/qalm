@@ -29,6 +29,7 @@ Cases referenced here are defined in `docs/api-cases.md`.
     "percent_complete": 74
   },
   "assignee_ids": ["018f1c2e-7b3a-7a10-9c2d-3f4a5b6c7d8e"],
+  "suite_ids": ["018f2a41-7c3d-7a1e-9b2f-4a5b6c7d8e9f"],
   "created_by": "018f1c2e-7b3a-7a10-9c2d-3f4a5b6c7d8e",
   "updated_by": "018f1c2e-7b3a-7a10-9c2d-3f4a5b6c7d8e",
   "created_at": "2026-10-26T08:00:00Z",
@@ -41,6 +42,11 @@ Cases referenced here are defined in `docs/api-cases.md`.
   `untested` when it has none). `percent_complete = round((total - untested) /
   total * 100)`, `0` when `total = 0`.
 - `assignee_ids` are the distinct non-null assignees among the run's items.
+- `suite_ids` are the distinct non-null `case_suite_id` snapshots among the
+  run's items — the sections this run actually touches. Order is unspecified;
+  clients that need the tree order sort against
+  `GET /projects/:projectId/suites`. This is what the run detail's Section
+  filter offers: a suite the run has no items from is not an option.
 - `start_date` and `due_date` are plain calendar dates (`YYYY-MM-DD`), never
   instants, so they cannot shift with a timezone. Both are optional and
   independent of each other except for the ordering rule below.
@@ -427,5 +433,5 @@ Backs the case drawer's **Linked runs** tab (§4.2). Newest run first.
   null` in the write transaction (reject → `409`).
 - **Tester write guard**: resolve the item's `assignee_id` and compare with the
   caller's user id; a mismatch on a Tester is `403`. Admin/Lead bypass.
-- Run list `assignee_ids` and plan rollup are computed with grouped aggregates
-  per page — never a query per row.
+- Run list `assignee_ids` and `suite_ids`, and the plan rollup, are computed
+  with grouped aggregates per page — never a query per row.

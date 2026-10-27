@@ -438,6 +438,9 @@ export interface Run {
   counts: RunCounts;
   /** Distinct non-null assignees among the run's items. */
   assignee_ids: string[];
+  /** Distinct non-null item `case_suite_id` snapshots — the sections this run
+   * has items from (the Section filter's options). */
+  suite_ids: string[];
   created_by: string;
   updated_by: string;
   created_at: string;

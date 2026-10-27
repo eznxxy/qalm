@@ -101,6 +101,7 @@ function makeRun(overrides: Partial<Run> = {}): Run {
       percent_complete: 40,
     },
     assignee_ids: [],
+    suite_ids: [],
     created_by: "u-1",
     updated_by: "u-1",
     created_at: "2026-10-21T12:00:00Z",
