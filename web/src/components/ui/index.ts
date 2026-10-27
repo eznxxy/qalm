@@ -4,6 +4,8 @@ export { StatusBar, STATUS_ORDER, formatCounts, nonzeroStatuses } from "./Status
 export type { StatusBarProps, StatusBarValue } from "./StatusBar";
 export { StatusPie } from "./StatusPie";
 export type { StatusPieProps } from "./StatusPie";
+export { StatusSummary } from "./StatusSummary";
+export type { StatusSummaryProps } from "./StatusSummary";
 export { PriorityIcon, PRIORITY_LABELS } from "./PriorityIcon";
 export type { PriorityIconProps, PriorityName } from "./PriorityIcon";
 export { DataTable, TableSkeleton } from "./DataTable";

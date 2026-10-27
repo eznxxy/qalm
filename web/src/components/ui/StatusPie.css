@@ -31,43 +31,6 @@
   fill: currentColor;
 }
 
-/* Headline figures beside the pie (review feedback): the passed share as the
- * card's one big number, the untouched share as its footnote. Centre-aligned
- * and unbreakable so the block keeps a steady width as results land. */
-.stp-stat {
-  flex: 0 0 auto;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.stp-stat-headline {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.stp-stat-percent {
-  color: var(--ink-900);
-  font-size: 40px;
-  font-weight: 600;
-  line-height: 44px;
-}
-
-.stp-stat-label {
-  color: var(--ink-900);
-  font-size: 18px;
-  line-height: 24px;
-}
-
-.stp-stat-sub {
-  margin: var(--space-2) 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 18px;
-}
-
 /* Every legend row keeps its status colour, zeros included, so the dot stays
  * the colour key rather than a presence indicator. */
 .stp-legend {

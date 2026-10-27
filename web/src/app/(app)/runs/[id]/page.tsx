@@ -71,6 +71,7 @@ import {
   STATUS_LABELS,
   StatusBadge,
   StatusPie,
+  StatusSummary,
   TableSkeleton,
   type DataTableColumn,
   type DataTableSort,
@@ -761,6 +762,7 @@ export default function RunDetailPage() {
 
       <div className="rd-summary">
         <StatusPie counts={run.counts} label={run.name} />
+        <StatusSummary counts={run.counts} />
       </div>
 
       {statusError && (

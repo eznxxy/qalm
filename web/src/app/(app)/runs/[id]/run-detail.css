@@ -96,12 +96,18 @@
   line-height: 16px;
 }
 
-/* The rollup card: the one memorable number, given its own surface so the
- * filters below stay a separate band. Hugs its content — a full-width card
- * would leave the legend swimming in white space. */
+/* The rollup row: the pie card and the headline card side by side (review
+ * feedback — the overall figure gets its own surface, not a column inside the
+ * breakdown). Both children are cards; the row only spaces and aligns them. */
 .rd-summary {
-  display: inline-block;
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   margin: var(--space-4) 0;
+}
+
+.rd-summary > * {
   padding: var(--space-5) var(--space-6);
   background: var(--surface);
   border: 1px solid var(--border);

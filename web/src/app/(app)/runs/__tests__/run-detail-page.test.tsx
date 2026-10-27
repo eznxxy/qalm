@@ -404,12 +404,15 @@ describe("run detail", () => {
     ]);
     // The old progress bar is gone from this screen.
     expect(summary.querySelector(".stb-root")).toBeNull();
-    // The headline beside the pie: passed share, then the untouched footer.
-    expect(within(summary).getByText("50%")).toBeInTheDocument();
-    expect(within(summary).getByText("passed")).toBeInTheDocument();
-    expect(
-      within(summary).getByText("1 / 4 untested (25%).")
-    ).toBeInTheDocument();
+    // The headline sits on its own card beside the pie (reviewer's reference),
+    // not inside the breakdown.
+    const card = document.querySelector(".sts-root") as HTMLElement;
+    expect(card).toBeInTheDocument();
+    expect(card.closest(".rd-summary")).toBeInTheDocument();
+    expect(within(card).getByText("50%")).toBeInTheDocument();
+    expect(within(card).getByText("passed")).toBeInTheDocument();
+    expect(within(card).getByText("1 / 4 untested (25%).")).toBeInTheDocument();
+    expect(summary.contains(card)).toBe(false);
   });
 
   it("opens the result drawer through ?item in the URL", async () => {

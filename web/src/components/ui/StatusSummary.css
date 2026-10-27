@@ -1,0 +1,48 @@
+/*
+ * StatusSummary — stylesheet for web/src/components/ui/StatusSummary.tsx.
+ *
+ * The card chrome (surface, border, radius, padding) belongs to the run detail
+ * row that places the card (`.rd-summary > *` in run-detail.css); this file is
+ * only the content: one big number over its label, then the muted footer. The
+ * block is centred and unbreakable so it keeps a steady width as results land.
+ */
+
+.sts-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  /* Wide enough for "91 / 239 untested (38%)." without crowding the padding
+   * and for the big number to sit on its own. */
+  min-width: 20rem;
+}
+
+.sts-headline {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.sts-percent {
+  color: var(--ink-900);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 44px;
+}
+
+.sts-label {
+  color: var(--ink-900);
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.sts-sub {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}

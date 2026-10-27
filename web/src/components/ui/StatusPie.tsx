@@ -10,9 +10,6 @@
  *   the reader gets both the absolute and the relative size in one glance.
  * - Wedge order is FIXED (STATUS_ORDER: Passed, Retest, Blocked, Failed,
  *   Skipped, Untested) — never sorted by size; position is memory.
- * - Beside the pie sits the headline figure: the passed share as a large
- *   number, then "untested / total (share)" — the two numbers a reviewer asks
- *   for before reading the breakdown.
  * - Wedges use the status SOLIDS (--passed …) from tokens.css; tints stay
  *   reserved for badge backgrounds (§2.2).
  * - Zero-count statuses render no wedge (an empty arc would read as data) but
@@ -54,13 +51,18 @@ function wedgePath(start: number, end: number): string {
 }
 
 /** count ÷ total as a whole percent; 0 for a run with no items. */
-function sharePercent(count: number, total: number): number {
+export function sharePercent(count: number, total: number): number {
   if (total === 0) return 0;
   return Math.round((count / total) * 100);
 }
 
+/** Every result in the run — the denominator of both the wedges and shares. */
+export function statusTotal(counts: StatusBarValue): number {
+  return STATUS_ORDER.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
+}
+
 export function StatusPie({ counts, label }: StatusPieProps): ReactElement {
-  const total = STATUS_ORDER.reduce((sum, s) => sum + (counts[s] ?? 0), 0);
+  const total = statusTotal(counts);
 
   // Wedge angles are prefix sums of the counts, so they cannot drift away from
   // the whole (and nothing is reassigned during render —
@@ -79,9 +81,6 @@ export function StatusPie({ counts, label }: StatusPieProps): ReactElement {
       end: (before + entry.count) / total,
     };
   });
-
-  const passed = counts.passed ?? 0;
-  const untested = counts.untested ?? 0;
 
   return (
     <div
@@ -116,21 +115,6 @@ export function StatusPie({ counts, label }: StatusPieProps): ReactElement {
           )
         )}
       </svg>
-
-      {/* The headline figures, beside the pie: how much has passed, and how
-       * much of the run is still untouched — the two numbers a reviewer asks
-       * for first (review feedback). */}
-      <div className="stp-stat">
-        <p className="stp-stat-headline">
-          <span className="stp-stat-percent t-nums">
-            {sharePercent(passed, total)}%
-          </span>{" "}
-          <span className="stp-stat-label">passed</span>
-        </p>
-        <p className="stp-stat-sub t-nums">
-          {untested} / {total} untested ({sharePercent(untested, total)}%).
-        </p>
-      </div>
 
       <ul className="stp-legend">
         {STATUS_ORDER.map((status) => {
