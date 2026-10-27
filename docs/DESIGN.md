@@ -214,10 +214,12 @@ assignee, due date. Filter by Open / Completed.
 └ Click a row → result drawer (480px): case steps, [Add result] form, history
 ```
 
-- **Header rollup** is a donut with completion (`done` = items with any result)
-  in the middle and a legend listing **every** status — zeros greyed, no slice,
-  so the full vocabulary stays visible on a half-run run. Slice order is the
-  fixed status order. The status bar stays the element for tables (§4.3, §4.5).
+- **Header rollup** is a donut (132px) on its own surface card, with completion
+  (`done` = items with any result) in the middle and a legend listing **every**
+  status — zeros greyed, no slice, so the full vocabulary stays visible on a
+  half-run run. Slice order is the fixed status order; the legend is two columns
+  of three beside the ring. The status bar stays the element for tables
+  (§4.3, §4.5).
 - **Add result** form: status (segmented buttons with shortcuts P, F, B, R, S),
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
   Hovering or focusing a status button previews that status — its tint as the

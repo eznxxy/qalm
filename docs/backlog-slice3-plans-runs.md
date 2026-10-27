@@ -330,7 +330,13 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   and plan detail); `runHeadline()` and `.rd-headline` were removed — the
   percentage moved into the donut. The legend first rendered as full-width grid
   rows (a count stretched 400px from its label) and was tightened to a compact
-  3 × 2 block beside the donut.
+  block beside the donut.
+- **Bigger, in a card.** Second review pass: the ring went 88px → 132px, the
+  centre number to 26px, and the legend to a fixed two columns of three; the
+  whole rollup now sits on its own surface card (`.rd-summary`: surface, 1px
+  border, 10px radius, 16/24px padding) that hugs its content rather than
+  spanning the page — a full-width card left the legend swimming in white
+  space. 438 × 166px at both 1600px and 1024px wide.
 - **Hover contrast on the result status buttons.** First pass (brand tint +
   darker border/label) was still too quiet on the real screen — the reviewer's
   screenshot showed the hovered button almost identical to its neighbours.
