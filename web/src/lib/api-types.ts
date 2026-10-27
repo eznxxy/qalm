@@ -403,18 +403,22 @@ export interface CreatePlanRunInput {
   due_date?: string | null;
 }
 
-/** POST /projects/:projectId/plans (docs/api-plans.md § Validation). */
+/**
+ * POST /projects/:projectId/plans (docs/api-plans.md § Validation).
+ *
+ * A plan is born with at least one run, either new (`runs`) or an existing
+ * unplanned one (`run_ids`), or both — at most 20 together.
+ */
 export interface CreatePlanInput {
   name: string;
   /** Omit or `null` for none. */
   description?: string | null;
   /** Plain `YYYY-MM-DD`; omit or `null` for none. */
   due_date?: string | null;
-  /**
-   * 1–20 runs, inserted with the plan in one transaction. The contract allows
-   * no runless plan, so this is required rather than optional.
-   */
-  runs: CreatePlanRunInput[];
+  /** New runs, inserted with the plan in one transaction. */
+  runs?: CreatePlanRunInput[];
+  /** Existing runs with no plan, attached to the new plan (3.10). */
+  run_ids?: string[];
 }
 
 /** PATCH /plans/:id — any non-empty subset; `null` clears an optional field. */

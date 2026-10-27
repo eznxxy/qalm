@@ -187,6 +187,22 @@ describe('Plans API (integration)', () => {
     return { runId, itemIds: (items.body.data as { id: string }[]).map((item) => item.id) };
   };
 
+  /** A run with no items, for the attach path (3.10). */
+  const createBareRun = async (
+    name: string,
+    targetProjectId = projectId,
+    planId?: string,
+  ): Promise<string> => {
+    const res = await test.req
+      .post(`/api/v1/projects/${targetProjectId}/runs`)
+      .set(as('admin'))
+      .send({ name, ...(planId === undefined ? {} : { plan_id: planId }) });
+    expect(res.status).toBe(201);
+    return res.body.data.id as string;
+  };
+
+  const getRun = (id: string) => test.req.get(`/api/v1/runs/${id}`).set(as('admin'));
+
   const record = (
     runId: string,
     itemId: string,
@@ -285,14 +301,11 @@ describe('Plans API (integration)', () => {
       );
     });
 
-    it('requires at least one run and caps them at 20', async () => {
+    it('requires at least one run and caps the combined total at 20', async () => {
       for (const body of [
         { name: 'No runs' },
         { name: 'Empty runs', runs: [] },
-        {
-          name: 'Too many',
-          runs: Array.from({ length: 21 }, (_, index) => ({ name: `Run ${index}` })),
-        },
+        { name: 'Empty ids', run_ids: [] },
       ]) {
         const res = await createPlan('admin', body);
         expect(res.status).toBe(400);
@@ -300,6 +313,28 @@ describe('Plans API (integration)', () => {
           expect.objectContaining({ field: 'runs' }),
         );
       }
+
+      const tooManyRuns = await createPlan('admin', {
+        name: 'Too many',
+        runs: Array.from({ length: 21 }, (_, index) => ({ name: `Run ${index}` })),
+      });
+      expect(tooManyRuns.status).toBe(400);
+      expect(tooManyRuns.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'runs' }),
+      );
+
+      // The cap spans both arrays: 20 new runs + 1 existing is still 21.
+      const existing = await createBareRun('Adopted at the cap');
+      const mixed = await createPlan('admin', {
+        name: 'Too many together',
+        runs: Array.from({ length: 20 }, (_, index) => ({ name: `New ${index}` })),
+        run_ids: [existing],
+      });
+      expect(mixed.status).toBe(400);
+      expect(mixed.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'runs', issue: 'at most 20 runs are allowed' }),
+      );
+      expect((await getRun(existing)).body.data.plan_id).toBeNull();
     });
 
     it('names the offending run by index', async () => {
@@ -474,6 +509,157 @@ describe('Plans API (integration)', () => {
       expect(detail.status).toBe(200);
       expect(detail.body.data.run_count).toBe(0);
       expect(detail.body.data.counts).toMatchObject({ total: 0, percent_complete: 0 });
+    });
+  });
+
+  describe('create with attached runs', () => {
+    it('attaches an unplanned run and keeps everything except plan_id', async () => {
+      const runId = await createBareRun('Nightly checkout');
+      const before = (await getRun(runId)).body.data as {
+        description: string | null;
+        start_date: string | null;
+        due_date: string | null;
+      };
+
+      // The exact body the New plan dialog sends once its new-run rows are
+      // removed: an explicit empty `runs` next to the ids to adopt.
+      const plan = await createPlanOk({
+        name: 'Adopting plan',
+        runs: [],
+        run_ids: [runId],
+      });
+      expect(plan.run_count).toBe(1);
+
+      const detail = await getRun(runId);
+      expect(detail.status).toBe(200);
+      expect(detail.body.data).toMatchObject({
+        id: runId,
+        plan_id: plan.id,
+        name: 'Nightly checkout',
+        description: before.description,
+        start_date: before.start_date,
+        due_date: before.due_date,
+      });
+      const listed = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ plan_id: plan.id });
+      expect((listed.body.data as Array<{ id: string }>).map((run) => run.id)).toEqual([
+        runId,
+      ]);
+    });
+
+    it('counts the results an attached run already has', async () => {
+      const caseId = await createCase('Refund a paid order');
+      const { runId, itemIds } = await createRun([caseId]);
+      expect((await record(runId, itemIds[0]!, { status: 'passed' })).status).toBe(201);
+
+      const plan = await createPlanOk({
+        name: 'Late plan',
+        runs: undefined,
+        run_ids: [runId],
+      });
+      expect(plan.run_count).toBe(1);
+      expect(plan.counts).toMatchObject({
+        total: 1,
+        passed: 1,
+        untested: 0,
+        percent_complete: 100,
+      });
+    });
+
+    it('mixes new and attached runs under one plan', async () => {
+      const adopted = await createBareRun('Already started');
+      const plan = await createPlanOk({
+        name: 'Mixed plan',
+        runs: [{ name: 'Fresh run' }],
+        run_ids: [adopted],
+      });
+      expect(plan.run_count).toBe(2);
+
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ plan_id: plan.id });
+      expect((runs.body.data as Array<{ name: string }>).map((run) => run.name).sort()).toEqual([
+        'Already started',
+        'Fresh run',
+      ]);
+    });
+
+    it('400s unknown, other-project and deleted ids alike, naming the index', async () => {
+      const otherProjectRun = await createBareRun('Elsewhere', otherProjectId);
+      const deleted = await createBareRun('Gone soon');
+      expect((await test.req.delete(`/api/v1/runs/${deleted}`).set(as('admin'))).status).toBe(
+        204,
+      );
+
+      for (const id of ['00000000-0000-4000-8000-000000000000', otherProjectRun, deleted]) {
+        const res = await createPlan('admin', {
+          name: `Plan for ${id}`,
+          run_ids: [id],
+        });
+        expect(res.status).toBe(400);
+        expect(res.body.error.details).toContainEqual(
+          expect.objectContaining({ field: 'run_ids[0]', issue: 'unknown run' }),
+        );
+      }
+      expect((await listPlans('admin')).body.meta.total).toBe(0);
+    });
+
+    it('400s a run that belongs to another plan and never moves it', async () => {
+      const otherPlan = await createPlanOk({ name: 'Owner plan' });
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ plan_id: otherPlan.id });
+      const taken = (runs.body.data as Array<{ id: string }>)[0]!.id;
+
+      const res = await createPlan('admin', { name: 'Poacher', run_ids: [taken] });
+      expect(res.status).toBe(400);
+      expect(res.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'run_ids[0]', issue: 'already in a plan' }),
+      );
+
+      expect((await getRun(taken)).body.data.plan_id).toBe(otherPlan.id);
+      expect((await listPlans('admin')).body.meta.total).toBe(1);
+    });
+
+    it('400s the same id twice and rolls back a mixed request', async () => {
+      const runId = await createBareRun('Only once');
+      const repeated = await createPlan('admin', {
+        name: 'Repeated ids',
+        run_ids: [runId, runId],
+      });
+      expect(repeated.status).toBe(400);
+      expect(repeated.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'run_ids[1]', issue: 'duplicate in request' }),
+      );
+
+      // A good plan payload with one bad id leaves no plan and no new run.
+      const rolledBack = await createPlan('admin', {
+        name: 'Atomic attach',
+        runs: [{ name: 'Never inserted' }],
+        run_ids: ['00000000-0000-4000-8000-000000000000'],
+      });
+      expect(rolledBack.status).toBe(400);
+      expect((await listPlans('admin')).body.meta.total).toBe(0);
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'));
+      expect((runs.body.data as Array<{ name: string }>).map((run) => run.name)).toEqual([
+        'Only once',
+      ]);
+      expect((await getRun(runId)).body.data.plan_id).toBeNull();
+    });
+
+    it('is 403 for Tester and Viewer', async () => {
+      const runId = await createBareRun('Protected');
+      for (const role of ['tester', 'viewer'] as UserRole[]) {
+        const res = await createPlan(role, { name: `By ${role}`, run_ids: [runId] });
+        expect(res.status).toBe(403);
+      }
+      expect((await getRun(runId)).body.data.plan_id).toBeNull();
     });
   });
 

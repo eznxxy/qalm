@@ -6,13 +6,20 @@
  * A plan with no runs is a folder with nothing in it, so this dialog collects
  * both halves and posts them as one request (docs/api-plans.md § POST
  * /projects/:projectId/plans): the plan's own three fields plus one fieldset
- * per run. The API inserts the plan and its runs in one transaction, so a
- * rejected run leaves no plan behind — and Save is blocked below one run,
- * mirroring the contract's "at least one run, at most 20" rule.
+ * per new run, and — since card 3.10 — any existing runs that have no plan yet.
+ * The API inserts the plan, its runs and the attachments in one transaction, so
+ * a rejected run leaves no plan behind — and Save is blocked below one run
+ * overall, mirroring the contract's "at least one run, at most 20" rule.
  *
  * The embedded runs are name/description/dates only. Picking cases belongs to
  * the New run dialog (and a plan made this way starts with its runs empty, by
  * design — see the contract's note on `runs`).
+ *
+ * Existing runs: only the ones the page fetched with `plan_id=none` are
+ * offered, because attaching must never move a run out of another plan (the
+ * API refuses those too). Ticking one adds a read-only row — the run keeps its
+ * own fields, items and results — and the 20-run cap counts new and attached
+ * runs together.
  *
  * Field rules are the same constants the other two dialogs use: plan name
  * required 1–120, descriptions ≤ 1,000, dates plain `YYYY-MM-DD` with start ≤
@@ -20,12 +27,13 @@
  * here so the form cannot send a request that would 409; a clash with a run
  * that already exists in the project is server-side, so errors arrive keyed
  * exactly like the API's `details[].field` — including the indexed
- * `runs[0].name` form.
+ * `runs[0].name` and `run_ids[0]` forms.
  *
  * Modal behaviour (focus trap, Escape, key shield) mirrors PlanFormDialog.
  */
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { isDateOnly } from "@/lib/dates";
+import { RUN_STATUS_LABELS, type Run } from "@/lib/api-types";
 import {
   PLAN_DESCRIPTION_MAX,
   PLAN_NAME_MAX,
@@ -55,14 +63,25 @@ export interface PlanWithRunsValues {
   /** Empty string = no due date; otherwise `YYYY-MM-DD`. */
   dueDate: string;
   runs: PlanRunValues[];
+  /** Ids of existing unplanned runs to attach, in the order shown. */
+  runIds: string[];
 }
 
 export interface PlanWithRunsDialogProps {
   busy?: boolean;
   /**
+   * Live runs of this project that have no plan, already fetched with
+   * `plan_id=none`. Empty while loading or when there are none.
+   */
+  unplannedRuns?: readonly Run[];
+  unplannedRunsLoading?: boolean;
+  unplannedRunsError?: string | null;
+  /** The picker's "Try again": the page refetches the unplanned runs. */
+  onRetryUnplannedRuns?: () => void;
+  /**
    * API error details keyed by the server's `field` string: `name`,
-   * `description`, `due_date`, `runs`, or an indexed run field such as
-   * `runs[1].name`.
+   * `description`, `due_date`, `runs`, `run_ids`, or an indexed run field such
+   * as `runs[1].name` / `run_ids[0]`.
    */
   serverFieldErrors?: Readonly<Record<string, string>>;
   formError?: string | null;
@@ -84,6 +103,10 @@ type LocalErrors = Record<string, string>;
 
 export function PlanWithRunsDialog({
   busy = false,
+  unplannedRuns,
+  unplannedRunsLoading = false,
+  unplannedRunsError = null,
+  onRetryUnplannedRuns,
   serverFieldErrors,
   formError,
   onSubmit,
@@ -91,6 +114,8 @@ export function PlanWithRunsDialog({
 }: PlanWithRunsDialogProps) {
   const nextKey = useRef(2);
   const [runs, setRuns] = useState<RunDraft[]>([emptyRun(1)]);
+  /** Attached existing runs, in the order the user ticked them. */
+  const [attachedIds, setAttachedIds] = useState<string[]>([]);
   const [values, setValues] = useState({
     name: "",
     description: "",
@@ -169,7 +194,24 @@ export function PlanWithRunsDialog({
     }
   }
 
-  /** Server error for `field`, else the local one once it has been earned. */
+  // ---- existing runs to attach (docs/api-plans.md § Attaching existing runs) ----
+  const unplannedById = new Map((unplannedRuns ?? []).map((run) => [run.id, run]));
+  // Keep the tick order; a run that vanished from the page's list still has an
+  // id to send, so only drop rows we cannot label.
+  const attachedRuns = attachedIds.flatMap((id) => {
+    const run = unplannedById.get(id);
+    return run ? [run] : [];
+  });
+  const availableRuns = (unplannedRuns ?? []).filter(
+    (run) => !attachedIds.includes(run.id)
+  );
+  const totalRuns = runs.length + attachedRuns.length;
+  const atMaxRuns = totalRuns >= PLAN_RUNS_MAX;
+  const zeroRuns = totalRuns === 0;
+
+  /**
+   * Server error for `field`, else the local one once it has been earned.
+   */
   function errorFor(field: string, localKey = field): string | undefined {
     const server = serverFieldErrors?.[field];
     if (server) return server;
@@ -233,15 +275,21 @@ export function PlanWithRunsDialog({
   }
 
   function addRun(): void {
-    setRuns((current) =>
-      current.length >= PLAN_RUNS_MAX
-        ? current
-        : [...current, emptyRun(nextKey.current++)]
-    );
+    if (totalRuns >= PLAN_RUNS_MAX) return;
+    setRuns((current) => [...current, emptyRun(nextKey.current++)]);
   }
 
   function removeRun(index: number): void {
     setRuns((current) => current.filter((_, i) => i !== index));
+  }
+
+  function attachRun(id: string): void {
+    if (totalRuns >= PLAN_RUNS_MAX || attachedIds.includes(id)) return;
+    setAttachedIds((current) => [...current, id]);
+  }
+
+  function detachRun(id: string): void {
+    setAttachedIds((current) => current.filter((runId) => runId !== id));
   }
 
   function handleSubmit(event: FormEvent): void {
@@ -249,7 +297,7 @@ export function PlanWithRunsDialog({
     setSubmitted(true);
     // Save is disabled at zero runs; the guard keeps the option open if the
     // list is ever changed to allow removing the last row.
-    if (runs.length === 0) return;
+    if (totalRuns === 0) return;
     if (Object.keys(localErrors).length > 0) return;
     onSubmit({
       name: trimmedName,
@@ -261,11 +309,12 @@ export function PlanWithRunsDialog({
         startDate: run.startDate,
         dueDate: run.dueDate,
       })),
+      // Only the rows on screen are sent, so a `run_ids[i]` error always names
+      // the row the user can see; a run that vanished from the page's list mid-
+      // edit simply drops out instead of failing the save.
+      runIds: attachedRuns.map((run) => run.id),
     });
   }
-
-  const atMaxRuns = runs.length >= PLAN_RUNS_MAX;
-  const zeroRuns = runs.length === 0;
 
   return (
     <div className="dialog-overlay">
@@ -281,7 +330,8 @@ export function PlanWithRunsDialog({
           <h2 id={titleId}>New plan</h2>
           <p id={bodyId} className="field-hint">
             A plan groups runs for a release or a milestone. The plan and the
-            runs below are created together.
+            new runs below are created together; existing runs can be attached
+            too.
           </p>
 
           {formError && (
@@ -379,10 +429,11 @@ export function PlanWithRunsDialog({
           </div>
 
           <fieldset className="fieldset pwr-runs">
-            <legend>Runs</legend>
+            <legend>New runs</legend>
             <p className="field-hint pwr-runs-hint">
-              At least one run is required, and a plan can hold {PLAN_RUNS_MAX}.
-              Names and dates only — pick the cases later on the run.
+              A plan needs at least one run in total (new or attached) and can
+              hold {PLAN_RUNS_MAX}. Names and dates only — pick the cases later
+              on the run.
             </p>
 
             {serverFieldErrors?.runs && (
@@ -560,7 +611,7 @@ export function PlanWithRunsDialog({
               <DisabledHint
                 hint={
                   atMaxRuns
-                    ? `A plan can hold at most ${PLAN_RUNS_MAX} runs`
+                    ? `A plan can hold at most ${PLAN_RUNS_MAX} runs, including attached ones`
                     : null
                 }
               >
@@ -573,16 +624,138 @@ export function PlanWithRunsDialog({
                 </button>
               </DisabledHint>
               <span className="field-hint" aria-live="polite">
-                {runs.length} of {PLAN_RUNS_MAX} runs
+                {`${runs.length} new · ${attachedRuns.length} attached · ${totalRuns} of ${PLAN_RUNS_MAX} runs`}
               </span>
             </div>
+          </fieldset>
+
+          <fieldset className="fieldset pwr-attach">
+            <legend>Attach existing runs</legend>
+            <p className="field-hint">
+              Only runs that have no plan are listed. An attached run keeps its
+              name, dates, cases and results.
+            </p>
+
+            {serverFieldErrors?.run_ids && (
+              <p className="field-error" role="alert">
+                {serverFieldErrors.run_ids}
+              </p>
+            )}
+
+            {attachedRuns.length > 0 && (
+              <ul className="pwr-attached-list">
+                {attachedRuns.map((run, index) => {
+                  const serverError = serverFieldErrors?.[`run_ids[${index}]`];
+                  return (
+                    <li className="pwr-attached" key={run.id}>
+                      <div className="pwr-attached-body">
+                        <span className="pwr-attached-name">
+                          {run.name}
+                        </span>
+                        <span className="field-hint">
+                          {RUN_STATUS_LABELS[run.status]} ·{" "}
+                          {run.counts.percent_complete}% complete · Attached to
+                          this plan; its fields stay as they are.
+                        </span>
+                        {serverError && (
+                          <p
+                            className="field-error"
+                            id={`${runFieldId}-${run.id}-error`}
+                            role="alert"
+                          >
+                            {serverError}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${run.name}`}
+                        disabled={busy}
+                        onClick={() => detachRun(run.id)}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {unplannedRunsLoading && (
+              <p className="field-hint" role="status">
+                Loading runs…
+              </p>
+            )}
+
+            {!unplannedRunsLoading && unplannedRunsError && (
+              <p className="field-error" role="alert">
+                {unplannedRunsError}
+                {onRetryUnplannedRuns && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={onRetryUnplannedRuns}
+                    >
+                      Try again
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
+
+            {!unplannedRunsLoading &&
+              !unplannedRunsError &&
+              availableRuns.length === 0 && (
+                <p className="pwr-runs-empty">
+                  {attachedRuns.length > 0
+                    ? "Every unplanned run is attached."
+                    : "No unplanned runs in this project — add one above."}
+                </p>
+              )}
+
+            {availableRuns.length > 0 && (
+              <ul className="pwr-pick-list">
+                {availableRuns.map((run) => (
+                  <li className="pwr-pick" key={run.id}>
+                    <div className="pwr-pick-body">
+                      <span className="pwr-pick-name">{run.name}</span>
+                      <span className="field-hint">
+                        {RUN_STATUS_LABELS[run.status]} ·{" "}
+                        {run.counts.percent_complete}% complete
+                        {run.start_date || run.due_date
+                          ? ` · ${run.start_date ?? "no start"} → ${run.due_date ?? "no due date"}`
+                          : ""}
+                      </span>
+                    </div>
+                    <DisabledHint
+                      hint={
+                        atMaxRuns
+                          ? `A plan can hold at most ${PLAN_RUNS_MAX} runs`
+                          : null
+                      }
+                    >
+                      <button
+                        type="button"
+                        aria-label={`Attach ${run.name}`}
+                        disabled={busy || atMaxRuns}
+                        onClick={() => attachRun(run.id)}
+                      >
+                        Attach
+                      </button>
+                    </DisabledHint>
+                  </li>
+                ))}
+              </ul>
+            )}
           </fieldset>
 
           <div className="button-row dialog-actions">
             <DisabledHint
               hint={
                 zeroRuns
-                  ? "Add at least one run to save the plan"
+                  ? "Add or attach at least one run to save the plan"
                   : busy
                     ? "Creating — please wait"
                     : null

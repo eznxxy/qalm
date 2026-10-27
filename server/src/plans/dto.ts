@@ -1,10 +1,10 @@
 import {
   ArrayMaxSize,
-  ArrayNotEmpty,
   IsArray,
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Max,
   Min,
@@ -142,15 +142,27 @@ export class CreatePlanDto {
   due_date?: string | null;
 
   /**
-   * Required: a plan is a collection of runs, so a plan is born with 1–20 of
-   * them. Validation names the item, e.g. `runs[1].name`.
+   * New runs made with the plan. Optional since 3.10: a plan may instead adopt
+   * existing unplanned runs via `run_ids` (or do both). The combined 1–20 rule
+   * lives in PlansService, because it spans two arrays.
    */
+  @IsOptional()
   @IsArray()
-  @ArrayNotEmpty()
   @ArrayMaxSize(PLAN_RUNS_MAX)
   @ValidateNested({ each: true })
   @Type(() => CreatePlanRunDto)
-  runs!: CreatePlanRunDto[];
+  runs?: CreatePlanRunDto[];
+
+  /**
+   * Existing runs attached to the new plan (docs/api-plans.md § Attaching
+   * existing runs). Shape only here; "live, unplanned, same project" is a
+   * cross-row rule in PlansService, reported as `run_ids[i]`.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(PLAN_RUNS_MAX)
+  @IsUUID('all', { each: true })
+  run_ids?: string[];
 }
 
 export class UpdatePlanDto {

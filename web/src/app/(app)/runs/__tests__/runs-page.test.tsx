@@ -171,10 +171,14 @@ interface ApiOptions {
   project?: Project;
   runs?: Run[];
   plans?: Plan[];
+  /** Runs with no plan — what the New plan dialog's attach picker fetches. */
+  unplannedRuns?: Run[];
+  /** Fail the first `plan_id=none` request, so the picker's retry can be seen. */
+  unplannedRunsError?: boolean;
   /** Make the create POST fail with a 400 (or a 409 for a duplicate) field error. */
   createError?: boolean | "start_date" | "conflict";
-  /** Same for the plan-with-runs POST, keyed the API's way: `runs[1].name`. */
-  planCreateError?: boolean | "runs[0].name";
+  /** Same for the plan-with-runs POST, keyed the API's way. */
+  planCreateError?: boolean | "runs[0].name" | "run_ids[0]";
 }
 
 function mockApi({
@@ -182,10 +186,13 @@ function mockApi({
   project = PROJECT,
   runs = ROWS,
   plans = [PLAN],
+  unplannedRuns = [],
+  unplannedRunsError = false,
   createError = false,
   planCreateError = false,
 }: ApiOptions = {}): void {
   const user = makeUser({ role });
+  let unplannedFetches = 0;
   fetchMock.mockImplementation(
     (url: string, init?: { method?: string; body?: string }) => {
       const target = String(url);
@@ -229,11 +236,18 @@ function mockApi({
       }
       if (/\/projects\/[\w-]+\/plans$/.test(target) && method === "POST") {
         if (planCreateError) {
-          const field = planCreateError === "runs[0].name" ? "runs[0].name" : "name";
+          const field =
+            planCreateError === "runs[0].name"
+              ? "runs[0].name"
+              : planCreateError === "run_ids[0]"
+                ? "run_ids[0]"
+                : "name";
           const issue =
             planCreateError === "runs[0].name"
               ? "Run name is required."
-              : "Plan name is required.";
+              : planCreateError === "run_ids[0]"
+                ? "already in a plan"
+                : "Plan name is required.";
           return Promise.resolve(
             jsonResponse(400, {
               error: {
@@ -247,6 +261,38 @@ function mockApi({
         return Promise.resolve(jsonResponse(201, { data: PLAN }));
       }
       if (/\/projects\/[\w-]+\/runs(\?|$)/.test(target) && method === "GET") {
+        // `plan_id=none` is the attach picker's query (card 3.10); everything
+        // else is the list on screen.
+        const planFilter = new URL(target, "http://qalm.test").searchParams.get(
+          "plan_id"
+        );
+        if (planFilter === "none") {
+          // A 4xx is not auto-retried by the API client (only 5xx/429 are), so
+          // the picker's error state is reached on the first attempt.
+          if (unplannedRunsError && unplannedFetches === 0) {
+            unplannedFetches += 1;
+            return Promise.resolve(
+              jsonResponse(400, {
+                error: {
+                  code: "VALIDATION_ERROR",
+                  message: "Something went wrong.",
+                },
+              })
+            );
+          }
+          unplannedFetches += 1;
+          return Promise.resolve(
+            jsonResponse(200, {
+              data: unplannedRuns,
+              meta: {
+                page: 1,
+                limit: 100,
+                total: unplannedRuns.length,
+                total_pages: 1,
+              },
+            })
+          );
+        }
         return Promise.resolve(
           jsonResponse(200, {
             data: runs,
@@ -694,6 +740,99 @@ describe("runs list", () => {
       "true"
     );
     expect(mockRouterState.push).not.toHaveBeenCalled();
+  });
+
+  it("attaches an existing unplanned run when creating a plan", async () => {
+    mockApi({
+      unplannedRuns: [run({ id: "r-free", name: "Ad-hoc checkout" })],
+    });
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+    const dialog = await screen.findByRole("dialog", { name: "New plan" });
+
+    // The picker is fetched on open, and only for runs with no plan — a run in
+    // another plan is never offered (the API refuses it too).
+    const attach = await within(dialog).findByRole("button", {
+      name: "Attach Ad-hoc checkout",
+    });
+    expect(listRunCalls().some((url) => /plan_id=none/.test(url))).toBe(true);
+
+    fireEvent.change(within(dialog).getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.click(attach);
+    // The default new-run row goes away: one attached run is enough.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove run 1" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create plan" }));
+
+    await waitFor(() => expect(planPosts()).toHaveLength(1));
+    expect(planPosts()[0]?.body).toEqual({
+      name: "Release 2.5",
+      description: null,
+      due_date: null,
+      runs: [],
+      run_ids: ["r-free"],
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "New plan" })).toBeNull()
+    );
+    expect(mockRouterState.push).not.toHaveBeenCalled();
+  });
+
+  it("shows a server run_ids error on the attached row", async () => {
+    mockApi({
+      unplannedRuns: [run({ id: "r-free", name: "Ad-hoc checkout" })],
+      planCreateError: "run_ids[0]",
+    });
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+    const dialog = await screen.findByRole("dialog", { name: "New plan" });
+    fireEvent.change(within(dialog).getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.click(
+      await within(dialog).findByRole("button", {
+        name: "Attach Ad-hoc checkout",
+      })
+    );
+    // No new run is needed: the attached one alone satisfies the contract.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove run 1" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create plan" }));
+
+    // `run_ids[0]` is an inline field, so it lands on the attached row rather
+    // than the dialog's form-level error.
+    expect(await screen.findByText("already in a plan")).toBeInTheDocument();
+    expect(within(dialog).queryByText("already in a plan")).toBeInTheDocument();
+    expect(mockRouterState.push).not.toHaveBeenCalled();
+  });
+
+  it("retries the unplanned runs after the picker fails to load", async () => {
+    mockApi({
+      unplannedRuns: [run({ id: "r-free", name: "Ad-hoc checkout" })],
+      unplannedRunsError: true,
+    });
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+    const dialog = await screen.findByRole("dialog", { name: "New plan" });
+
+    expect(await within(dialog).findByText("Something went wrong.")).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
+
+    expect(
+      await within(dialog).findByRole("button", {
+        name: "Attach Ad-hoc checkout",
+      })
+    ).toBeInTheDocument();
   });
 });
 

@@ -8,6 +8,7 @@ import { isRunNameConflict, runNameConflict } from '../runs/run-name';
 import { RunsStore } from '../runs/runs.store';
 import { DEFAULT_LIMIT, DEFAULT_PAGE } from '../runs/runs.constants';
 import { CreatePlanDto, ListPlansQuery, UpdatePlanDto } from './dto';
+import { PLAN_RUNS_MAX } from './plans.constants';
 import { PlanListFilter, PlansStore } from './plans.store';
 import { PlanDto, toPlanDto } from './plans.types';
 
@@ -19,6 +20,24 @@ function planNotFound(): ApiError {
 function nameConflict(): ApiError {
   return new ApiError('CONFLICT', 'A plan with this name already exists.', [
     { field: 'name', issue: 'already in use' },
+  ]);
+}
+
+/**
+ * A run id in `run_ids` that cannot be attached (400). The field carries the
+ * index so the dialog can point at the offending row, exactly like
+ * `runs[i].name`.
+ */
+function invalidRunId(index: number, issue: string): ApiError {
+  return new ApiError('VALIDATION_ERROR', `Invalid run in run_ids: ${issue}.`, [
+    { field: `run_ids[${index}]`, issue },
+  ]);
+}
+
+/** "At least one run, at most 20" spans both arrays, so the service enforces it. */
+function invalidRunCount(issue: string): ApiError {
+  return new ApiError('VALIDATION_ERROR', 'Invalid run selection.', [
+    { field: 'runs', issue },
   ]);
 }
 
@@ -65,11 +84,26 @@ export class PlansService {
 
   /**
    * Creates a plan **and its runs** in one transaction (docs/api-plans.md §
-   * POST). A plan is never born empty: `runs` is required and non-empty, and a
-   * rejected run rolls the plan back with it.
+   * POST). A plan is never born empty: it gets at least one run, either new
+   * (`runs`) or an existing unplanned one (`run_ids`, 3.10). A rejected run
+   * rolls the plan back with it.
    */
   async create(caller: AuthUser, projectId: string, dto: CreatePlanDto): Promise<PlanDto> {
     await this.requireProject(projectId, caller, 'write');
+    const newRuns = dto.runs ?? [];
+    const runIds = dto.run_ids ?? [];
+    const total = newRuns.length + runIds.length;
+    if (total === 0) throw invalidRunCount('at least one run is required');
+    if (total > PLAN_RUNS_MAX) {
+      throw invalidRunCount(`at most ${PLAN_RUNS_MAX} runs are allowed`);
+    }
+    // Duplicates are a request-shape error, so they are caught before the
+    // transaction; the rest needs the rows (and their row locks) to answer.
+    const uniqueRunIds = new Set<string>();
+    runIds.forEach((id, index) => {
+      if (uniqueRunIds.has(id)) throw invalidRunId(index, 'duplicate in request');
+      uniqueRunIds.add(id);
+    });
     // Pre-check names the field; the partial unique index (catch path) closes
     // the concurrent-write race.
     const duplicate = await this.store.findIdByNameIgnoreCase(projectId, dto.name, null);
@@ -90,7 +124,7 @@ export class PlansService {
       // can clash either with a live run already in the project or with an
       // earlier run in this same request. Both are reported against the run.
       const seenNames = new Set<string>();
-      for (const [index, run] of dto.runs.entries()) {
+      for (const [index, run] of newRuns.entries()) {
         const field = `runs[${index}].name`;
         const key = run.name.toLowerCase();
         if (seenNames.has(key)) throw runNameConflict(field);
@@ -125,6 +159,7 @@ export class PlansService {
           throw error;
         }
       }
+      await this.attachRuns(runIds, projectId, row.id, caller.id, client);
       return this.loadPlan(row.id, client);
     });
   }
@@ -188,6 +223,31 @@ export class PlansService {
   }
 
   // --- internals ----------------------------------------------------------
+
+  /**
+   * Attaches the requested existing runs (docs/api-plans.md § Attaching
+   * existing runs). Only live runs of this project that have no plan qualify —
+   * a run in another plan is never moved silently, and unknown/other-project
+   * ids stay indistinguishable. `FOR UPDATE` keeps a concurrent attach from
+   * landing between the check and the update.
+   */
+  private async attachRuns(
+    runIds: string[],
+    projectId: string,
+    planId: string,
+    actorId: string,
+    client: Queryable,
+  ): Promise<void> {
+    if (runIds.length === 0) return;
+    const rows = await this.runs.findLiveByIdsForUpdate(runIds, client);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    runIds.forEach((id, index) => {
+      const row = byId.get(id);
+      if (!row || row.project_id !== projectId) throw invalidRunId(index, 'unknown run');
+      if (row.plan_id !== null) throw invalidRunId(index, 'already in a plan');
+    });
+    await this.runs.attachToPlan(runIds, planId, actorId, client);
+  }
 
   private async loadPlan(id: string, q?: Queryable): Promise<PlanDto> {
     const row = await this.store.findWithCounts(id, q);

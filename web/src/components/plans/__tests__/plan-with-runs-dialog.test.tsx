@@ -5,6 +5,7 @@ import {
   PlanWithRunsDialog,
   type PlanWithRunsValues,
 } from "@/components/plans/PlanWithRunsDialog";
+import type { Run } from "@/lib/api-types";
 
 /**
  * PlanWithRunsDialog (card 3.6): the runs screen's New plan flow. The plan and
@@ -12,7 +13,53 @@ import {
  * these tests pin the two things that matter for that rule — a run always
  * starts in the form and Save is blocked below one — plus the per-run field
  * rules and the indexed `runs[i].<field>` error mapping the API uses.
+ *
+ * Card 3.10 adds the other half: existing runs with no plan can be attached in
+ * the same request (`run_ids`), they count toward the same 1–20 rule, and a
+ * rejected attach is reported against its row (`run_ids[i]`).
  */
+
+/** An existing run as `GET /runs?plan_id=none` returns it. */
+function makeRun(overrides: Partial<Run> & { id: string; name: string }): Run {
+  return {
+    project_id: "p-1",
+    plan_id: null,
+    description: null,
+    status: "open",
+    start_date: null,
+    due_date: null,
+    completed_at: null,
+    completed_by: null,
+    counts: {
+      total: 4,
+      passed: 2,
+      failed: 1,
+      blocked: 0,
+      retest: 0,
+      skipped: 0,
+      untested: 1,
+      percent_complete: 75,
+    },
+    assignee_ids: [],
+    suite_ids: [],
+    created_by: "u-1",
+    updated_by: "u-1",
+    created_at: "2026-10-24T09:00:00Z",
+    updated_at: "2026-10-24T09:00:00Z",
+    ...overrides,
+  };
+}
+
+const UNPLANNED: Run[] = [
+  makeRun({
+    id: "run-nightly",
+    name: "Nightly checkout",
+    start_date: "2026-10-01",
+    due_date: "2026-10-05",
+  }),
+  makeRun({ id: "run-staging", name: "Smoke on staging" }),
+  makeRun({ id: "run-mobile", name: "Mobile smoke" }),
+];
 
 function renderDialog(
   props: Partial<React.ComponentProps<typeof PlanWithRunsDialog>> = {}
@@ -81,6 +128,7 @@ describe("PlanWithRunsDialog", () => {
           dueDate: "2026-12-10",
         },
       ],
+      runIds: [],
     });
   });
 
@@ -91,7 +139,9 @@ describe("PlanWithRunsDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add run" }));
     expect(screen.getAllByRole("group", { name: /^Run \d$/ })).toHaveLength(3);
     expect(screen.getByRole("group", { name: "Run 3" })).toBeInTheDocument();
-    expect(screen.getByText(`3 of ${PLAN_RUNS_MAX} runs`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`3 new · 0 attached · 3 of ${PLAN_RUNS_MAX} runs`)
+    ).toBeInTheDocument();
 
     // Removing Run 2 renumbers the rest, so the last run becomes Run 2.
     fireEvent.click(screen.getByRole("button", { name: "Remove run 2" }));
@@ -120,7 +170,9 @@ describe("PlanWithRunsDialog", () => {
       PLAN_RUNS_MAX
     );
     expect(
-      screen.getByText(`${PLAN_RUNS_MAX} of ${PLAN_RUNS_MAX} runs`)
+      screen.getByText(
+        `${PLAN_RUNS_MAX} new · 0 attached · ${PLAN_RUNS_MAX} of ${PLAN_RUNS_MAX} runs`
+      )
     ).toBeInTheDocument();
     // Re-queried: at the cap the button moves inside a DisabledHint wrapper,
     // so the pre-cap node is no longer the one on screen.
@@ -241,5 +293,144 @@ describe("PlanWithRunsDialog", () => {
       key: "Escape",
     });
     expect(onCancel).toHaveBeenCalledTimes(2);
+  });
+
+  // ---- existing runs (card 3.10) ----
+
+  it("attaches an unplanned run and sends just its id", () => {
+    const { onSubmit } = renderDialog({ unplannedRuns: UNPLANNED });
+
+    // The picker lists every unplanned run with its facts, so a run can be
+    // recognized before it is adopted.
+    const pick = screen.getByRole("button", { name: "Attach Nightly checkout" });
+    const row = pick.closest("li")!;
+    expect(row).toHaveTextContent("Open · 75% complete");
+    expect(row).toHaveTextContent("2026-10-01 → 2026-10-05");
+
+    fireEvent.change(screen.getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    // Drop the new-run row first: an attached run alone still satisfies the
+    // contract's "at least one run" floor.
+    fireEvent.click(screen.getByRole("button", { name: "Remove run 1" }));
+    expect(
+      screen.getByText("A plan needs at least one run before it can be saved.")
+    ).toBeInTheDocument();
+
+    fireEvent.click(pick);
+
+    expect(
+      screen.queryByText("A plan needs at least one run before it can be saved.")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(`0 new · 1 attached · 1 of ${PLAN_RUNS_MAX} runs`)
+    ).toBeInTheDocument();
+    // Attached runs are read-only here: no Name field was added for it.
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create plan" }));
+
+    const values = onSubmit.mock.calls[0]?.[0] as PlanWithRunsValues;
+    expect(values).toEqual({
+      name: "Release 2.5",
+      description: "",
+      dueDate: "",
+      runs: [],
+      runIds: ["run-nightly"],
+    });
+  });
+
+  it("offers an attached run again once it is removed", () => {
+    renderDialog({ unplannedRuns: UNPLANNED });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Attach Nightly checkout" })
+    );
+    expect(
+      screen.queryByRole("button", { name: "Attach Nightly checkout" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove Nightly checkout" })
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Attach Nightly checkout" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`1 new · 0 attached · 1 of ${PLAN_RUNS_MAX} runs`)
+    ).toBeInTheDocument();
+  });
+
+  it("counts attached runs toward the cap of 20", () => {
+    renderDialog({ unplannedRuns: UNPLANNED });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Attach Nightly checkout" })
+    );
+    // One attached + one new is 2, so 18 more new runs reach the cap.
+    for (let i = 2; i < PLAN_RUNS_MAX; i += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "Add run" }));
+    }
+
+    expect(
+      screen.getByText(
+        `${PLAN_RUNS_MAX - 1} new · 1 attached · ${PLAN_RUNS_MAX} of ${PLAN_RUNS_MAX} runs`
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add run" })).toBeDisabled();
+    // The remaining unplanned runs cannot be attached either — the cap spans
+    // both lists.
+    expect(
+      screen.getByRole("button", { name: "Attach Smoke on staging" })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Attach Mobile smoke" })
+    ).toBeDisabled();
+  });
+
+  it("shows the server's run_ids error on the attached row", () => {
+    renderDialog({
+      unplannedRuns: UNPLANNED,
+      serverFieldErrors: { "run_ids[0]": "already in a plan" },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Attach Nightly checkout" })
+    );
+
+    const attached = screen.getByText("Nightly checkout").closest("li")!;
+    expect(within(attached).getByRole("alert")).toHaveTextContent(
+      "already in a plan"
+    );
+  });
+
+  it("shows the picker's empty state when nothing is unplanned", () => {
+    renderDialog({ unplannedRuns: [] });
+
+    expect(
+      screen.getByText("No unplanned runs in this project — add one above.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the picker's loading state", () => {
+    renderDialog({ unplannedRunsLoading: true });
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading runs…");
+    expect(screen.queryByRole("button", { name: /^Attach / })).toBeNull();
+  });
+
+  it("surfaces a failed picker load and retries it", () => {
+    const onRetry = jest.fn();
+    renderDialog({
+      unplannedRunsError: "Couldn't load the runs to attach.",
+      onRetryUnplannedRuns: onRetry,
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Couldn't load the runs to attach."
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

@@ -48,18 +48,35 @@ describe('plans DTOs', () => {
       );
       expect(dto.name).toBe('Release 2.4');
       expect(dto.description).toBe('sweep');
-      expect(dto.runs.map((run) => run.name)).toEqual(['Smoke', 'Full']);
-      expect(dto.runs[0]?.description).toBe('');
+      expect(dto.runs?.map((run) => run.name)).toEqual(['Smoke', 'Full']);
+      expect(dto.runs?.[0]?.description).toBe('');
     });
 
-    it('requires runs: a plan is never created empty', async () => {
-      expect(await fieldsOf({ name: 'Release 2.4' })).toContain('runs');
-      expect(await fieldsOf(validCreate({ runs: [] }))).toContain('runs');
+    it('leaves the 1–20 rule to the service now that runs may be omitted', async () => {
+      // `runs` is optional at the shape level (3.10): a plan may be created
+      // entirely from `run_ids`. The combined floor/cap needs both arrays, so
+      // PlansService enforces it; the DTO accepts either array alone.
+      expect(await issuesFor({ name: 'Release 2.4' })).toEqual([]);
+      expect(await issuesFor(validCreate({ runs: [] }))).toEqual([]);
+      expect(
+        await issuesFor({ name: 'Release 2.4', run_ids: ['018f4b21-6c7d-7e8f-9a0b-1c2d3e4f5a6b'] }),
+      ).toEqual([]);
     });
 
-    it('caps the embedded runs at 20', async () => {
+    it('caps runs and run_ids at 20 each and validates every id', async () => {
       const runs = Array.from({ length: 21 }, (_, index) => ({ name: `Run ${index}` }));
       expect(await fieldsOf(validCreate({ runs }))).toContain('runs');
+
+      const runIds = Array.from(
+        { length: 21 },
+        (_, index) => `018f4b21-6c7d-7e8f-9a0b-1c2d3e4f5a${String(index).padStart(2, '0')}`,
+      );
+      expect(await fieldsOf({ name: 'Release 2.4', run_ids: runIds })).toContain('run_ids');
+      // A malformed element is named by its array, the way `case_ids` is —
+      // cross-row failures (unknown / already planned) get `run_ids[i]`.
+      expect(
+        await fieldsOf({ name: 'Release 2.4', run_ids: ['not-a-uuid'] }),
+      ).toContain('run_ids');
     });
 
     it('names the indexed run field for an invalid run', async () => {

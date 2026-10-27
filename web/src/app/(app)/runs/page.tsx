@@ -84,7 +84,7 @@ const SEARCH_DEBOUNCE_MS = 300;
  * dialog's form-level error instead.
  */
 const PLAN_FIELD_PATTERN =
-  /^(name|description|due_date|runs|runs\[\d+\]\.(name|description|start_date|due_date))$/;
+  /^(name|description|due_date|runs|run_ids|runs\[\d+\]\.(name|description|start_date|due_date)|run_ids\[\d+\])$/;
 
 type ProjectState =
   | { kind: "loading" }
@@ -400,6 +400,56 @@ export default function RunsPage() {
   >({});
   const [planFormError, setPlanFormError] = useState<string | null>(null);
 
+  // ---- unplanned runs: the New plan dialog's attach picker (card 3.10) ----
+  // Only fetched when the dialog opens, and only `plan_id=none`, so the picker
+  // can never offer a run that already belongs to another plan.
+  const [unplannedRuns, setUnplannedRuns] = useState<Run[]>([]);
+  const [unplannedRunsLoading, setUnplannedRunsLoading] = useState(false);
+  const [unplannedRunsError, setUnplannedRunsError] = useState<string | null>(
+    null
+  );
+  const [unplannedRunsRetry, setUnplannedRunsRetry] = useState(0);
+  useEffect(() => {
+    if (!creatingPlan || !projectId) return;
+    let active = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!active) return;
+      setUnplannedRunsLoading(true);
+      setUnplannedRunsError(null);
+      try {
+        const result = await api.listRuns(projectId, {
+          plan_id: "none",
+          limit: 100,
+        });
+        if (active) setUnplannedRuns(result.data);
+      } catch (err) {
+        if (!active || isSessionDead(err)) return;
+        setUnplannedRuns([]);
+        setUnplannedRunsError(
+          errorMessage(
+            err,
+            "Couldn't load the runs to attach. Check your connection and retry."
+          )
+        );
+      } finally {
+        if (active) setUnplannedRunsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [creatingPlan, projectId, unplannedRunsRetry]);
+
+  /** Open the dialog; the effect above loads the unplanned runs on demand. */
+  function openPlanDialog(): void {
+    // Loading starts here, not in the effect's first tick, so the picker never
+    // flashes "No unplanned runs" before the request goes out.
+    setUnplannedRunsLoading(true);
+    setUnplannedRunsError(null);
+    setCreatingPlan(true);
+  }
+
   async function submitPlanWithRuns(values: PlanWithRunsValues): Promise<void> {
     if (!projectId) return;
     setPlanCreateBusy(true);
@@ -416,6 +466,7 @@ export default function RunsPage() {
           ...(run.startDate ? { start_date: run.startDate } : {}),
           ...(run.dueDate ? { due_date: run.dueDate } : {}),
         })),
+        ...(values.runIds.length > 0 ? { run_ids: values.runIds } : {}),
       });
       setCreatingPlan(false);
       // The new plan feeds the Plan column and the New run picker; the new runs
@@ -557,7 +608,7 @@ export default function RunsPage() {
     emptyAction = (
       <div className="runs-empty-actions">
         {canWritePlan && (
-          <button type="button" onClick={() => setCreatingPlan(true)}>
+          <button type="button" onClick={openPlanDialog}>
             New plan
           </button>
         )}
@@ -610,7 +661,7 @@ export default function RunsPage() {
           <DisabledHint hint="Create a plan together with its runs">
             <button
               type="button"
-              onClick={() => setCreatingPlan(true)}
+              onClick={openPlanDialog}
             >
               New plan
             </button>
@@ -699,6 +750,12 @@ export default function RunsPage() {
       {creatingPlan && (
         <PlanWithRunsDialog
           busy={planCreateBusy}
+          unplannedRuns={unplannedRuns}
+          unplannedRunsLoading={unplannedRunsLoading}
+          unplannedRunsError={unplannedRunsError}
+          onRetryUnplannedRuns={() =>
+            setUnplannedRunsRetry((count) => count + 1)
+          }
           serverFieldErrors={planFieldErrors}
           formError={planFormError}
           onSubmit={(values) => void submitPlanWithRuns(values)}

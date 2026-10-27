@@ -519,6 +519,42 @@ export class RunsStore {
     return result.rows[0] ?? null;
   }
 
+  /**
+   * Live runs with these ids, locked for the caller's transaction, in no
+   * particular order (docs/api-plans.md § Attaching existing runs). Missing,
+   * soft-deleted and other-project ids simply do not come back; the caller
+   * reports them per index.
+   */
+  async findLiveByIdsForUpdate(ids: string[], client: Queryable): Promise<RunRow[]> {
+    if (ids.length === 0) return [];
+    const result = await client.query<RunRow>(
+      `SELECT ${runColumns('r')} FROM runs r
+       WHERE r.id = ANY($1::uuid[]) AND r.deleted_at IS NULL
+       FOR UPDATE`,
+      [ids],
+    );
+    return result.rows;
+  }
+
+  /**
+   * Attaches already-validated runs to a plan. One statement for the whole
+   * batch, so a 20-run plan stays one round trip; only `plan_id` and the audit
+   * columns change and nothing else about the run moves.
+   */
+  async attachToPlan(
+    ids: string[],
+    planId: string,
+    actorId: string,
+    client: Queryable,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await client.query(
+      `UPDATE runs SET plan_id = $2, updated_by = $3, updated_at = now()
+       WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
+      [ids, planId, actorId],
+    );
+  }
+
   /** One run with its counts and assignees (detail + post-write responses). */
   async findWithCounts(id: string, q: Queryable = this.db): Promise<RunWithCountsRow | null> {
     const result = await q.query<RunWithCountsRow>(

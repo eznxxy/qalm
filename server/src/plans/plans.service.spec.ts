@@ -43,6 +43,8 @@ interface FakeRun {
   start_date: string | null;
   due_date: string | null;
   created_by: string;
+  /** Only seeded runs set this; inserted runs are live by definition. */
+  deleted_at?: Date | null;
 }
 
 class FakeStore {
@@ -126,6 +128,7 @@ class FakeStore {
       start_date: overrides.start_date ?? null,
       due_date: overrides.due_date ?? null,
       created_by: overrides.created_by ?? 'u-admin',
+      deleted_at: overrides.deleted_at ?? null,
     };
     this.runs.push(run);
     return run;
@@ -236,9 +239,26 @@ class FakeStore {
       (row) =>
         row.project_id === projectId &&
         row.name.toLowerCase() === wanted &&
+        (row.deleted_at ?? null) === null &&
         (excludeId === null || row.id !== excludeId),
     );
     return found?.id ?? null;
+  }
+
+  /** Mirrors `RunsStore.findLiveByIdsForUpdate` for the attach path. */
+  findLiveByIdsForUpdate(ids: string[]): FakeRun[] {
+    return this.runs.filter(
+      (row) => ids.includes(row.id) && (row.deleted_at ?? null) === null,
+    );
+  }
+
+  /** Mirrors `RunsStore.attachToPlan`: only `plan_id` moves. */
+  attachToPlan(ids: string[], planId: string): void {
+    for (const run of this.runs) {
+      if (ids.includes(run.id) && (run.deleted_at ?? null) === null) run.plan_id = planId;
+    }
+    const plan = this.plans.find((candidate) => candidate.id === planId);
+    if (plan) plan.run_count += ids.length;
   }
 
   /** Mirrors `RunsStore.insertRun` for the plan-create path. */
@@ -396,6 +416,14 @@ class FakeRunsStore {
     created_by: string;
   }): Promise<FakeRun> {
     return this.store.insertRun(row);
+  }
+
+  async findLiveByIdsForUpdate(ids: string[]): Promise<FakeRun[]> {
+    return this.store.findLiveByIdsForUpdate(ids);
+  }
+
+  async attachToPlan(ids: string[], planId: string): Promise<void> {
+    this.store.attachToPlan(ids, planId);
   }
 }
 
@@ -622,6 +650,161 @@ describe('PlansService (unit, in-memory plans)', () => {
           runs: [{ name: 'Smoke' }],
         }),
       ).resolves.toMatchObject({ name: 'Release 2.4', run_count: 1 });
+    });
+
+    it('attaches existing unplanned runs, changing only plan_id', async () => {
+      const first = store.addRun({
+        name: 'Nightly checkout',
+        description: 'kept',
+        start_date: '2026-10-01',
+        due_date: '2026-10-05',
+      });
+      const second = store.addRun({ name: 'Nightly mobile' });
+
+      const plan = await service.create(AS('lead'), 'p-1', {
+        name: 'Release 2.4',
+        run_ids: [first.id, second.id],
+      });
+
+      expect(plan.run_count).toBe(2);
+      expect(store.runs).toEqual([
+        {
+          ...first,
+          plan_id: plan.id,
+        },
+        {
+          ...second,
+          plan_id: plan.id,
+        },
+      ]);
+    });
+
+    it('mixes new and attached runs under one plan', async () => {
+      const existing = store.addRun({ name: 'Already here' });
+
+      const plan = await service.create(AS('admin'), 'p-1', {
+        name: 'Release 2.4',
+        runs: [{ name: 'Brand new' }],
+        run_ids: [existing.id],
+      });
+
+      expect(plan.run_count).toBe(2);
+      expect(store.runs.map((run) => [run.name, run.plan_id])).toEqual([
+        ['Already here', plan.id],
+        ['Brand new', plan.id],
+      ]);
+    });
+
+    it('400s a plan with neither new nor attached runs', async () => {
+      await expect(
+        service.create(AS('admin'), 'p-1', { name: 'Release 2.4', runs: [] }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'runs', issue: 'at least one run is required' }],
+      });
+      await expect(
+        service.create(AS('admin'), 'p-1', { name: 'Release 2.4' }),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+      expect(store.plans).toEqual([]);
+    });
+
+    it('400s more than 20 runs across runs and run_ids', async () => {
+      const seeded = Array.from({ length: 11 }, (_unused, index) =>
+        store.addRun({ name: `Seeded ${index}` }),
+      );
+      const runs = Array.from({ length: 10 }, (_unused, index) => ({
+        name: `New ${index}`,
+      }));
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          runs,
+          run_ids: seeded.map((run) => run.id),
+        }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'runs', issue: 'at most 20 runs are allowed' }],
+      });
+
+      expect(store.plans).toEqual([]);
+      expect(store.runs.every((run) => run.plan_id === null)).toBe(true);
+    });
+
+    it('400s the same run id twice in one request', async () => {
+      const run = store.addRun({ name: 'Once' });
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          run_ids: [run.id, run.id],
+        }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'run_ids[1]', issue: 'duplicate in request' }],
+      });
+      expect(store.runs[0]?.plan_id).toBeNull();
+    });
+
+    it('400s unknown, other-project and deleted run ids, without leaking which', async () => {
+      const otherProject = store.addRun({ project_id: 'p-2', name: 'Elsewhere' });
+      const deleted = store.addRun({
+        name: 'Gone',
+        deleted_at: new Date('2026-10-06T00:00:00Z'),
+      });
+
+      for (const id of ['run-missing', otherProject.id, deleted.id]) {
+        await expect(
+          service.create(AS('admin'), 'p-1', {
+            name: `Plan ${id}`,
+            run_ids: [id],
+          }),
+        ).rejects.toMatchObject({
+          code: 'VALIDATION_ERROR',
+          details: [{ field: 'run_ids[0]', issue: 'unknown run' }],
+        });
+      }
+      expect(store.plans).toEqual([]);
+    });
+
+    it('400s a run already in another plan and never moves it', async () => {
+      const otherPlan = store.addPlan({ project_id: 'p-1', name: 'Other plan', run_count: 1 });
+      const attached = store.addRun({ name: 'Taken', plan_id: otherPlan.id });
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          run_ids: [attached.id],
+        }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'run_ids[0]', issue: 'already in a plan' }],
+      });
+
+      expect(attached.plan_id).toBe(otherPlan.id);
+      expect(store.plans.map((plan) => plan.name)).toEqual(['Other plan']);
+    });
+
+    it('rolls back a plan when a later attached run is rejected', async () => {
+      const good = store.addRun({ name: 'Free' });
+      const otherPlan = store.addPlan({ name: 'Other plan' });
+      const taken = store.addRun({ name: 'Taken', plan_id: otherPlan.id });
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          runs: [{ name: 'Brand new' }],
+          run_ids: [good.id, taken.id],
+        }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'run_ids[1]', issue: 'already in a plan' }],
+      });
+
+      expect(good.plan_id).toBeNull();
+      expect(store.plans.map((plan) => plan.name)).toEqual(['Other plan']);
+      // The new run is gone too: the plan and everything with it rolled back.
+      expect(store.runs.map((run) => run.name)).toEqual(['Free', 'Taken']);
     });
 
     it('is 409 for a duplicate name, ignoring case and spaces', async () => {
