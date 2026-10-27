@@ -39,9 +39,9 @@ export const RESULT_DEFECT_URL_MAX = 500;
 /** Roles that may be an item assignee (PRD decision 2). */
 export const ASSIGNEE_ROLES = ['admin', 'lead', 'tester'] as const;
 
-export const RUN_SORTS = ['created_at', 'updated_at', 'due_date', 'name'] as const;
+export const RUN_SORTS = ['created_at', 'updated_at', 'start_date', 'due_date', 'name'] as const;
 export type RunSortKey = (typeof RUN_SORTS)[number];
-export const RUN_SORT_PATTERN = /^-?(created_at|updated_at|due_date|name)$/;
+export const RUN_SORT_PATTERN = /^-?(created_at|updated_at|start_date|due_date|name)$/;
 
 export const ITEM_SORTS = ['position', 'case_display_id', 'status', 'updated_at'] as const;
 export type ItemSortKey = (typeof ITEM_SORTS)[number];

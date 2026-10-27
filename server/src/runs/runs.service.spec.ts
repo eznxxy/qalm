@@ -273,12 +273,14 @@ class FakeStore {
     let primary: number;
     if (key === 'name') primary = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
     else if (key === 'updated_at') primary = a.updated_at.getTime() - b.updated_at.getTime();
-    else if (key === 'due_date') {
-      // Nulls always sort last, whichever direction was asked for.
-      if (a.due_date === null && b.due_date === null) primary = 0;
-      else if (a.due_date === null) return 1;
-      else if (b.due_date === null) return -1;
-      else primary = a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0;
+    else if (key === 'due_date' || key === 'start_date') {
+      // Null dates always sort last, whichever direction was asked for.
+      const av = key === 'due_date' ? a.due_date : a.start_date;
+      const bv = key === 'due_date' ? b.due_date : b.start_date;
+      if (av === null && bv === null) primary = 0;
+      else if (av === null) return 1;
+      else if (bv === null) return -1;
+      else primary = av < bv ? -1 : av > bv ? 1 : 0;
     } else primary = a.created_at.getTime() - b.created_at.getTime();
     if (primary !== 0) return descending ? -primary : primary;
     return a.id.localeCompare(b.id);
@@ -824,6 +826,18 @@ describe('RunsService (unit, in-memory runs)', () => {
       const page2 = await service.list(AS('admin'), 'p-1', { page: 2, limit: 2 });
       expect(page2.data).toHaveLength(1);
       expect(page2.meta).toEqual({ page: 2, limit: 2, total: 3, total_pages: 2 });
+    });
+
+    it('sorts by start date with null start dates last in both directions', async () => {
+      store.addRun({ name: 'later', startDate: '2026-11-05' });
+      store.addRun({ name: 'none', startDate: null });
+      store.addRun({ name: 'earlier', startDate: '2026-11-01' });
+
+      const ascending = await service.list(AS('admin'), 'p-1', { sort: 'start_date' });
+      expect(ascending.data.map((row) => row.name)).toEqual(['earlier', 'later', 'none']);
+
+      const descending = await service.list(AS('admin'), 'p-1', { sort: '-start_date' });
+      expect(descending.data.map((row) => row.name)).toEqual(['later', 'earlier', 'none']);
     });
 
     it('404s an unknown project and hides an archived one from non-Admins', async () => {

@@ -435,7 +435,9 @@ export default function RunsPage() {
     {
       key: "start_date",
       header: "Start date",
+      sortable: true,
       className: "run-col-start",
+      sortValue: (row) => row.start_date,
       render: (row) =>
         row.start_date ? (
           <time dateTime={row.start_date}>

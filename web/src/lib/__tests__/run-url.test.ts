@@ -113,6 +113,8 @@ describe("sort mapping", () => {
   it.each([
     ["name", "asc", "name"],
     ["name", "desc", "-name"],
+    ["start_date", "asc", "start_date"],
+    ["start_date", "desc", "-start_date"],
     ["due_date", "asc", "due_date"],
     ["due_date", "desc", "-due_date"],
     ["created_at", "asc", "created_at"],
@@ -129,10 +131,17 @@ describe("sort mapping", () => {
 
   it("round-trips through DataTable sort state", () => {
     expect(runSortState("-due_date")).toEqual({ key: "due_date", dir: "desc" });
+    expect(runSortState("start_date")).toEqual({
+      key: "start_date",
+      dir: "asc",
+    });
     expect(runSortState("name")).toEqual({ key: "name", dir: "asc" });
     expect(runSortParam("name", runSortState("name").dir)).toBe("name");
     expect(runSortParam("due_date", runSortState("-due_date").dir)).toBe(
       "-due_date"
+    );
+    expect(runSortParam("start_date", runSortState("-start_date").dir)).toBe(
+      "-start_date"
     );
   });
 });

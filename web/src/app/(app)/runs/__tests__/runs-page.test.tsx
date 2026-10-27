@@ -405,6 +405,17 @@ describe("runs list", () => {
     await waitFor(() => expect(lastReplaceUrl()).toContain("sort=due_date"));
   });
 
+  it("sorts by start date through the ?sort= param", async () => {
+    mockApi();
+    await renderPage();
+    const table = await screen.findByRole("table", { name: "Test runs" });
+
+    await within(table).findByText("Release 2.4 smoke");
+    fireEvent.click(within(table).getByRole("button", { name: /Start date/ }));
+
+    await waitFor(() => expect(lastReplaceUrl()).toContain("sort=start_date"));
+  });
+
   it("opens a run from its name", async () => {
     mockApi();
     await renderPage();

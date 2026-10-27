@@ -444,14 +444,21 @@ export interface Run {
   updated_at: string;
 }
 
-export type RunSortKey = "created_at" | "updated_at" | "due_date" | "name";
+export type RunSortKey =
+  | "created_at"
+  | "updated_at"
+  | "start_date"
+  | "due_date"
+  | "name";
 
-/** Null `due_date` sorts last regardless of direction (server-side). */
+/** Null `start_date`/`due_date` sort last regardless of direction (server-side). */
 export type RunSort =
   | "created_at"
   | "-created_at"
   | "updated_at"
   | "-updated_at"
+  | "start_date"
+  | "-start_date"
   | "due_date"
   | "-due_date"
   | "name"

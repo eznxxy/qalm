@@ -395,6 +395,7 @@ function attachmentContextColumns(): string {
 const RUN_SORT_COLUMNS: Record<RunSortKey, string> = {
   created_at: 'r.created_at',
   updated_at: 'r.updated_at',
+  start_date: 'r.start_date',
   due_date: 'r.due_date',
   name: 'lower(r.name)',
 };
@@ -663,8 +664,9 @@ export class RunsStore {
     const key = (descending ? filter.sort.slice(1) : filter.sort) as RunSortKey;
     const column = RUN_SORT_COLUMNS[key] ?? RUN_SORT_COLUMNS.created_at;
     const direction = descending ? 'DESC' : 'ASC';
-    // Null due dates always sort last, whichever direction was asked for.
-    const nulls = key === 'due_date' ? `NULLS LAST` : '';
+    // Null dates always sort last, whichever direction was asked for.
+    const nulls =
+      key === 'due_date' || key === 'start_date' ? `NULLS LAST` : '';
     const result = await this.db.query<RunWithCountsRow>(
       `${this.runSelect()}
        ${clause}

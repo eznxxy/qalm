@@ -434,6 +434,29 @@ describe('Runs API (integration)', () => {
       expect((byName.body.data as RunData[]).map((r) => r.name)).toEqual(['charlie']);
       expect(byName.body.meta).toEqual({ page: 2, limit: 2, total: 3, total_pages: 2 });
     });
+
+    it('sorts by start_date in both directions with nulls last', async () => {
+      await createOk({ name: 'later', start_date: '2026-11-05' });
+      await createOk({ name: 'none' });
+      await createOk({ name: 'earlier', start_date: '2026-11-01' });
+
+      const ascending = await listRuns('viewer', { sort: 'start_date' });
+      expect((ascending.body.data as RunData[]).map((r) => r.name)).toEqual([
+        'earlier',
+        'later',
+        'none',
+      ]);
+
+      const descending = await listRuns('viewer', { sort: '-start_date' });
+      expect((descending.body.data as RunData[]).map((r) => r.name)).toEqual([
+        'later',
+        'earlier',
+        'none',
+      ]);
+
+      const badSort = await listRuns('viewer', { sort: 'bogus' });
+      expect(badSort.status).toBe(400);
+    });
   });
 
   describe('run detail, update, close and delete', () => {

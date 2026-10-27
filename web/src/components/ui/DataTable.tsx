@@ -151,7 +151,8 @@ function compareSortValues(
   a: string | number | boolean | null | undefined,
   b: string | number | boolean | null | undefined
 ): number {
-  // null/undefined sort last regardless of direction (handled by caller).
+  // Empty cells are pulled out before the direction is applied (see the sort
+  // above); this only guards direct calls.
   if (a == null && b == null) return 0;
   if (a == null) return 1;
   if (b == null) return -1;
@@ -257,12 +258,20 @@ export function DataTable<T>({
     if (!col?.sortValue) return rows;
     const dir = activeSort.dir === "desc" ? -1 : 1;
     const keyOf = col.sortValue;
-    return [...rows].sort(
-      (a, b) =>
-        compareSortValues(keyOf(a), keyOf(b)) * dir ||
-        // Stable tiebreaker so equal keys never flip between renders.
-        getRowId(a).localeCompare(getRowId(b))
-    );
+    // Stable tiebreaker so equal keys never flip between renders.
+    const tiebreak = (a: T, b: T) => getRowId(a).localeCompare(getRowId(b));
+    return [...rows].sort((a, b) => {
+      const av = keyOf(a);
+      const bv = keyOf(b);
+      // Empty cells sort last in *both* directions, so the empties stay at the
+      // bottom where the server put them — multiplying by `dir` here would
+      // float them to the top of a descending sort.
+      if (av == null || bv == null) {
+        if (av == null && bv == null) return tiebreak(a, b);
+        return av == null ? 1 : -1;
+      }
+      return compareSortValues(av, bv) * dir || tiebreak(a, b);
+    });
   }, [rows, activeSort, columns, getRowId]);
 
   function moveRowFocus(next: number) {

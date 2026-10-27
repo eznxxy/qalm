@@ -13,6 +13,7 @@ import { RUN_STATUSES } from "./api-types";
 /** Columns the table may sort by; their keys match the contract's `sort`. */
 export const RUN_SORT_KEYS: readonly RunSortKey[] = [
   "name",
+  "start_date",
   "due_date",
   "created_at",
   "updated_at",
@@ -23,6 +24,8 @@ export const RUN_SORTS: readonly RunSort[] = [
   "-created_at",
   "updated_at",
   "-updated_at",
+  "start_date",
+  "-start_date",
   "due_date",
   "-due_date",
   "name",

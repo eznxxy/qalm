@@ -108,6 +108,41 @@ describe("DataTable sorting", () => {
     expect(rows[2]).toHaveTextContent("alpha");
   });
 
+  it("keeps empty sort values last in both directions", () => {
+    interface Dated {
+      id: string;
+      label: string;
+      due: string | null;
+    }
+    const withNulls: Dated[] = [
+      { id: "d1", label: "bravo", due: "2026-11-02" },
+      { id: "d2", label: "alpha", due: "2026-11-01" },
+      { id: "d3", label: "empty", due: null },
+    ];
+    const columns: DataTableColumn<Dated>[] = [
+      { key: "label", header: "Label", sortValue: (r) => r.label },
+      { key: "due", header: "Due", sortable: true, sortValue: (r) => r.due },
+    ];
+    const { container } = render(
+      <DataTable<Dated>
+        columns={columns}
+        rows={withNulls}
+        getRowId={(r) => r.id}
+        caption="Dated rows"
+        defaultSort={{ key: "due", dir: "asc" }}
+      />
+    );
+    const labels = () =>
+      [...container.querySelectorAll("tbody tr")].map((tr) => tr.textContent);
+    expect(labels()[0]).toContain("alpha");
+    expect(labels()[2]).toContain("empty");
+
+    fireEvent.click(screen.getByRole("button", { name: /Due/ })); // asc -> desc
+    const descending = labels();
+    expect(descending[0]).toContain("bravo");
+    expect(descending[2]).toContain("empty");
+  });
+
   it("sorts numbers numerically, not lexicographically", () => {
     render(
       <DataTable<Row> {...baseProps()} defaultSort={{ key: "points", dir: "desc" }} />
