@@ -292,15 +292,25 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 - Column shares were rebalanced to keep the fixed layout at 100%
   (`runs.css`), and both date columns are `white-space: nowrap` — a `29 Oct` /
   `2026` split reads as two values. Verified at 1600px and 1024px wide.
-- Notes: the column is **display-only**. `RUN_SORTS` in
-  `server/src/runs/runs.constants.ts` is `created_at|updated_at|due_date|name`,
-  so making Start date sortable is a contract (`docs/api-runs.md` sort section)
-  plus server change, not a web one — left undone on purpose. Due date remains
-  the only sortable date column until that lands. No API change was needed: the
-  run list already returns `start_date` (card 3.5).
-- Verified: web unit 546 (38 suites), `tsc`/`eslint` clean; live as Tester on
-  Webshop QA — `ABC` shows its start date, `Run October` shows `—`, dates stay
-  on one line in both wide and narrow windows.
+- Follow-up (same review thread): **Start date sorts exactly like Due date**.
+  `docs/api-runs.md` now lists `start_date` in the `sort` row with the rule
+  "null `start_date`/`due_date` sort last in both directions";
+  `RUN_SORTS`/`RUN_SORT_PATTERN`/`RUN_SORT_COLUMNS` in the server gained
+  `start_date` with `NULLS LAST`, and the web column is `sortable` with
+  `sortValue` → `?sort=start_date` / `?sort=-start_date`. No migration: the run
+  list already returned `start_date` (card 3.5).
+- Contract-adjacent fix, found while testing the descending direction:
+  `DataTable` multiplied the comparison by the sort direction, so an empty cell
+  (`—`) floated to the **top** of a descending sort — a pre-existing bug that
+  also affected Due date. `sortedRows` now pulls empty values out before the
+  direction is applied, so they stay last both ways.
+- Verified: server `tsc`/`lint` clean, unit 446 (27 suites), `runs` +
+  `case-runs` e2e 39 (start date asc/desc with nulls last, `sort=bogus` → 400);
+  web `tsc`/`eslint` clean, jest 549 (38 suites). Live as Tester on Webshop QA —
+  clicking Start date writes `?sort=start_date` then `?sort=-start_date`, `ABC`
+  (Oct 29) leads and `Run October` (`—`) stays last in both directions; the
+  sort indicator shows on the column; dates stay on one line in wide and narrow
+  windows.
 
 ---
 
