@@ -396,6 +396,84 @@ Left sub-nav: Project, Members and roles, Case fields (phase 2), Integrations
 (phase 2). Roles: Admin, Lead, Tester, Viewer. Hide or disable controls the
 role cannot use, and explain why on hover ("Viewers can't edit cases").
 
+### 4.8 Project overview
+
+The project page is the project's overview. Title, key, status badge and the
+Edit/Archive buttons stay in the header (unchanged from slice 1); directly
+below them, a tab strip; below that, the Overview tab's content.
+
+```
+┌ Projects › Checkout                    [Edit] [Archive] ┐
+│ Checkout  [Archived]      Key: CHK                      │
+│ Overview │ Milestones │ Test runs │ Test cases │ Reports│
+├────────────────────────────────────┬────────────────────┤
+│ Results recorded, last 14 days     │ Milestones         │
+│  ▁▂▅▃▆▂▁  ▲ 81.6%      [as table]  │ Release 2.4        │
+│  ● Passed ● Failed ● Blocked       │ 14 Nov · 12 days   │
+│  ● Retest ● Skipped                │ ▓▓▓▓▓▓░░░ 71%      │
+│                                    │ Release 2.5        │
+├────────────────────────────────────┴────────────────────┤
+│ Test runs                                  View all →    │
+│ Release 2.4 smoke · 31 of 50 · 74% · 14 Nov              │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Tab strip.** Underline tabs (§5): 2px `--brand` underline on the active tab,
+`aria-current="page"`, real links. `Overview` → `/projects/:id`;
+`Milestones` → `/milestones?project=:id`; `Test runs` → `/runs?project=:id`;
+`Test cases` → `/cases?project=:id`. `Reports` is rendered as a disabled tab
+(`aria-disabled="true"`, no `href`, explanation on hover/focus: "Reports arrive
+in a later slice"). No Todo tab. The active tab follows the route, never local
+state.
+
+**Grid.** 12 columns, 16px gutters (§4.6): trend card 8, Milestones card 4,
+Test Runs card 12. One column below 1024px, in that order.
+
+**Results trend card.** Title names the insight and its source: "Results
+recorded, last 14 days" (generated from the window, never hard-coded). Two
+series on one plot: stacked daily columns of recorded results by status (left
+axis, counts) and the daily pass rate as a line (right axis, 0–100%). Status
+colours are the only colours used (§2.2) and the legend spells out every status
+in text. Days with no results draw no column and **break** the pass-rate line —
+never a point at 0%. A day with no verdicts labels `—`, not `0%`. The window
+footer states "UTC days" so the buckets are unambiguous.
+
+- Hover/focus a day: tooltip with date, per-status counts, total and pass rate.
+  Keyboard: the plot is a single `role="img"` with an `aria-label` summarising
+  the window, total and pass rate; the day detail is reachable through the table
+  view, which is the accessible path.
+- **View as table** toggle (§4.6), a real button with `aria-expanded`: Date,
+  Passed, Failed, Blocked, Retest, Skipped, Total, Pass rate — exactly the 14
+  rows, `—` for a null rate. Toggling does not refetch.
+- Empty window: keep the axes and legend, put "No results recorded in the last
+  14 days." in the plot area with a link to Test runs. Never an empty frame
+  alone.
+
+**Milestones card.** Up to 5, sorted by due date ascending with undated last
+(the milestones screen's default), each with name, due date, days left (or
+"No due date"), the 8px status bar and `% complete`. Rows link to the milestone.
+Header link "View all milestones" → `/milestones?project=:id`. Empty: "No
+milestones yet. Create one to track a release." plus "New milestone" for
+Admin/Lead only.
+
+**Test Runs card.** Up to 5 live runs, newest first, each with name, plan (or
+`—`), milestone (or `—`), status badge, `31 of 50`, the status bar, `74%
+complete` and due date. Rows link to the run. Header link "View all runs" →
+`/runs?project=:id`. Empty: "No runs yet. Create a run to start recording
+results." plus "New run" for Admin/Lead only. No "By" column: the run resource
+carries no author name and `GET /users` is Admin-only (see PRD decision 8).
+
+**Description.** The slice-1 Description panel moves into the Overview tab,
+above the trend card: description or "No description.", then created / last
+updated. It is no longer a card above the tabs, and the stale "arrive in later
+slices" line is removed.
+
+**States.** Each card loads and fails independently: its own skeleton
+(chart = axis skeleton, cards = row skeletons), its own error with Retry that
+refetches only that card. The header and tab strip render as soon as the project
+loads. The archived-project banner and the project-level 404/403 states are
+unchanged.
+
 ---
 
 ## 5. Components
