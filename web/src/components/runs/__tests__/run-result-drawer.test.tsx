@@ -243,6 +243,36 @@ describe("RunResultDrawer", () => {
     ).toBeDisabled();
   });
 
+  it("states which file types the picker accepts", async () => {
+    await renderDrawer();
+
+    const input = (await screen.findByLabelText("Attachments")) as HTMLInputElement;
+    // The hint names the extensions ...
+    expect(
+      screen.getByText(
+        "Up to 5 files, 10 MB each. Allowed: PNG, JPG, GIF, WebP, PDF, TXT, CSV, ZIP. Uploaded when you save."
+      )
+    ).toBeInTheDocument();
+    // ... and `accept` offers exactly the same eight types.
+    expect(input.accept.split(",")).toEqual([
+      "image/png",
+      "image/jpeg",
+      "image/gif",
+      "image/webp",
+      "application/pdf",
+      "text/plain",
+      "text/csv",
+      "application/zip",
+    ]);
+    // A type outside the allow-list is still refused on pick.
+    fireEvent.change(input, {
+      target: { files: [new File(["x"], "run.exe", { type: "application/x-msdownload" })] },
+    });
+    expect(
+      await screen.findByText("run.exe: that file type is not allowed.")
+    ).toBeInTheDocument();
+  });
+
   it("removes a staged file through the × button, not a text link", async () => {
     await renderDrawer();
 

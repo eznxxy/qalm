@@ -56,16 +56,23 @@ import { MarkdownLite } from "./MarkdownLite";
 /** Mirrors server/src/runs/runs.constants.ts (PRD decision 5). */
 const ATTACHMENT_MAX_PER_RESULT = 5;
 const ATTACHMENT_MAX_BYTES = 10 * 1_048_576;
+/**
+ * The allow-list, paired with the extension users recognise: `accept`, the
+ * hint under the picker and the type check all read this one array, so they
+ * cannot drift apart.
+ */
 const ATTACHMENT_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-  "text/plain",
-  "text/csv",
-  "application/zip",
+  { mime: "image/png", label: "PNG" },
+  { mime: "image/jpeg", label: "JPG" },
+  { mime: "image/gif", label: "GIF" },
+  { mime: "image/webp", label: "WebP" },
+  { mime: "application/pdf", label: "PDF" },
+  { mime: "text/plain", label: "TXT" },
+  { mime: "text/csv", label: "CSV" },
+  { mime: "application/zip", label: "ZIP" },
 ] as const;
+const ATTACHMENT_ACCEPT = ATTACHMENT_TYPES.map((type) => type.mime).join(",");
+const ATTACHMENT_ALLOWED = ATTACHMENT_TYPES.map((type) => type.label).join(", ");
 
 const HISTORY_LIMIT = 25;
 
@@ -411,7 +418,7 @@ export function RunResultDrawer({
         error = `At most ${ATTACHMENT_MAX_PER_RESULT} attachments per result.`;
         break;
       }
-      if (!(ATTACHMENT_TYPES as readonly string[]).includes(file.type)) {
+      if (!ATTACHMENT_TYPES.some((type) => type.mime === file.type)) {
         error = `${file.name}: that file type is not allowed.`;
         continue;
       }
@@ -713,12 +720,12 @@ export function RunResultDrawer({
                           id="rd-attachments"
                           type="file"
                           multiple
-                          accept={ATTACHMENT_TYPES.join(",")}
+                          accept={ATTACHMENT_ACCEPT}
                           onChange={onFilesPicked}
                         />
                         <p className="rd-hint">
                           Up to {ATTACHMENT_MAX_PER_RESULT} files, 10 MB each.
-                          Uploaded when you save.
+                          Allowed: {ATTACHMENT_ALLOWED}. Uploaded when you save.
                         </p>
                         {fieldErrors.file && (
                           <p className="field-error">{fieldErrors.file}</p>
@@ -1005,12 +1012,15 @@ function HistoryRow({
           <button type="button" className="linklike" onClick={onEdit}>
             Edit result
           </button>
-          <label className="rd-attach-add">
+          <label
+            className="rd-attach-add"
+            title={`Allowed: ${ATTACHMENT_ALLOWED} · up to ${ATTACHMENT_MAX_PER_RESULT} files, 10 MB each`}
+          >
             <span className="linklike">Add attachment</span>
             <input
               type="file"
               multiple
-              accept={ATTACHMENT_TYPES.join(",")}
+              accept={ATTACHMENT_ACCEPT}
               disabled={busy !== null}
               onChange={(event) => {
                 onAddAttachment(event.target.files);
