@@ -57,22 +57,31 @@ import { MarkdownLite } from "./MarkdownLite";
 const ATTACHMENT_MAX_PER_RESULT = 5;
 const ATTACHMENT_MAX_BYTES = 10 * 1_048_576;
 /**
- * The allow-list, paired with the extension users recognise: `accept`, the
- * hint under the picker and the type check all read this one array, so they
- * cannot drift apart.
+ * The allow-list (mirrors PRD §Attachment), paired with the extension users
+ * recognise: `accept` and the pick-time check read every entry, so they cannot
+ * drift from the server.
+ *
+ * `listed: false` keeps a type accepted but out of the hint. ZIP and CSV are
+ * accepted because macOS and Linux map them to `application/zip` and
+ * `text/csv`, but Windows does not: the browser sends
+ * `application/x-zip-compressed` and `application/vnd.ms-excel`, both off the
+ * list, so a `.zip` or `.csv` picked there is refused. Advertising them would
+ * promise an upload that always fails.
  */
 const ATTACHMENT_TYPES = [
-  { mime: "image/png", label: "PNG" },
-  { mime: "image/jpeg", label: "JPG" },
-  { mime: "image/gif", label: "GIF" },
-  { mime: "image/webp", label: "WebP" },
-  { mime: "application/pdf", label: "PDF" },
-  { mime: "text/plain", label: "TXT" },
-  { mime: "text/csv", label: "CSV" },
-  { mime: "application/zip", label: "ZIP" },
+  { mime: "image/png", label: "PNG", listed: true },
+  { mime: "image/jpeg", label: "JPG", listed: true },
+  { mime: "image/gif", label: "GIF", listed: true },
+  { mime: "image/webp", label: "WebP", listed: true },
+  { mime: "application/pdf", label: "PDF", listed: true },
+  { mime: "text/plain", label: "TXT", listed: true },
+  { mime: "text/csv", label: "CSV", listed: false },
+  { mime: "application/zip", label: "ZIP", listed: false },
 ] as const;
 const ATTACHMENT_ACCEPT = ATTACHMENT_TYPES.map((type) => type.mime).join(",");
-const ATTACHMENT_ALLOWED = ATTACHMENT_TYPES.map((type) => type.label).join(", ");
+const ATTACHMENT_ALLOWED = ATTACHMENT_TYPES.filter((type) => type.listed)
+  .map((type) => type.label)
+  .join(", ");
 
 const HISTORY_LIMIT = 25;
 

@@ -243,17 +243,19 @@ describe("RunResultDrawer", () => {
     ).toBeDisabled();
   });
 
-  it("states which file types the picker accepts", async () => {
+  it("states the file types that actually upload, not the whole allow-list", async () => {
     await renderDrawer();
 
     const input = (await screen.findByLabelText("Attachments")) as HTMLInputElement;
-    // The hint names the extensions ...
+    // The hint advertises only what lands: ZIP and CSV are on the allow-list but
+    // Windows reports their MIME as x-zip-compressed / vnd.ms-excel, which is
+    // refused, so promising them would be a lie. See ATTACHMENT_TYPES.
     expect(
       screen.getByText(
-        "Up to 5 files, 10 MB each. Allowed: PNG, JPG, GIF, WebP, PDF, TXT, CSV, ZIP. Uploaded when you save."
+        "Up to 5 files, 10 MB each. Allowed: PNG, JPG, GIF, WebP, PDF, TXT. Uploaded when you save."
       )
     ).toBeInTheDocument();
-    // ... and `accept` offers exactly the same eight types.
+    // `accept` still offers all eight canonical types (macOS/Linux send them).
     expect(input.accept.split(",")).toEqual([
       "image/png",
       "image/jpeg",
