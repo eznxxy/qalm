@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import type { Result, RunItemDetail } from "@/lib/api-types";
 
@@ -124,6 +124,34 @@ describe("RunResultDrawer", () => {
       screen.getByRole("heading", { name: /Add result/ })
     ).toBeInTheDocument();
     expect(await screen.findByText("No results recorded yet.")).toBeInTheDocument();
+  });
+
+  it("gives each status button its own status class, the hook the hover colour reads", async () => {
+    await renderDrawer();
+
+    const group = await screen.findByRole("group", { name: "Status" });
+    const expected: [string, string][] = [
+      ["Passed", "rd-seg-passed"],
+      ["Failed", "rd-seg-failed"],
+      ["Blocked", "rd-seg-blocked"],
+      ["Retest", "rd-seg-retest"],
+      ["Skipped", "rd-seg-skipped"],
+    ];
+    for (const [label, className] of expected) {
+      expect(within(group).getByRole("button", { name: label })).toHaveClass(
+        "rd-seg",
+        className
+      );
+    }
+    // Nothing is selected until the tester picks; the tint on hover must never
+    // read as a choice, so only an explicit click adds the solid fill.
+    expect(
+      within(group).getByRole("button", { name: "Failed" })
+    ).not.toHaveClass("is-active");
+    fireEvent.click(within(group).getByRole("button", { name: "Failed" }));
+    expect(within(group).getByRole("button", { name: "Failed" })).toHaveClass(
+      "is-active"
+    );
   });
 
   it("requires a comment for a failed result, inline, without a request", async () => {

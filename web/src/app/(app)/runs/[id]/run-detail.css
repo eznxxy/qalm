@@ -334,12 +334,53 @@
   color: var(--ink-700);
   font-size: 13px;
   line-height: 18px;
+  /* Per-status hover colours, set by the .rd-seg-<status> classes below. */
+  --seg: var(--ink-500);
+  --seg-tint: var(--canvas);
 }
 
-.rd-seg:hover:not(:disabled) {
-  background: var(--brand-tint);
-  border-color: var(--ink-700);
+/* Hover and keyboard focus preview the status you are about to pick: that
+ * status's tint as the fill, its solid as a 2px edge (1px border + 1px inset
+ * ring, so nothing shifts) and --ink-900 for the label. The label stays ink
+ * because 13px text in the status colour on its own tint only reaches ~3.4:1
+ * (--passed on --passed-tint); the solid sits on the edge instead, where the
+ * floor is 3:1. The selected button keeps its solid brand fill and is excluded.
+ * Review feedback: the old hover changed only the border and read as nothing. */
+.rd-seg:hover:not(:disabled):not(.is-active),
+.rd-seg:focus-visible:not(:disabled):not(.is-active),
+/* `button` prefix only to out-rank the global secondary-button hover in
+ * globals.css, which also sets border-color on hover. */
+button.rd-seg:hover:not(:disabled):not(.is-active),
+button.rd-seg:focus-visible:not(:disabled):not(.is-active) {
+  background: var(--seg-tint);
+  border-color: var(--seg);
   color: var(--ink-900);
+  box-shadow: inset 0 0 0 1px var(--seg);
+}
+
+.rd-seg-passed {
+  --seg: var(--passed);
+  --seg-tint: var(--passed-tint);
+}
+
+.rd-seg-retest {
+  --seg: var(--retest);
+  --seg-tint: var(--retest-tint);
+}
+
+.rd-seg-blocked {
+  --seg: var(--blocked);
+  --seg-tint: var(--blocked-tint);
+}
+
+.rd-seg-failed {
+  --seg: var(--failed);
+  --seg-tint: var(--failed-tint);
+}
+
+.rd-seg-skipped {
+  --seg: var(--skipped);
+  --seg-tint: var(--skipped-tint);
 }
 
 .rd-seg.is-active {

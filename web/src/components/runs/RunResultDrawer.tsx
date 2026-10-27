@@ -633,8 +633,8 @@ export function RunResultDrawer({
                             type="button"
                             className={
                               status === value
-                                ? "rd-seg is-active"
-                                : "rd-seg"
+                                ? `rd-seg rd-seg-${value} is-active`
+                                : `rd-seg rd-seg-${value}`
                             }
                             aria-pressed={status === value}
                             disabled={editingId !== null}
