@@ -34,6 +34,7 @@ import {
   PlanListQuery,
   Project,
   ProjectListQuery,
+  ProjectTrend,
   RefreshResult,
   ReorderSuitesInput,
   Result,
@@ -162,6 +163,14 @@ export const api = {
   /** Admin only per the role matrix; idempotent. */
   restoreProject: (id: string) =>
     client.apiFetch<Project>(`/projects/${encodeURIComponent(id)}/restore`, opts("POST")),
+
+  // ---- reports (docs/api-project-overview.md) ----
+  /** Daily results for the last `days` UTC days, ending today, inclusive. */
+  getProjectTrend: (projectId: string, days: number) =>
+    client.apiFetch<ProjectTrend>(
+      `/projects/${encodeURIComponent(projectId)}/reports/trend`,
+      { query: { days } }
+    ),
 
   // ---- suites (docs/api-suites.md) ----
   /** Whole project tree, nested; not paginated. */

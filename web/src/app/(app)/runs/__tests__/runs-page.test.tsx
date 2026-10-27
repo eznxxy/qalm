@@ -877,6 +877,29 @@ describe("roles and archived projects", () => {
   });
 });
 
+describe("?new=1 deep link from the project overview", () => {
+  it("opens the New run dialog once for a writer, then strips the param", async () => {
+    mockRouterState.search = "project=p-1&new=1";
+    mockApi();
+    await renderPage();
+
+    expect(
+      await screen.findByRole("dialog", { name: "New run" })
+    ).toBeInTheDocument();
+    await waitFor(() => expect(lastReplaceUrl()).toBe("/runs?project=p-1"));
+  });
+
+  it("leaves a viewer on the ordinary list and never strips anything", async () => {
+    mockRouterState.search = "project=p-1&new=1";
+    mockApi({ role: "viewer" });
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+
+    expect(screen.queryByRole("dialog", { name: "New run" })).toBeNull();
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+});
+
 describe("project resolution", () => {
   it("resolves the first project and writes it to the URL when none is given", async () => {
     mockRouterState.search = "";

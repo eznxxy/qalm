@@ -600,3 +600,28 @@ describe("milestones list", () => {
     ).toBeNull();
   });
 });
+
+describe("?new=1 deep link from the project overview", () => {
+  it("opens the New milestone dialog once for a writer, then strips the param", async () => {
+    mockRouterState.search = "project=p-1&new=1";
+    mockApi();
+    await renderPage();
+
+    expect(
+      await screen.findByRole("dialog", { name: "New milestone" })
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(lastReplaceUrl()).toBe("/milestones?project=p-1")
+    );
+  });
+
+  it("leaves a Tester on the ordinary list and never strips anything", async () => {
+    mockRouterState.search = "project=p-1&new=1";
+    mockApi({ role: "tester" });
+    await renderPage();
+    await table();
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+});

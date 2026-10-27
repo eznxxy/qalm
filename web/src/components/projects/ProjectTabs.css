@@ -1,0 +1,57 @@
+/*
+ * Project tab strip (docs/DESIGN.md §4.8, §5 underline tabs). Tokens only.
+ * The underline is a bottom border on the link so the row's own divider is
+ * never doubled; the active tab is brand + 2px brand underline, plus
+ * aria-current for assistive tech.
+ */
+
+.project-tabs {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-5);
+}
+
+.project-tabs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-tabs a,
+.project-tab-disabled {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--ink-700);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.project-tabs a:hover {
+  color: var(--ink-900);
+  text-decoration: none;
+}
+
+.project-tabs a[aria-current="page"] {
+  border-bottom-color: var(--brand);
+  color: var(--brand);
+}
+
+.project-tabs a:focus-visible,
+.project-tab-disabled:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+}
+
+/* A disabled tab is still a tab stop so its explanation is reachable by
+ * keyboard (§8). It is not a link and has no href. */
+.project-tab-disabled {
+  color: var(--ink-500);
+  cursor: not-allowed;
+}

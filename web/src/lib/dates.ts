@@ -167,6 +167,34 @@ export function formatDateOnly(
   }).format(date);
 }
 
+/**
+ * Compact calendar date for chart axes, e.g. "14 Nov". Same date-only rebuild
+ * as `formatDateOnly` (no UTC-midnight shift); a malformed value is returned
+ * unchanged rather than guessed at.
+ */
+export function formatDayMonth(
+  ymd: string,
+  options: DateFormatOptions = {}
+): string {
+  const match = DATE_ONLY_RE.exec(ymd);
+  if (!match) return ymd;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return ymd;
+  }
+  return new Intl.DateTimeFormat(options.locale, {
+    day: "numeric",
+    month: "short",
+  }).format(date);
+}
+
 /** A whole number of calendar days between two local dates, ignoring clock time. */
 function calendarDayDiff(target: Date, from: Date): number {
   const t = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());

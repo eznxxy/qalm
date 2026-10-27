@@ -829,3 +829,49 @@ export interface LinkedRunQuery {
   page?: number;
   limit?: number;
 }
+
+// ---- reports (docs/api-project-overview.md) ----
+
+/** The five statuses a result can be recorded with; `untested` never occurs. */
+export type TrendStatus = "passed" | "failed" | "blocked" | "retest" | "skipped";
+
+export const TREND_STATUSES: readonly TrendStatus[] = [
+  "passed",
+  "failed",
+  "blocked",
+  "retest",
+  "skipped",
+] as const;
+
+export type TrendStatusCounts = Record<TrendStatus, number>;
+
+/** One UTC day of recorded results. Empty days are zero-filled by the API. */
+export interface TrendBucket {
+  /** Plain `YYYY-MM-DD`, UTC. */
+  date: string;
+  status_counts: TrendStatusCounts;
+  total: number;
+  /** `null` when no verdict was recorded that day — rendered `—`, never 0. */
+  pass_rate: number | null;
+}
+
+export interface TrendTotals {
+  status_counts: TrendStatusCounts;
+  total: number;
+  /** Recomputed from the summed counts, not the mean of the daily rates. */
+  pass_rate: number | null;
+}
+
+/** GET /projects/:projectId/reports/trend */
+export interface ProjectTrend {
+  project_id: string;
+  /** Plain `YYYY-MM-DD`, UTC, inclusive. */
+  from: string;
+  /** Plain `YYYY-MM-DD`, UTC, inclusive. */
+  to: string;
+  /** The resolved window length; the client titles the card from this. */
+  days: number;
+  /** Exactly `days` entries, oldest first. */
+  buckets: TrendBucket[];
+  totals: TrendTotals;
+}

@@ -376,6 +376,27 @@ export default function RunsPage() {
     setCreating(true);
   }
 
+  // The project overview's empty card links here with `&new=1`. Consume it
+  // once (writers only), then strip it from the URL so a reload does not reopen
+  // the dialog. A Tester/Viewer typing it by hand simply gets the list.
+  const createFromUrlHandled = useRef(false);
+  useEffect(() => {
+    if (createFromUrlHandled.current) return;
+    if (searchParams.get("new") !== "1") return;
+    if (!projectId || !canWrite) return;
+    createFromUrlHandled.current = true;
+    const params = new URLSearchParams(searchKey);
+    params.delete("new");
+    const qs = params.toString();
+    router.replace(qs ? `/runs?${qs}` : "/runs", { scroll: false });
+    void (async () => {
+      await Promise.resolve();
+      setCreateFieldErrors({});
+      setCreateFormError(null);
+      setCreating(true);
+    })();
+  }, [projectId, canWrite, searchParams, searchKey, router]);
+
   async function submitRun(
     values: RunFormValues,
     selection: RunSelection | undefined

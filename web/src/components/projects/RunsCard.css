@@ -1,0 +1,99 @@
+/*
+ * Test Runs card (docs/DESIGN.md §4.8). The run status pill is intentionally
+ * neutral: §2.2 status colours are reserved for test statuses, never for
+ * "Open"/"Completed".
+ */
+
+.ov-runs-card {
+  grid-column: span 12;
+}
+
+.ov-runs-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-runs-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.ov-run-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin: 0 calc(var(--space-3) * -1);
+  border-radius: var(--radius-control);
+  color: var(--ink-900);
+  text-decoration: none;
+}
+
+.ov-run-row:hover {
+  background: var(--canvas);
+}
+
+.ov-run-row:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.ov-run-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ov-run-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ov-run-status {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-badge);
+  padding: 0 var(--space-2);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.ov-run-status-open {
+  background: var(--brand-tint);
+  border-color: var(--brand-tint);
+  color: var(--ink-900);
+}
+
+.ov-run-status-completed {
+  background: var(--canvas);
+  color: var(--ink-700);
+}
+
+.ov-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.ov-run-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 12px;
+}
+
+.ov-run-progress .stb-root {
+  flex: 1 1 auto;
+}
+
+.ov-run-count,
+.ov-run-percent {
+  flex: 0 0 auto;
+  color: var(--ink-700);
+  font-variant-numeric: tabular-nums;
+}

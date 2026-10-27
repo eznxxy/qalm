@@ -1,0 +1,235 @@
+/*
+ * Results trend card (docs/DESIGN.md §4.8). Status colours are the §2.2
+ * solids — no new palette. The selector's selected state is a filled surface
+ * plus aria-pressed, never colour alone.
+ */
+
+.ov-trend-card {
+  grid-column: span 8;
+}
+
+.ov-trend-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ov-trend-updating {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+/* ---------- range selector ---------- */
+
+.ov-range {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.ov-range button {
+  min-width: 40px;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-range button + button {
+  border-left: 1px solid var(--line);
+}
+
+.ov-range button:hover:not([aria-pressed="true"]) {
+  background: var(--canvas);
+}
+
+.ov-range button[aria-pressed="true"] {
+  background: var(--brand);
+  color: var(--text-on-brand);
+}
+
+.ov-range button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+/* ---------- plot ---------- */
+
+.ov-trend-body {
+  min-width: 0;
+}
+
+.ov-trend-plot {
+  position: relative;
+}
+
+.ov-trend-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.ov-trend-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.ov-trend-axis-line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.ov-trend-axis {
+  fill: var(--ink-500);
+  font-size: 11px;
+}
+
+.ov-trend-line {
+  fill: none;
+  stroke: var(--ink-900);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.ov-trend-point {
+  fill: var(--ink-900);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.ov-trend-empty {
+  position: absolute;
+  left: 12%;
+  right: 15%;
+  top: 42%;
+  transform: translateY(-50%);
+  text-align: center;
+}
+
+.ov-trend-empty p {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-700);
+}
+
+/* ---------- legend, table toggle, footer ---------- */
+
+.ov-trend-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.ov-trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-700);
+  font-size: 12px;
+}
+
+.ov-trend-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ov-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.ov-legend-passed {
+  background: var(--passed);
+}
+
+.ov-legend-failed {
+  background: var(--failed);
+}
+
+.ov-legend-blocked {
+  background: var(--blocked);
+}
+
+.ov-legend-retest {
+  background: var(--retest);
+}
+
+.ov-legend-skipped {
+  background: var(--skipped);
+}
+
+.ov-legend-line {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--ink-900);
+}
+
+.ov-trend-toggle {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink-700);
+  height: var(--control-height-small);
+}
+
+.ov-trend-toggle:hover {
+  background: var(--canvas);
+}
+
+.ov-trend-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  font-size: 12px;
+}
+
+/* ---------- table view ---------- */
+
+.ov-trend-table-wrap {
+  overflow-x: auto;
+}
+
+.ov-trend-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ov-trend-table th,
+.ov-trend-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ov-trend-table thead th {
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.ov-trend-table tbody th {
+  font-weight: 500;
+}
+
+.ov-trend-table .ov-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
