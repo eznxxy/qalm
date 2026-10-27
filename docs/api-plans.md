@@ -6,6 +6,10 @@ here. Product rules: `docs/PRD-plans-runs.md`. Runs: `docs/api-runs.md`.
 
 A plan is a thin container over runs. This contract is small on purpose.
 
+Plans are not created on their own: `POST /projects/:projectId/plans` takes the
+plan **and its runs** in one request, and requires at least one run. There is no
+plan-only create, so a plan cannot be born empty.
+
 ## Resource: Plan
 ```json
 {
@@ -42,12 +46,22 @@ total * 100)`, and is `0` when `total = 0`.
 | `name` | required, trimmed 1–120 chars, unique per project (case-insensitive) |
 | `description` | optional, ≤ 1,000 chars; `null` clears it |
 | `due_date` | optional `YYYY-MM-DD`; `null` clears it |
+| `runs` | **required on create**, 1–20 entries (a plan needs at least one run) |
+| `runs[].name` | required, trimmed 1–120 chars; run names are not unique |
+| `runs[].description` | optional, ≤ 1,000 chars |
+| `runs[].start_date`, `runs[].due_date` | optional `YYYY-MM-DD`; `start_date` may not be after `due_date` |
+| `runs[].plan_id` | not accepted — every run inherits the new plan's id |
+
+Run fields follow `docs/api-runs.md`; the embedded run has no
+`selection`/`case_ids`. Runs created this way start empty (`0` items) — cases
+are added afterwards from the run screen.
 
 ## Endpoints
 
 ### `GET /api/v1/projects/:projectId/plans` — any authenticated role
-Paginated list, newest first (`created_at desc`, `id` tiebreak), for the plans
-screen.
+Paginated list, newest first (`created_at desc`, `id` tiebreak), for plan
+pickers (the Plan column and the Plan filter on the runs screen) and the plan
+detail screen.
 
 | Query param | Rules |
 |---|---|
@@ -59,13 +73,43 @@ screen.
 - `404` `NOT_FOUND` — unknown project, or archived project for a non-Admin.
 
 ### `POST /api/v1/projects/:projectId/plans` — Admin, Lead
+A plan is a collection of runs, so it is created **together with its runs**, in
+one request, with at least one run.
 ```json
 // request
-{ "name": "Release 2.4", "description": "Regression sweep before 2.4.", "due_date": "2026-11-14" }
+{
+  "name": "Release 2.4",
+  "description": "Regression sweep before 2.4.",
+  "due_date": "2026-11-14",
+  "runs": [
+    { "name": "Smoke — checkout", "start_date": "2026-11-02", "due_date": "2026-11-06" },
+    { "name": "Full regression", "description": "All suites" }
+  ]
+}
 ```
-- `201` → `{ "data": { ...plan } }` (`run_count: 0`, zeroed `counts`).
+- `201` → `{ "data": { ...plan } }` with `run_count` equal to the number of runs
+  created and zeroed `counts` (each new run has no items).
 - `400` `VALIDATION_ERROR`; `409` `CONFLICT` — duplicate name in the project,
   or project archived; `403` for Tester and Viewer.
+
+#### Atomicity
+The plan and all of its runs are inserted in **one transaction**. If any run is
+rejected — bad field, `start_date` after `due_date`, a plan-name conflict — the
+whole request rolls back: no plan and no runs. Retrying the same request is
+safe because nothing was written.
+
+#### Validation details
+- Errors are reported per field, including the index:
+  `runs` (missing, empty, more than 20), `runs[0].name`,
+  `runs[1].start_date`, and so on.
+- A plan's `name` uniqueness is checked once per request; run names are free to
+  repeat (runs have no uniqueness rule, here or in `docs/api-runs.md`).
+
+#### "At least one run" applies to create only
+Runs can be deleted (`DELETE /runs/:id`) or detached
+(`PATCH /runs/:id { "plan_id": null }`) later, so a plan may end up with
+`run_count: 0`. That plan stays visible and is not deleted implicitly — the
+rule guards creation, not the plan's lifetime.
 
 ### `GET /api/v1/plans/:id` — any authenticated role
 - `200` → `{ "data": { ...plan } }` (with `counts`). Runs are fetched from the
@@ -110,5 +154,12 @@ deleted (PRD decision 7, 2026-10-26).
   query per list page (aggregate in SQL, not per row in the app).
 - Deleting a plan runs `update runs set plan_id = null where plan_id = $1` in the
   same transaction as the `deleted_at` update.
+- `POST /projects/:projectId/plans` inserts the plan row first, then every
+  `runs[i]` with that `plan_id`, inside the store's transaction. Reuse
+  `RunsStore.insertRun`/`PlansStore.transaction` so there is exactly one
+  transaction and no second code path for run inserts; roll back the lot on the
+  first rejected run.
+- The create response is re-read with `findWithCounts` inside the same
+  transaction, so `run_count` reflects the runs just written.
 - `GET /projects/:projectId/plans` backs `run_count` with a grouped count
   `left join`; a plan with zero runs still appears.

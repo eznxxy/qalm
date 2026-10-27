@@ -139,11 +139,10 @@ Case IDs use the form `C1042`, tabular figures, weight 500.
 │ Overview   │  Page title                         [Secondary] [Primary]   │
 │ Test cases │  ─ tabs ─────────────────────────────────────────────────── │
 │ Test runs  │  Filter bar                                                 │
-│ Test plans │  ┌───────────────────────────────────────────────────────┐  │
-│ Milestones │  │ Content (table / two-pane / report)                   │  │
-│ Reports    │  │                                                       │  │
-│ ────────── │  └───────────────────────────────────────────────────────┘  │
-│ Settings   │                                                             │
+│ Milestones │  ┌───────────────────────────────────────────────────────┐  │
+│ Reports    │  │ Content (table / two-pane / report)                   │  │
+│ ────────── │  │                                                       │  │
+│ Settings   │  └───────────────────────────────────────────────────────┘  │
 └────────────┴─────────────────────────────────────────────────────────────┘
   Sidebar 232px (collapses to 56px icons)          Content max-width: none
 ```
@@ -197,8 +196,17 @@ cases."
 
 ### 4.3 Test runs list
 
-Columns: name, milestone, status bar (the memorable element), % complete,
-assignee, due date. Filter by Open / Completed.
+Columns: name, plan, status bar (the memorable element), % complete,
+assignee, start date, due date. Filter by Open / Completed.
+
+- **The toolbar creates both things, and a plan is created with its runs.** A
+  plan with no runs is an empty folder, so "New plan" opens one dialog that
+  collects the plan's own fields and one or more runs (name, description,
+  dates) and posts them as a single request; nothing is saved until there is at
+  least one run, and the API inserts the plan and its runs in one transaction.
+  The runs screen stays where it is after a save. There is no plans list: the
+  runs list's Plan column and the plan detail screen are the way to a plan,
+  which carries its rollup and its Edit/Delete actions.
 
 ### 4.4 Run detail (the most-used screen)
 
@@ -294,7 +302,11 @@ assignee, due date. Filter by Open / Completed.
 
 ### 4.5 Plans, milestones
 
-Plan: a table of runs with an aggregate status bar per row and in the header.
+Plan: created from the runs screen together with at least one run (§4.3); its
+own screen shows the plan's fields, the aggregate rollup, the Edit/Delete pair
+(Admin/Lead, read-only when archived) and a table of its runs — the runs list's
+columns minus Plan, sorted by the server.
+
 Milestone: name, due date, progress bar, linked runs, days left.
 
 ### 4.6 Reports and dashboard
@@ -364,8 +376,8 @@ Do not add a UI library without Daedalus's approval.
   expands (120 ms), toast appears. No page-load animations, no hover animations
   on rows or cards.
 - Respect `prefers-reduced-motion`: replace motion with instant changes.
-- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`/`p`
-  go to cases, runs, plans, `n` new, `Ctrl+Enter` save, `P F B R S` set status
+- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`
+  go to cases, runs, `n` new, `Ctrl+Enter` save, `P F B R S` set status
   in a result form, `j`/`k` move between rows, `Esc` close.
 
 ---

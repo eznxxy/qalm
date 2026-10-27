@@ -509,6 +509,74 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.8 — Create a plan together with its runs (review feedback, medium) — DONE 2026-10-27
+- **The request, verbatim:** "add button for create a new test plan beside new run
+  buttons"; "the modal pops out with the form (same form with existing) +
+  additional button or whatever it is to create a test run inside it"; "test plan
+  cannot be save if there is no test run, minimal test run to save the test plan
+  is 1". Card 3.3's separate `/plans` list is therefore gone: a plan has no use
+  without runs, so it is created where runs are.
+- **Contract first.** `docs/api-plans.md § POST /projects/:projectId/plans` now
+  requires `runs[]` (1–20) and describes the embedded run (name required,
+  optional description/start_date/due_date, no `plan_id` and no `selection`),
+  the atomic insert, per-index validation (`runs[1].start_date`), and the rule
+  that "at least one run" applies to **create only** — deleting or detaching
+  later may leave `run_count: 0`, and such a plan stays visible. Run names are
+  not unique (plans keep `(project_id, lower(name)) where deleted_at is null`).
+- **Server.** `CreatePlanDto` gains `runs!` (`@ValidateNested`, `@ArrayMinSize(1)`,
+  `@ArrayMaxSize(PLAN_RUNS_MAX = 20)`), a `CreatePlanRunDto` (whitelisted, so
+  `plan_id`/`selection` in a body are rejected rather than silently ignored), and
+  `PlansService.create` inserts the plan and its runs in one transaction through
+  the `RunsStore` that `RunsModule` now exports — a rejected run rolls the plan
+  back. Date order is validated once, by the shared `runs/date-order.ts`, with
+  indexed field names. Specs: `plans/dto.spec.ts`, rewritten service spec with
+  rollback assertions, e2e `plans` suite (27 tests, includes create-with-runs and
+  the all-or-nothing case).
+- **Web.** The runs toolbar and its empty state grow **New plan** beside **New
+  run**. `web/src/components/plans/PlanWithRunsDialog.tsx` collects the plan's
+  three fields (`Plan name` / `Plan description` / `Plan due date`, labelled so a
+  run's `Name`/`Description`/`Due date` stay unambiguous) plus one fieldset per
+  run (`Run 1`, …) with Name, Start date, Due date and Description; Run 1 is
+  there on open, **Add run** stops at 20, each row has its own Remove, and the
+  contract's floor is surfaced rather than hidden: at zero runs the dialog says
+  "A plan needs at least one run before it can be saved" and Create is disabled
+  with a `DisabledHint`. Server details are matched against
+  `/^(name|description|due_date|runs|runs\[\d+\]\.(name|description|start_date|due_date))$/`
+  so `runs[1].name` lands on that run's field and anything else becomes the
+  form-level error. A save refreshes plans **and** runs and stays on the screen.
+- **The plans list is gone; the plan stays reachable.** `/plans` (page, CSS,
+  `plan-url.ts` and its test, the page test), its sidebar item, its `p:
+  "/plans"` shortcut, the `NavIcon` "plans" case and the `g p` help entry are
+  deleted. The Runs table's Plan cell is now the route into a plan:
+  `runTableColumns` takes `onOpenPlan` and renders the name as a
+  `run-title-link` button (`aria-label="Open plan <name>"`) pushing
+  `/plans/:id?project=`. `/plans/[id]` keeps its rollup and Runs table, gains the
+  **Edit plan** / **Delete plan** pair (Admin/Lead, hidden on archived projects
+  with a read-only note — hence the extra `GET /projects/:id`), and both of its
+  back-links now read "← Test runs". Edit reuses `PlanFormDialog` (`mode="edit"`;
+  its styles moved to `plan-dialog.css`), Delete reuses `ConfirmDialog` and says
+  the runs survive before navigating to the runs list.
+- Verified: server `tsc`/`eslint` clean, jest **457** (28 suites); web
+  `tsc`/`eslint` clean, jest **575** (40 suites) — new dialog tests cover the
+  default run, add/remove renumbering, the 20-run cap, the zero-run block, start
+  ≤ due, indexed server errors and the busy state; the runs page tests cover the
+  one-request payload, the plans+runs refresh with no navigation, and the Plan
+  cell opening `/plans/pl-1?project=p-1`; the plan detail tests cover edit,
+  delete-with-surviving-runs, Tester (no controls) and archived (read-only).
+  Live on Webshop QA, in the signed-in **Tess Tester** session: the sidebar has
+  no Test plans item, `/plans?project=…` returns the app's 404, the `?` dialog
+  lists only `g c` / `g r`, the runs list keeps its Plan column with "Open plan
+  Plan one" in every planned row (clicking it lands on
+  `/plans/<id>?project=…`), that page's back-link reads "← Test runs", its Runs
+  table is Name / Status / % complete / Assignees / Start date / Due date with no
+  Plan column, and a Tester sees the "creating or editing runs needs the Admin or
+  Lead role" note instead of the two buttons. **Gap:** the writer-only half —
+  the New plan button, the dialog itself, and Edit/Delete — was not reachable in
+  that session, so it is covered by the unit tests below and needs the reviewer's
+  own Admin/Lead pass before QA card 4.1.
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING
