@@ -238,6 +238,17 @@ them.
     the indexed `runs[i].name` when a plan is created with its runs), the same
     rule plan names already follow. A deleted run frees its name, and renaming
     a run to a different case of its own name stays allowed.
+12. **A new plan may adopt runs that have no plan** (2026-10-27). Creating a
+    plan already makes new runs; it now also accepts existing ones, so a run
+    started before the plan was written can still land in it. The picker offers
+    only runs **with no plan** in the same project, and only those are
+    accepted: attaching never pulls a run out of another plan, which would
+    silently rearrange a colleague's work. A run that is already planned must
+    be detached first (`plan_id: null`). An attached run keeps everything it
+    has — name, dates, items, results, attachments — and only gains the
+    `plan_id`; a plan therefore still cannot be born empty, and the "at most
+    20 runs" cap counts new and attached runs together. Deleting that plan
+    later detaches those runs, exactly like the runs it created (decision 7).
 
 ## Phasing (for the task breakdown, after approval)
 - **Phase 1 — contracts** (Daedalus): this PRD + `docs/api-runs.md` +

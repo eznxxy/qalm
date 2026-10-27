@@ -207,6 +207,14 @@ assignee, start date, due date. Filter by Open / Completed.
   The runs screen stays where it is after a save. There is no plans list: the
   runs list's Plan column and the plan detail screen are the way to a plan,
   which carries its rollup and its Edit/Delete actions.
+- **Existing runs can join the plan.** Below the run rows, the same dialog
+  lists the project's runs that have no plan yet, each with a checkbox, its
+  status and its progress; ticking one adds it to the plan as a read-only row
+  (name, dates and item count, no fields to edit) with a Remove action. Only
+  unplanned runs are offered — a run already in another plan is not listed and
+  the API refuses it — so a save never moves work out of someone else's plan.
+  The "at least one run, at most 20" rule counts new and attached runs
+  together, and a rejected request points at the offending row.
 - **One live run per name per project.** A run name another live run in the
   project already uses — ignoring case — is refused on create and rename, with
   the message on the Name field and nothing saved. A deleted run stops holding

@@ -638,6 +638,73 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.10 — Attach existing unplanned runs to a new plan (review feedback, medium) — DONE 2026-10-27
+- **The request:** a new plan should be able to take runs that already exist,
+  not only the ones typed into the dialog — a run started before its plan was
+  written otherwise had no way in except being deleted and recreated.
+- **Contract first.** Updated before any code: `docs/api-plans.md` (validation
+  table, request example, `201`/`400`/`409` semantics, a new "Attaching
+  existing runs" section and implementation notes), `docs/PRD-plans-runs.md`
+  decision 12, and `docs/DESIGN.md` §4.3. The rules: `runs` becomes optional
+  and `run_ids` is new; a plan still needs **at least one run and at most 20**
+  across the two; every id must be a live run of the same project with
+  `plan_id: null`, so attaching can never pull a run out of another plan;
+  an attached run keeps its name, dates, items, results and attachments and
+  only gains the `plan_id`; deleting the plan later detaches it like any other
+  run. Shape errors name the array (`run_ids`, the way `case_ids` does);
+  cross-row failures name the index — `run_ids[i]` with `unknown run`,
+  `already in a plan` or `duplicate in request`.
+- **Server.** `CreatePlanDto.runs` is now `@IsOptional()` (the `@ArrayNotEmpty`
+  floor is gone) and `run_ids` is `@IsArray @ArrayMaxSize(20) @IsUUID('all',
+  { each: true })`. `PlansService.create` owns the rules that span both arrays:
+  the combined 1–20 check reports `field: "runs"`, and a repeated id is
+  rejected before the transaction (`run_ids[i]`, `duplicate in request`). Inside
+  the transaction, after the new runs are inserted, `attachRuns` locks the
+  requested rows with `RunsStore.findLiveByIdsForUpdate` (`FOR UPDATE`, live
+  only), rejects an id that is missing, belongs to another project or already
+  has a plan, then attaches the whole batch with one
+  `RunsStore.attachToPlan` (`UPDATE … WHERE id = ANY($1::uuid[])` touching only
+  `plan_id`, `updated_by`, `updated_at`). A rejected attach rolls the plan and
+  any new run back with it. Specs: `plans.service.spec.ts` (+8: attach, mix,
+  no-run, combined cap, duplicate id, unknown/other-project/deleted, already
+  planned, rollback), `dto.spec.ts` (optional arrays, both caps, non-UUID →
+  `run_ids`), `plans` e2e (new "create with attached runs" describe, 7 tests:
+  attach and keep every field, results counted, mixed, unknown/other-project/
+  deleted, already planned, duplicate + atomic rollback, 403 for Tester/Viewer;
+  plus the combined-cap case and `runs: []` with `run_ids` — the dialog's exact
+  body).
+- **Web.** `CreatePlanInput.runs` is optional and `run_ids?: string[]` is new.
+  `PlanWithRunsDialog` gains an **Attach existing runs** fieldset: one row per
+  unplanned run (name, status, % complete, date range) with **Attach**; ticking
+  one turns it into a read-only row (*"Attached to this plan; its fields stay as
+  they are"*) with **Remove**, and the counter reads
+  `N new · M attached · T of 20 runs`. The cap, the zero-run block and Save all
+  count both lists, so a plan whose only run is attached can be saved and
+  nothing can exceed 20. `run_ids[i]` server errors land on the attached row,
+  `run_ids` on the fieldset, and the picker has loading / empty / error states
+  with **Try again**. The runs page fetches `GET /runs?plan_id=none&limit=100`
+  on demand when the dialog opens (so a run in another plan is never offered),
+  extends `PLAN_FIELD_PATTERN` with `run_ids` / `run_ids[i]`, and adds
+  `run_ids` to the POST body only when at least one run is attached. Styles in
+  `plan-with-runs-dialog.css`; no schema change (`runs.plan_id` already
+  existed).
+- Verified: server `tsc`/`eslint` clean, jest **472** (28 suites), `plans`
+  e2e **36**; full e2e **276** across 11 suites (the attach path runs against
+  the scratch DB, real Postgres locks and all). Web `tsc`/`eslint` clean, jest
+  **587** (40 suites) — new dialog tests cover attach-only saves (`runIds`
+  payload, no new row), Remove putting the run back in the picker, the shared
+  20 cap, `run_ids[0]` on the row, and the loading/empty/error + retry states;
+  new page tests cover the `plan_id=none` fetch, the `runs: []` + `run_ids`
+  payload with no navigation, the row-level server error and the picker retry.
+  **Gap:** the picker itself is writer-only (`canWritePlans`, Admin/Lead) and
+  there are no such credentials in this session, so the visible flow —
+  including the read-only attached row and the cap hint — is covered by tests
+  only and needs the reviewer's own pass before QA card 4.1. Nothing was pushed
+  and the dev database was not touched (no rows created or deleted for this
+  check).
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING
