@@ -458,6 +458,31 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   `— ` indentation still says where the suite sits. A `?suite=` for a suite the
   run no longer touches stays selectable as "Selected section" instead of
   silently resetting to "All sections".
+- **The plan detail's Runs table is now the runs table** (eleventh review pass:
+  "change this table runs same with the table in test run page"). Card 3.3's
+  decision (2) — a compact table private to the plan screen — had drifted: it
+  showed a `Run` / `Status` (chip) / `Progress` / `Due date` table while the runs
+  screen had grown to Name / Plan / Status (`StatusBar`) / % complete /
+  Assignees / Start date / Due date. The columns now come from one factory,
+  `web/src/components/runs/runTable.tsx` (`runTableColumns`), and the styles from
+  one `runTable.css`; both callers pass their own row action and root class. The
+  plan page omits `planNames`, which is exactly what drops the Plan column
+  (every row would repeat the page title) — 6 columns, and the 12% the Plan
+  column had goes to Name (26%) and Status (20%) on a fixed layout that still
+  totals 100%. The Open/Completed chip is gone: run status is now the status bar
+  plus % complete, as on the runs list, and the name cell is the same
+  `Open run …` button rather than a link, so both screens open a run the same
+  way (`router.push`, covered by a new plan-detail test). Sorting stays **off**
+  on the plan table on purpose: that page fetches one page of runs, so a
+  client-side sort would reorder a slice while the runs list sorts on the server
+  through `?sort=`; turning it on means teaching the plan page the sort contract
+  first. `.pd-run-status`, `.pd-run-open/completed`, `.pd-col-*` and
+  `.pd-run-link` are deleted, as are the width rules that moved out of
+  `runs.css`. Checked live on `Plan one` (Webshop QA): headers Name / Status /
+  % complete / Assignees / Start date / Due date in that order,
+  `table-layout: fixed`, 259/200/130/130/140/140px of 998, and `/runs` still
+  7 columns at 220/120/160/120/110/130/140. Jest 581 (was 580): the new test is
+  the plan page opening a run from its name.
 - Verified: web `tsc`/`eslint` clean, jest **580** (41 suites) including seven
   new `StatusPie` tests, four drawer attachment tests (staged image viewer +
   revoke, uploaded PDF `iframe` after a fetch, icon-only removal, the actions as
