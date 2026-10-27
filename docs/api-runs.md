@@ -59,7 +59,7 @@ Cases referenced here are defined in `docs/api-cases.md`.
 | `plan_id` | optional UUID of a plan in the same project; `null` detaches |
 | `due_date` | optional `YYYY-MM-DD`; `null` clears |
 | `start_date` | optional `YYYY-MM-DD`; `null` clears; when both dates are set, `start_date` must be **on or before** `due_date` (`400` otherwise) |
-| `selection` | create-only; `{ "case_ids"?: [uuid], "suite_id"?: uuid, "include_descendants"?: bool (default true) }`. Omit for an empty run |
+| `selection` | create-only; `{ "case_ids"?: [uuid], "suite_ids"?: [uuid], "include_descendants"?: bool (default true) }`. Omit for an empty run. `suite_ids` holds 1–20 distinct suites of the project; every listed suite's subtree is unioned with `case_ids`. Always plural: there is no singular `suite_id` alias |
 
 A run may hold at most **2,000 items**; exceeding it is `400`.
 
@@ -159,18 +159,25 @@ Paginated list for the runs screen (§4.3).
   "due_date": "2026-11-14",
   "selection": {
     "case_ids": ["018f2c57-2b3c-7d4e-9f50-6a7b8c9d0e1f"],
-    "suite_id": "018f2a41-7c3d-7a1e-9b2f-4a5b6c7d8e9f",
+    "suite_ids": [
+      "018f2a41-7c3d-7a1e-9b2f-4a5b6c7d8e9f",
+      "018f2a42-8d4e-7b2f-8c30-5b6c7d8e9f01"
+    ],
     "include_descendants": true
   }
 }
 ```
-- Materialises one run item per live case in `selection` (union of `case_ids`
-  and the `suite_id` subtree), deduplicated, `position` = case order
-  (`case_number` ascending). An omitted `selection` or empty result creates an
-  **empty** run (items can be added later).
+- Materialises one run item per live case in `selection` — the union of
+  `case_ids` and every `suite_ids` subtree — deduplicated, `position` = case
+  order (`case_number` ascending). An omitted `selection` or empty result
+  creates an **empty** run (items can be added later).
+- `suite_ids` is deduplicated by the server; selecting a parent and one of its
+  children is therefore allowed and still yields one item per case. The same
+  `include_descendants` applies to every listed suite.
 - `201` → `{ "data": { ...run } }` with `counts.total` = items created.
-- `400` `VALIDATION_ERROR` — bad fields, unknown suite, `start_date` after
-  `due_date`, or more than 2,000 items.
+- `400` `VALIDATION_ERROR` — bad fields, more than 20 `suite_ids`, an unknown
+  suite (`selection.suite_ids`, or `selection.suite_ids[i]` when the bad id can
+  be named), `start_date` after `due_date`, or more than 2,000 items.
 - `409` `CONFLICT` — the project is archived, or a live run in the project
   already has this name (case-insensitive; details name the field `name`).
 - `404` — project or referenced case/suite unknown; `403` — non-writer.
@@ -426,10 +433,12 @@ Backs the case drawer's **Linked runs** tab (§4.2). Newest run first.
   `lateral join` to `results` ordered by `(created_at desc, id desc) limit 1`.
   Counts, the item list's `status`, and the run/plan rollups all use that.
 - **Selection on create**: reuse the suite-subtree recursive CTE from
-  `docs/api-cases.md` (`include_descendants`) and union with explicit
-  `case_ids`; insert `run_items` with the case's `case_number` → `case_display_id`,
-  title, priority, suite id and a jsonb snapshot of `case_steps`, in one
-  transaction, ordered by `case_number` for `position`.
+  `docs/api-cases.md` (`include_descendants`) once per `suite_ids` row, union
+  the subtrees with explicit `case_ids`; insert `run_items` with the case's
+  `case_number` → `case_display_id`, title, priority, suite id and a jsonb
+  snapshot of `case_steps`, in one transaction, ordered by `case_number` for
+  `position`. Validating the suites can be one query over
+  `suite_ids = any($1)`; the item count is then checked against 2,000.
 - **Attachments**: store bytes under a configured `STORAGE_DIR` (env, default
   `./storage`) at `<STORAGE_DIR>/attachments/<projectId>/<attachmentId>` — the
   `attachmentId` is the storage key, so the original filename never becomes a

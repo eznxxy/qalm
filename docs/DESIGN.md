@@ -226,6 +226,13 @@ assignee, start date, due date. Filter by Open / Completed.
   its name, and changing only the case of a run's own name is allowed. The New
   plan dialog catches a repeat among its own run rows before sending, so that
   case never reaches the API.
+- **New run takes whole suites, and several of them.** The Cases fieldset's
+  suite picker adds one suite per choice and lists the chosen ones as removable
+  chips under the search field; a single "Include descendants" checkbox applies
+  to all of them. The run is the union of those subtrees plus any specific cases
+  added by hand, so overlapping picks never duplicate an item. A search field
+  with chips keeps the fieldset short — the full suite tree already lives on
+  Test cases, and a run needs a handful of suites, not the hierarchy.
 
 ### 4.4 Run detail (the most-used screen)
 

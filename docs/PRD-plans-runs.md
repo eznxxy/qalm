@@ -161,9 +161,10 @@ Viewers get `403` on every write.
   audit. New runs cannot select a deleted case.
 
 ## Acceptance criteria
-1. An Admin or Lead creates a run by selecting an explicit set of cases and/or a
-   suite (with or without descendants); one run item is created per live case,
-   `position` set, status `untested`, and no case appears twice in one run.
+1. An Admin or Lead creates a run by selecting an explicit set of cases and/or
+   one or more suites (with or without descendants); one run item is created per
+   live case, `position` set, status `untested`, and no case appears twice in one
+   run.
 2. Creating a run with the same case already present skips it and reports the
    skipped count rather than duplicating (`200` on the add-cases path).
 3. A run header shows a status bar (§5, segment order Passed, Retest, Blocked,
@@ -249,6 +250,17 @@ them.
     `plan_id`; a plan therefore still cannot be born empty, and the "at most
     20 runs" cap counts new and attached runs together. Deleting that plan
     later detaches those runs, exactly like the runs it created (decision 7).
+13. **A new run can take several whole suites** (review feedback, 2026-10-27).
+    A tester often covers sibling areas in one pass — Payments and Accounts, not
+    one suite at a time — and repeating "New run" per suite splits the pass
+    across runs. The create selection therefore carries `suite_ids` (1–20,
+    distinct) instead of a single `suite_id`; the cases are the union of every
+    listed suite's subtree (each honouring `include_descendants`) plus the
+    explicitly picked `case_ids`, de-duplicated, so picking a parent and one of
+    its children, or a suite and a case inside it, still creates one item per
+    case. The 2,000-item cap is unchanged and still applies to the union. When
+    no suite is chosen the field is simply absent, so a run made only of
+    explicit cases or of no cases at all is unaffected.
 
 ## Phasing (for the task breakdown, after approval)
 - **Phase 1 — contracts** (Daedalus): this PRD + `docs/api-runs.md` +

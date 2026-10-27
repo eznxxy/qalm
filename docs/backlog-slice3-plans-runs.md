@@ -759,6 +759,51 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.13 — New run: pick several whole suites (review feedback, medium) — DONE 2026-10-27
+- **The request, as reported:** "add an option to select multiple suites,
+  currently its only can select a single test suites". A pass usually covers
+  sibling areas together, and one run per suite split the same work across
+  separate runs.
+- **Contract (docs/api-runs.md, approved 2026-10-27).** `selection.suite_ids`
+  (`uuid[]`, 1–20, distinct) **replaces** the singular `suite_id`; there is no
+  alias, this app is the only client. The run's items are the union of every
+  listed suite's subtree — each honouring `include_descendants`, which now
+  applies to all of them — plus `case_ids`, de-duplicated, so a parent picked
+  beside its child (or a suite beside a case inside it) still creates one item
+  per case. Omitted means no suites; `suite_ids: []` is a `400` (omit the field
+  instead); more than 20 is a `400` on `selection.suite_ids`; an unknown suite
+  names the row (`selection.suite_ids[i]`) when it can. The 2,000-item cap is
+  unchanged and applies to the union. Also reflected in `PRD-plans-runs.md`
+  (acceptance criterion 1, decision 13) and `DESIGN.md` §4.3.
+- **Server.** `RUN_SELECTION_SUITES_MAX` in `runs.constants.ts`;
+  `RunSelectionDto.suite_ids` with `ArrayMinSize(1)`/`ArrayMaxSize(20)`/UUID per
+  item; `findSuiteIds` validates the list in one query and
+  `suiteSubtreeIdsMany` unions the subtrees with `UNION` (not `UNION ALL`, so
+  overlaps collapse); `materializeSelection` keeps the caller's order when
+  naming a bad id and sends the distinct list to the existing `selectCases`.
+  The singular `suiteSubtreeIds` stays for the item filter, which still takes
+  one suite.
+- **Web.** `RunSelection.suite_ids`; the New run dialog's picker became an
+  "add" control that always shows a blank search box — choosing appends a chip
+  and removes that suite from the list, so it cannot be added twice — with a
+  removable chip per chosen suite under it, one shared "Include descendants"
+  checkbox (disabled until a suite is picked), and the control disabled at 20
+  with the cap explained in the hint. Removals put the suite back in the list.
+  `runs/page.tsx` now shows a `selection.*` server error by the picker instead
+  of as a bare form error.
+- Verified: server jest **115** (5 suites), e2e `runs.e2e-spec` +
+  `case-runs.e2e-spec` **42** passed (new tests cover a two-suite union with a
+  repeated id, a nested pick, and the `selection.suite_ids[0]` error); web jest
+  **594** (40 suites) with new dialog tests for two suites in added order,
+  removing one, a chosen suite disappearing from the list and returning after
+  removal, the shared descendants toggle and the field being omitted when every
+  chip is removed. `tsc` and `eslint` clean on both sides. Nothing pushed.
+- **Open risk:** the chip picker is covered by jest only — no Admin/Lead
+  credentials in this session, so the visible dialog still needs the reviewer's
+  own pass before QA card 4.1 (same gap as 3.10/3.11).
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING
@@ -770,8 +815,9 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   shortcuts, close/reopen guard, item add/remove guard, attachment upload +
   survives reload, plan rollup + detach-on-delete, Linked runs tab, §6 states.
 - Also recheck the review-feedback fixes end to end: an attach-only plan saves
-  without a new-run name (3.11), and leaving Test cases for Test runs and coming
-  back starts with nothing selected (3.12).
+  without a new-run name (3.11), leaving Test cases for Test runs and coming
+  back starts with nothing selected (3.12), and a run created from two suites
+  (plus a nested one) holds each case exactly once (3.13).
 - Report + failure cards with repro steps if any.
 
 ---
