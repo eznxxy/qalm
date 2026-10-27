@@ -10,15 +10,15 @@
 .stp-root {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-6);
   flex-wrap: wrap;
 }
 
 .stp-figure {
   position: relative;
   flex: 0 0 auto;
-  width: 88px;
-  height: 88px;
+  width: 132px;
+  height: 132px;
 }
 
 .stp-chart {
@@ -57,35 +57,31 @@
 
 .stp-percent {
   color: var(--ink-900);
-  font-size: 18px;
+  font-size: 26px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 30px;
 }
 
 .stp-percent-label {
   color: var(--text-muted);
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .stp-legend {
   list-style: none;
   margin: 0;
   padding: 0;
-  /* A compact block beside the donut (3 × 2 at this width), not rows stretched
-   * across the whole header — a count 400px from its label is unreadable. */
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-5);
-  max-width: 24rem;
-  flex: 0 1 auto;
+  /* Two columns of three beside the donut — a count stays next to its label. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(6.5rem, 1fr));
+  gap: var(--space-2) var(--space-6);
 }
 
 .stp-legend-row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 6.5rem;
   font-size: 13px;
   line-height: 18px;
 }

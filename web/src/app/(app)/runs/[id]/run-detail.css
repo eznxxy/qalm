@@ -96,8 +96,16 @@
   line-height: 16px;
 }
 
+/* The rollup card: the one memorable number, given its own surface so the
+ * filters below stay a separate band. Hugs its content — a full-width card
+ * would leave the legend swimming in white space. */
 .rd-summary {
-  margin: var(--space-3) 0 var(--space-4);
+  display: inline-block;
+  margin: var(--space-4) 0;
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
 }
 
 /* ---------- filter bar ---------- */
