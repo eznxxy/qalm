@@ -142,6 +142,7 @@ const ROWS: Run[] = [
     id: "r-1",
     name: "Release 2.4 smoke",
     plan_id: "pl-1",
+    start_date: "2026-11-01",
     due_date: "2026-11-14",
     assignee_ids: ["u-1", "u-2"],
   }),
@@ -313,7 +314,7 @@ describe("runs list", () => {
     expect(listRunCalls()[0]).toContain("status=open");
   });
 
-  it("maps the columns: plan name, status bar, % complete, assignees, due date", async () => {
+  it("maps the columns: plan name, status bar, % complete, assignees, start and due date", async () => {
     mockApi();
     await renderPage();
 
@@ -333,8 +334,35 @@ describe("runs list", () => {
     expect(within(table).getByText("2 assignees")).toBeInTheDocument();
     expect(within(table).getByText("No items")).toBeInTheDocument();
 
-    // The due date is a plain YYYY-MM-DD rendered without a day shift.
+    // Start and due dates are plain YYYY-MM-DD rendered without a day shift,
+    // and Start date sits immediately before Due date.
+    expect(within(table).getByText("1 Nov 2026")).toBeInTheDocument();
     expect(within(table).getByText("14 Nov 2026")).toBeInTheDocument();
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent?.trim() ?? "");
+    const startIndex = headers.findIndex((header) => header.includes("Start date"));
+    const dueIndex = headers.findIndex((header) => header.includes("Due date"));
+    expect(startIndex).toBeGreaterThan(-1);
+    expect(dueIndex).toBe(startIndex + 1);
+  });
+
+  it("shows an em dash in Start date when the run has none", async () => {
+    mockApi();
+    await renderPage();
+
+    const table = await screen.findByRole("table", { name: "Test runs" });
+    await within(table).findByText("Release 2.4");
+
+    const startIndex = within(table)
+      .getAllByRole("columnheader")
+      .findIndex((cell) => cell.textContent?.includes("Start date"));
+
+    const row = screen.getByText("Ad-hoc checkout").closest("tr");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getAllByRole("cell")[startIndex]).toHaveTextContent(
+      "—"
+    );
   });
 
   it("switches the Open/Completed filter through the URL", async () => {

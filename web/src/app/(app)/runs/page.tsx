@@ -433,6 +433,19 @@ export default function RunsPage() {
       render: (row) => assigneeLabel(row.assignee_ids),
     },
     {
+      key: "start_date",
+      header: "Start date",
+      className: "run-col-start",
+      render: (row) =>
+        row.start_date ? (
+          <time dateTime={row.start_date}>
+            {formatDateOnly(row.start_date)}
+          </time>
+        ) : (
+          <span className="muted">—</span>
+        ),
+    },
+    {
       key: "due_date",
       header: "Due date",
       sortable: true,
@@ -664,7 +677,7 @@ function RunsSkeleton() {
       <div className="runs-heading">
         <h1>Test runs</h1>
       </div>
-      <TableSkeleton rows={6} columns={6} label="Loading test runs" />
+      <TableSkeleton rows={6} columns={7} label="Loading test runs" />
     </div>
   );
 }
