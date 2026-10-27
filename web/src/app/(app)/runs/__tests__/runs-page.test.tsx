@@ -672,6 +672,19 @@ describe("runs list", () => {
       within(dialog).queryByText("A run with this name already exists.")
     ).not.toBeInTheDocument();
     expect(mockRouterState.push).not.toHaveBeenCalled();
+
+    // Card 3.14: the conflict belongs to that attempt, not to the dialog.
+    // Cancel and reopen — the empty Name must not still read "already in use".
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "New run" })).toBeNull()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "New run" }));
+    const reopened = await screen.findByRole("dialog", { name: "New run" });
+    expect(within(reopened).queryByText("already in use")).not.toBeInTheDocument();
+    expect(within(reopened).getByLabelText("Name")).not.toHaveAttribute(
+      "aria-invalid"
+    );
   });
 
   it("creates a plan together with its run, refreshes both lists and stays put", async () => {

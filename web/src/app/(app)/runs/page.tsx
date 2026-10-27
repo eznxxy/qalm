@@ -339,6 +339,19 @@ export default function RunsPage() {
   }>({});
   const [createFormError, setCreateFormError] = useState<string | null>(null);
 
+  /**
+   * Open the New run dialog with a clean slate. The server's field errors
+   * belong to the attempt that produced them, so re-opening the dialog — after
+   * Cancel, or after switching project — must not mark an empty Name
+   * "already in use" from the previous attempt (QA card 3.14). The dialog
+   * itself is mounted only while `creating`, so its own state resets on close.
+   */
+  function openRunDialog(): void {
+    setCreateFieldErrors({});
+    setCreateFormError(null);
+    setCreating(true);
+  }
+
   async function submitRun(
     values: RunFormValues,
     selection: RunSelection | undefined
@@ -619,7 +632,7 @@ export default function RunsPage() {
         <button
           type="button"
           className="primary"
-          onClick={() => setCreating(true)}
+          onClick={openRunDialog}
         >
           New run
         </button>
@@ -676,7 +689,7 @@ export default function RunsPage() {
             <button
               type="button"
               className="primary"
-              onClick={() => setCreating(true)}
+              onClick={openRunDialog}
             >
               New run
             </button>
