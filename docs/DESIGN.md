@@ -220,6 +220,9 @@ assignee, due date. Filter by Open / Completed.
   fixed status order. The status bar stays the element for tables (§4.3, §4.5).
 - **Add result** form: status (segmented buttons with shortcuts P, F, B, R, S),
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
+  Hovering or focusing a status button previews that status — its tint as the
+  fill, its solid as the edge, ink label — so the choice is legible before the
+  click; the chosen button is the only one filled solid.
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
 - Failed results require a comment. Show the reason inline, not in a toast.

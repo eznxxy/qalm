@@ -331,10 +331,18 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   percentage moved into the donut. The legend first rendered as full-width grid
   rows (a count stretched 400px from its label) and was tightened to a compact
   3 × 2 block beside the donut.
-- **Hover contrast on the result status buttons.** `.rd-seg:hover` used to change
-  only the border; it now also takes `--brand-tint` background, `--ink-700`
-  border and `--ink-900` label, and the active (brand) button deepens to
-  `--accent-strong`. Same tokens as the rest of the app — no new colours.
+- **Hover contrast on the result status buttons.** First pass (brand tint +
+  darker border/label) was still too quiet on the real screen — the reviewer's
+  screenshot showed the hovered button almost identical to its neighbours.
+  Second pass previews the status itself: each button carries a
+  `.rd-seg-<status>` hook that sets `--seg` / `--seg-tint` from the status pair,
+  and hover/focus draws that tint as the fill plus the status solid as a 2px
+  edge (1px border + 1px inset ring, so nothing shifts) with `--ink-900` on the
+  label. The label stays ink deliberately: 13px text in the status colour on its
+  own tint only reaches ~3.4:1 (`--passed` on `--passed-tint`), while the solid
+  on the edge clears the 3:1 UI floor. The chosen status keeps its solid brand
+  fill and is excluded from the preview. The `button.` prefix on the rule exists
+  only to out-rank the global secondary-button hover in `globals.css`.
 - **`×` instead of "Remove <filename>".** Staged files and uploaded attachments
   both render an icon-only `×` (`.rd-icon-btn`, 22px, destructive hover) with
   `aria-label="Remove <filename>"` and `title="Remove"`, so the file name stays
@@ -344,10 +352,13 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   link) and the run-detail pie test. Live as Tester on `Run October` — header
   group reads "Run October results by status", centre `33% done`, legend
   `Passed 1 · Retest 0 · Blocked 0 · Failed 0 · Skipped 0 · Untested 2`.
-  **Not verified live:** the status-button hover and the `×` control need a
-  writer (Admin/Lead) session and the run's items are unassigned, so the result
-  form never renders for the Tester account; both are covered by unit tests
-  only until a writer login or screenshot is available.
+  **Verification note:** the reviewer's Admin session showed the first hover pass
+  was too quiet, so the second pass was checked in the browser against the app's
+  own served stylesheet (button classes rendered on the run page, pointer over
+  Failed): fill `#fbe9e9`, border and inset ring `#c23a3a`, label `#17202e`.
+  The `×` control is still unit-tested only — it needs a writer session with an
+  item open, and the Tester account never gets the result form because every item
+  in these runs is unassigned.
 
 ---
 
