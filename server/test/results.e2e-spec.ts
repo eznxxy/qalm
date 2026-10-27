@@ -485,6 +485,44 @@ describe('Results & attachments API (integration)', () => {
       expect(Buffer.compare(downloaded.body as Buffer, payload)).toBe(0);
     });
 
+    it('keys the allow-list off the extension on every OS', async () => {
+      const { runId, itemId } = await createRunWithItem();
+      const result = await createResultOk(runId, itemId, { status: 'passed' });
+
+      // A non-canonical OS MIME (Windows uses application/octet-stream in some
+      // paths) must not block a valid file: the extension decides, and the
+      // stored type is canonical.
+      const jpeg = await uploadAttachment(tokens['admin']!, result.id, {
+        name: 'Evidence.JPEG',
+        contentType: 'application/octet-stream',
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      });
+      expect(jpeg.status).toBe(201);
+      expect(jpeg.body.data).toMatchObject({
+        filename: 'Evidence.JPEG',
+        content_type: 'image/jpeg',
+      });
+
+      // Windows reports application/x-zip-compressed for `.zip`; a `.zip` is
+      // refused everywhere, whatever the part claims. Same for the types the
+      // previous MIME list used to accept.
+      const zip = await uploadAttachment(tokens['admin']!, result.id, {
+        name: 'evidence.zip',
+        contentType: 'application/x-zip-compressed',
+        buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+      });
+      expect(zip.status).toBe(400);
+      expect(zip.body.error.code).toBe('VALIDATION_ERROR');
+
+      const gif = await uploadAttachment(tokens['admin']!, result.id, {
+        name: 'anim.gif',
+        contentType: 'image/gif',
+        buffer: Buffer.from('GIF89a'),
+      });
+      expect(gif.status).toBe(400);
+      expect(gif.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
     it('400s a missing file, a disallowed type, an oversized file and a wrong field name', async () => {
       const { runId, itemId } = await createRunWithItem();
       const result = await createResultOk(runId, itemId);

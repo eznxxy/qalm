@@ -52,16 +52,36 @@ export const ATTACHMENT_MAX_PER_RESULT = 5;
 export const ATTACHMENT_MAX_BYTES = 10 * 1_048_576;
 /** Original filename, trimmed 1–255 chars (never used as a storage path). */
 export const ATTACHMENT_FILENAME_MAX = 255;
-export const ATTACHMENT_TYPES = [
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-  'text/plain',
-  'text/csv',
-  'application/zip',
-] as const;
+/**
+ * Attachment allow-list: extension → canonical content type (PRD §Attachment).
+ *
+ * Keyed by extension, not MIME, so the rule is identical on every OS. The
+ * browser's type string is OS data — Windows reports a `.zip` as
+ * `application/x-zip-compressed` and a `.csv` as `application/vnd.ms-excel` —
+ * while the filename is the same everywhere. The trade-off is that the name is
+ * trusted, not the bytes; the download is always served as an attachment with
+ * the stored canonical type, never sniffed.
+ */
+export const ATTACHMENT_TYPES = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+} as const;
+
+/** The allowed extensions, for error messages and docs (`accept` on the web). */
+export const ATTACHMENT_EXTENSIONS = Object.keys(ATTACHMENT_TYPES) as AttachmentExtension[];
+export type AttachmentExtension = keyof typeof ATTACHMENT_TYPES;
+
+/** Canonical content type for a filename, or `null` when its extension is not allowed. */
+export function attachmentContentType(filename: string): string | null {
+  const dot = filename.lastIndexOf('.');
+  if (dot < 0) return null;
+  const extension = filename.slice(dot).toLowerCase() as AttachmentExtension;
+  if (!(extension in ATTACHMENT_TYPES)) return null;
+  return ATTACHMENT_TYPES[extension];
+}
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_LIMIT = 25;

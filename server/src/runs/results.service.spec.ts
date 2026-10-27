@@ -613,6 +613,29 @@ describe('ResultsService (unit, in-memory results)', () => {
       expect([...storage.files.values()]).toEqual([Buffer.from('abc')]);
     });
 
+    it('derives the content type from the extension, not the OS-reported MIME', async () => {
+      const run = store.addRun();
+      const item = store.addItem(run.id);
+      const result = store.addResult(item.id, { status: 'passed' });
+
+      // Windows reports plenty of valid files as `application/octet-stream` or
+      // with no type at all; the extension is the part the contract pins, so it
+      // alone decides, and the stored type is canonical.
+      const jpeg = await service.uploadAttachment(
+        AS('admin'),
+        result.id,
+        upload({ originalname: 'Evidence.JPEG', mimetype: 'application/octet-stream' }),
+      );
+      expect(jpeg).toMatchObject({ filename: 'Evidence.JPEG', content_type: 'image/jpeg' });
+
+      const pdf = await service.uploadAttachment(
+        AS('admin'),
+        result.id,
+        upload({ originalname: 'report.pdf', mimetype: '' }),
+      );
+      expect(pdf.content_type).toBe('application/pdf');
+    });
+
     it('400s a missing file, a disallowed type, an empty buffer and an oversized file', async () => {
       const run = store.addRun();
       const item = store.addItem(run.id);
@@ -626,7 +649,20 @@ describe('ResultsService (unit, in-memory results)', () => {
 
       await expectFile(service.uploadAttachment(AS('admin'), result.id, undefined));
       await expectFile(
-        service.uploadAttachment(AS('admin'), result.id, upload({ mimetype: 'application/exe' })),
+        service.uploadAttachment(
+          AS('admin'),
+          result.id,
+          upload({ originalname: 'payload.exe', mimetype: 'application/x-msdownload' }),
+        ),
+      );
+      // The OS MIME is irrelevant now: a `.zip` is refused even when the part
+      // claims the canonical `application/zip` that macOS/Linux report.
+      await expectFile(
+        service.uploadAttachment(
+          AS('admin'),
+          result.id,
+          upload({ originalname: 'bundle.zip', mimetype: 'application/zip' }),
+        ),
       );
       await expectFile(
         service.uploadAttachment(AS('admin'), result.id, upload({ buffer: Buffer.alloc(0) })),

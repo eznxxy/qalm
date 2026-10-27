@@ -5,10 +5,11 @@ import { ApiError } from '../errors';
 import { Queryable } from '../db/queryable';
 import { ListMeta, buildListMeta } from '../projects/projects.service';
 import {
+  ATTACHMENT_EXTENSIONS,
   ATTACHMENT_FILENAME_MAX,
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_MAX_PER_RESULT,
-  ATTACHMENT_TYPES,
+  attachmentContentType,
   DEFAULT_LIMIT,
   DEFAULT_PAGE,
 } from './runs.constants';
@@ -270,7 +271,16 @@ export class ResultsService {
 
   // --- internals ----------------------------------------------------------
 
-  /** Validates the multipart part; every failure names the `file` field. */
+  /**
+   * Validates the multipart part; every failure names the `file` field.
+   *
+   * The type comes from the filename extension, never `file.mimetype`: the
+   * browser's type string is OS data (Windows reports `.zip` as
+   * `application/x-zip-compressed`, `.csv` as `application/vnd.ms-excel`), and
+   * keying the rule off it made the allow-list machine-dependent. The
+   * extension also decides the stored `content_type`, so a `.jpeg` uploaded
+   * with an empty or bogus part type still lands as `image/jpeg`.
+   */
   private validateUpload(
     file: UploadedFile | undefined,
   ): { filename: string; contentType: string; buffer: Buffer } {
@@ -282,8 +292,12 @@ export class ResultsService {
         `filename must be 1–${ATTACHMENT_FILENAME_MAX} characters`,
       );
     }
-    if (!(ATTACHMENT_TYPES as readonly string[]).includes(file.mimetype)) {
-      throw validationError('file', `content type must be one of: ${ATTACHMENT_TYPES.join(', ')}`);
+    const contentType = attachmentContentType(filename);
+    if (!contentType) {
+      throw validationError(
+        'file',
+        `filename must end in one of: ${ATTACHMENT_EXTENSIONS.join(', ')}`,
+      );
     }
     const buffer = file.buffer;
     if (!Buffer.isBuffer(buffer) || buffer.length < 1 || buffer.length > ATTACHMENT_MAX_BYTES) {
@@ -292,7 +306,7 @@ export class ResultsService {
         `must be between 1 and ${ATTACHMENT_MAX_BYTES} bytes`,
       );
     }
-    return { filename, contentType: file.mimetype, buffer };
+    return { filename, contentType, buffer };
   }
 
   /** Only the item's newest result may be edited or carry attachments. */
