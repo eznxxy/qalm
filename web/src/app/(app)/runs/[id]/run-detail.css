@@ -98,7 +98,9 @@
 
 /* The rollup row: the pie card and the headline card side by side (review
  * feedback — the overall figure gets its own surface, not a column inside the
- * breakdown). Both children are cards; the row only spaces and aligns them. */
+ * breakdown). The pair spans the page: a third review pass pointed at the dead
+ * space to their right, so both cards grow to fill the row (the pie taking the
+ * larger share, it has more content) instead of leaving the right half empty. */
 .rd-summary {
   display: flex;
   align-items: stretch;
@@ -112,6 +114,18 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-dialog);
+}
+
+/* Grow, but never narrower than their content: the pie card needs 36rem for the
+ * pie and the two legend columns to stay side by side (at 1024px the pair still
+ * fits on one line), and the row wraps rather than crushing the pie on
+ * anything narrower. */
+.rd-summary > .stp-root {
+  flex: 1 1 36rem;
+}
+
+.rd-summary > .sts-root {
+  flex: 1 1 20rem;
 }
 
 /* ---------- filter bar ---------- */

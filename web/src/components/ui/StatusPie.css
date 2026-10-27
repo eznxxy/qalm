@@ -11,6 +11,11 @@
 .stp-root {
   display: flex;
   align-items: center;
+  /* The pair stays a group in the middle of the card: on a wide card it keeps
+   * pie and legend adjacent (the colour mapping reads better at 24px than
+   * across an open gap) and centres the leftover space instead of pooling it
+   * in one corner. */
+  justify-content: center;
   gap: var(--space-6);
   flex-wrap: wrap;
 }
