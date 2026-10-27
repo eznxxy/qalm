@@ -317,26 +317,28 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 ### Card 3.7 — Run detail: pie rollup, hover contrast, × remove (review feedback, small) — DONE 2026-10-27
 - Three notes from the same review pass on the run detail screen.
 - **Progress bar → pie.** New `web/src/components/ui/StatusPie.tsx` (+ CSS,
-  exported from `ui/index.ts`): a donut with completion in the middle and a
-  legend that lists **all six** statuses, zeros included (greyed, no slice) so a
-  half-run run still shows the full vocabulary of outcomes. Slice order is the
-  fixed `STATUS_ORDER` and slices use the status solids — tints stay reserved for
-  badges (§2.2). The ring is drawn with `stroke-dasharray` on a
-  circumference-100 circle, rotated to start at 12 o'clock; the SVG is
-  `aria-hidden` and the `role="group"` is named "`<run>` results by status",
-  with the legend carrying the numbers. `done` = total − untested, the same rule
-  as `percent_complete`, so the centre agrees with the API. The header now uses
-  `StatusPie` (`StatusBar` is untouched and still used by the runs list, plans
-  and plan detail); `runHeadline()` and `.rd-headline` were removed — the
-  percentage moved into the donut. The legend first rendered as full-width grid
-  rows (a count stretched 400px from its label) and was tightened to a compact
-  block beside the donut.
-- **Bigger, in a card.** Second review pass: the ring went 88px → 132px, the
-  centre number to 26px, and the legend to a fixed two columns of three; the
-  whole rollup now sits on its own surface card (`.rd-summary`: surface, 1px
-  border, 10px radius, 16/24px padding) that hugs its content rather than
-  spanning the page — a full-width card left the legend swimming in white
-  space. 438 × 166px at both 1600px and 1024px wide.
+  exported from `ui/index.ts`), on the run detail header: a **full pie** — no
+  hole, no number in the middle — with one wedge per nonzero status in the fixed
+  `STATUS_ORDER`, filled with the status solids (tints stay reserved for badges,
+  §2.2). Wedges are SVG paths built from prefix-sum angles starting at 12
+  o'clock; a status that owns the whole run renders as a full circle instead,
+  where an arc would collapse. The SVG is `aria-hidden` and the `role="group"`
+  is named "`<run>` results by status". `StatusBar` is untouched and still used
+  by the runs list, plans and plan detail; `runHeadline()` and `.rd-headline`
+  were removed.
+- **The legend carries the numbers** (reviewer's reference): two columns of
+  three, each row a status dot, a bold "110 Passed" line and a muted "46% set to
+  Passed" line under it. All six statuses are listed, zeros included at 0 / 0%,
+  and a zero row keeps its status-coloured dot — the dot is the colour key, not
+  a presence indicator. Shares are `round(count / total × 100)`; the overall
+  "done" figure the earlier cut showed in the middle still exists as
+  `percent_complete` on the run resource and as `% complete` on the runs list.
+  History: donut with `33% done` in the centre → 132px donut on a card → this
+  full pie with per-status shares.
+- **Card.** `.rd-summary` is a surface card — `--surface`, 1px `--border`, 10px
+  radius, 16/24px padding — that hugs its content rather than spanning the page
+  (a full-width card left the legend swimming in white space). 565 × 224px with
+  the 190px pie at both 1600px and 1024px wide.
 - **Hover contrast on the result status buttons.** First pass (brand tint +
   darker border/label) was still too quiet on the real screen — the reviewer's
   screenshot showed the hovered button almost identical to its neighbours.

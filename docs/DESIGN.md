@@ -204,7 +204,7 @@ assignee, due date. Filter by Open / Completed.
 
 ```
 ┌ Run: Release 2.4 smoke ──────────────────────── [Assign] [Close run]
-│ ◔ 62% done   Passed 31 · Retest 3 · Blocked 2 · Failed 4 · Skipped 0 · Untested 13
+│ ◕ 31 Passed 50% · 3 Retest 5% · 2 Blocked 3% · 4 Failed 6% · 0 Skipped 0% · 13 Untested 21%
 │ [Status ▾] [Assignee ▾] [Section ▾]  Search…
 │ ┌───────┬─────────────────────────┬──────────┬────────────┬──────────────┐
 │ │ ID    │ Title                   │ Status   │ Assignee   │ Updated      │
@@ -214,12 +214,12 @@ assignee, due date. Filter by Open / Completed.
 └ Click a row → result drawer (480px): case steps, [Add result] form, history
 ```
 
-- **Header rollup** is a donut (132px) on its own surface card, with completion
-  (`done` = items with any result) in the middle and a legend listing **every**
-  status — zeros greyed, no slice, so the full vocabulary stays visible on a
-  half-run run. Slice order is the fixed status order; the legend is two columns
-  of three beside the ring. The status bar stays the element for tables
-  (§4.3, §4.5).
+- **Header rollup** is a full pie (190px) on its own surface card: one wedge per
+  status, in the fixed status order, with no hole and no number in the middle.
+  The legend carries the numbers — two columns of three, each row a status dot,
+  a bold "110 Passed" line and a muted "46% set to Passed" line under it. Zeros
+  stay listed at 0 / 0%, keeping their dot colour as the key. The status bar
+  stays the element for tables (§4.3, §4.5).
 - **Add result** form: status (segmented buttons with shortcuts P, F, B, R, S),
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
   Hovering or focusing a status button previews that status — its tint as the
