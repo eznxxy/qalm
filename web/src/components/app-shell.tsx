@@ -259,6 +259,18 @@ function AppShellInner({ children }: { children: ReactNode }) {
     : "";
 
   function onProjectChange(id: string) {
+    // A detail URL (a run or a plan) belongs to the project in its path, not
+    // the `?project=` scope: the detail page rewrites the query back to the
+    // entity's project, so rewriting it here would be a silent no-op (QA card
+    // 3.18). Switch to the collection of the project the user picked instead.
+    const detail = /^\/(runs|plans)\/[^/]+$/.exec(pathname);
+    if (detail) {
+      const collection = `/${detail[1]}`;
+      router.push(
+        id ? `${collection}?project=${encodeURIComponent(id)}` : collection
+      );
+      return;
+    }
     const params = new URLSearchParams(searchParams.toString());
     if (id) params.set("project", id);
     else params.delete("project");

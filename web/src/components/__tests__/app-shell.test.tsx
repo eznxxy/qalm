@@ -355,6 +355,37 @@ describe("project switcher", () => {
     );
   });
 
+  it("leaves a run detail for the new project's runs list (card 3.18)", async () => {
+    // The detail page owns ?project= and would rewrite it back; replacing the
+    // query here used to do nothing at all. A real navigation is the fix.
+    mockRouterState.pathname = "/runs/r-1";
+    mockRouterState.search = "project=p-1";
+    await renderShell();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/runs?project=p-2")
+    );
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+
+  it("leaves a plan detail for the new project's plans list (card 3.18)", async () => {
+    mockRouterState.pathname = "/plans/pl-9";
+    mockRouterState.search = "project=p-1";
+    await renderShell();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/plans?project=p-2")
+    );
+  });
+
   it("is enabled once projects are listed, and disabled while loading", async () => {
     const ready = await renderShell();
     // findByRole resolves as soon as the combobox exists — during the
