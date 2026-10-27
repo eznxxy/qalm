@@ -283,6 +283,27 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.6 — Runs list: Start date column (review feedback, small) — DONE 2026-10-27
+- The **Test runs** table now shows **Start date** immediately before **Due
+  date** (`web/src/app/(app)/runs/page.tsx`): a `<time>` cell rendered through
+  `formatDateOnly` (so a `YYYY-MM-DD` never shifts a day in a negative-offset
+  zone), an `—` when the run has no start date, and the loading skeleton grew
+  to 7 columns.
+- Column shares were rebalanced to keep the fixed layout at 100%
+  (`runs.css`), and both date columns are `white-space: nowrap` — a `29 Oct` /
+  `2026` split reads as two values. Verified at 1600px and 1024px wide.
+- Notes: the column is **display-only**. `RUN_SORTS` in
+  `server/src/runs/runs.constants.ts` is `created_at|updated_at|due_date|name`,
+  so making Start date sortable is a contract (`docs/api-runs.md` sort section)
+  plus server change, not a web one — left undone on purpose. Due date remains
+  the only sortable date column until that lands. No API change was needed: the
+  run list already returns `start_date` (card 3.5).
+- Verified: web unit 546 (38 suites), `tsc`/`eslint` clean; live as Tester on
+  Webshop QA — `ABC` shows its start date, `Run October` shows `—`, dates stay
+  on one line in both wide and narrow windows.
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING
