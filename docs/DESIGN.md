@@ -253,6 +253,19 @@ assignee, due date. Filter by Open / Completed.
   while the name is the same everywhere. The server derives the stored
   `content_type` from the same extension. The history row's "Add attachment"
   link carries the same list as a tooltip instead of a second hint line.
+- **Attachments are cards, and clicking one opens it.** A staged file and a
+  saved attachment render the same way — an extension chip (images in the brand
+  tint, PDF in the failed tint), the name, the size, and the icon-only `×`
+  beside them — so what you picked and what you saved read as one idea. The
+  card is the affordance: the click (or Enter, on the name button) opens the
+  attachment in a modal instead of downloading it. Images show in an `<img>`;
+  PDFs go to the browser's own viewer inside an `<iframe>`. The modal is the
+  one place in the run detail that *is* modal — scrim, focus moved in, Tab
+  trapped, Escape closes, other keys swallowed — because a 480px drawer leaves
+  no room for the file itself. Its footer keeps "Open in new tab" and
+  "Download" for the copy you actually want to keep. Staged files preview from
+  the `File` already in memory; saved attachments are fetched as a blob first,
+  and the blob URL is revoked on close, on replace and on unmount.
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
 - Failed results require a comment. Show the reason inline, not in a toast.

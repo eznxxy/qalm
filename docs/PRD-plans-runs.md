@@ -187,6 +187,9 @@ Viewers get `403` on every write.
     fetching its URL without a valid token returns `401`; an extension outside
     the five (PNG, JPG, JPEG, WebP, PDF) or a file over 10 MB is rejected with a
     field-level error — on every OS, whatever MIME type the browser reports.
+    Clicking an attachment opens it in a viewer without leaving the run: an
+    image inline, a PDF in the browser's frame, with "Open in new tab" and
+    "Download" offered in the same place.
 11. A plan lists its runs with an aggregate status bar in the header that equals
     the sum of its runs' counts; deleting the plan detaches its runs, which
     remain visible and openable.

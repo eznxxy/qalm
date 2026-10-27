@@ -395,18 +395,34 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   the name is trusted, not the bytes. The history row's "Add attachment" link
   gets the same list as a `title` rather than a second hint line (its row is a
   text link, a hint paragraph would break the line).
-- Verified: web `tsc`/`eslint` clean, jest **560** (39 suites) including seven
-  new `StatusPie` tests, the two drawer removal tests (by role name, not text
-  link) and the run-detail pie test. Live as Tester on `Run October` — header
+- **Attachment cards + a viewer** (seventh review pass: "wrap it in card so its
+  more aesthetic then make it clickable view the attachment… open a modal
+  contains the file"). Staged files and saved attachments now share one card:
+  an extension chip (image in the brand tint, PDF in the failed tint), the
+  name, the size, and the `×` beside them. The name/size button
+  (`aria-label="View <filename>"`) opens `AttachmentViewer` — a scrim'd modal
+  (the drawer's non-modal, no-scrim rule stops at a file you cannot see at
+  480px), focus moved in, Tab trapped, Escape closes, every other key swallowed
+  so the run page's shortcuts cannot fire behind it. Images render in an
+  `<img>`, PDFs in an `<iframe>` fed by a blob URL, with "Open in new tab" and
+  "Download" in the footer. Staged files preview straight from the in-memory
+  `File`; saved ones are fetched through `api.fetchAttachmentBlob` first, and
+  a close during the fetch wins on a request id. The blob URL is revoked on
+  close, on replace and on unmount.
+- Verified: web `tsc`/`eslint` clean, jest **570** (40 suites) including seven
+  new `StatusPie` tests, three drawer attachment tests (staged image viewer +
+  revoke, uploaded PDF `iframe` after a fetch, icon-only removal) and the
+  run-detail pie test. Live as Tester on `Run October` — header
   group reads "Run October results by status", centre `33% done`, legend
   `Passed 1 · Retest 0 · Blocked 0 · Failed 0 · Skipped 0 · Untested 2`.
   **Verification note:** the reviewer's Admin session showed the first hover pass
   was too quiet, so the second pass was checked in the browser against the app's
   own served stylesheet (button classes rendered on the run page, pointer over
   Failed): fill `#fbe9e9`, border and inset ring `#c23a3a`, label `#17202e`.
-  The `×` control is still unit-tested only — it needs a writer session with an
-  item open, and the Tester account never gets the result form because every item
-  in these runs is unassigned.
+  The `×` control and the attachment cards/viewer are still unit-tested only —
+  they need a writer session with an item open or a saved attachment, and the
+  Tester account never gets the result form because every item in these runs is
+  unassigned.
 
 ---
 
