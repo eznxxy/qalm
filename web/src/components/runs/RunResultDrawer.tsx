@@ -21,8 +21,10 @@
  *   and every block starts fresh (no reset-in-effect).
  */
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -52,6 +54,10 @@ import { canEditResult, canRecordOnItem } from "@/lib/run-permissions";
 import { describeTimestamp } from "@/lib/dates";
 import { shortActorId } from "@/lib/case-history";
 import { MarkdownLite } from "./MarkdownLite";
+import {
+  AttachmentViewer,
+  type AttachmentPreview,
+} from "./AttachmentViewer";
 
 /** Mirrors server/src/runs/runs.constants.ts (PRD decision 5). */
 const ATTACHMENT_MAX_PER_RESULT = 5;
@@ -84,6 +90,11 @@ function fileExtension(name: string): string {
   return dot < 0 ? "" : name.slice(dot).toLowerCase();
 }
 
+/** PDF is the one allow-listed type that needs a frame, not an `<img>`. */
+function isPdfName(name: string): boolean {
+  return fileExtension(name) === ".pdf";
+}
+
 const HISTORY_LIMIT = 25;
 
 type ItemState =
@@ -96,6 +107,8 @@ type HistoryState =
   | { kind: "loading" }
   | { kind: "ready"; rows: Result[] }
   | { kind: "error"; message: string };
+
+type ViewerState = AttachmentPreview | null;
 
 interface FieldErrors {
   status?: string;
@@ -140,6 +153,22 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * The extension chip on an attachment card: a quiet visual key (PDF in the
+ * failed tint, everything else in the brand tint — the same colours the status
+ * pairs use). Decorative; the button's `aria-label` carries the file name.
+ */
+function FileTypeChip({ filename }: { filename: string }) {
+  const extension = fileExtension(filename).replace(".", "");
+  const label = extension === "" ? "FILE" : extension.toUpperCase();
+  const tone = label === "PDF" ? " is-pdf" : " is-image";
+  return (
+    <span className={`rd-file-ext${tone}`} aria-hidden="true">
+      {label}
+    </span>
+  );
 }
 
 /**
@@ -198,6 +227,38 @@ export function RunResultDrawer({
   const [attachmentBusy, setAttachmentBusy] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
+
+  // ---- attachment viewer ----
+  const [viewer, setViewer] = useState<ViewerState>(null);
+  const viewerUrlRef = useRef<string | null>(null);
+  // Bumped on close so a slow fetch cannot pop the modal back open.
+  const viewerRequestRef = useRef(0);
+
+  // The blob URL outlives React's render, so it is revoked by hand: on close,
+  // when another file replaces it, and when the drawer unmounts.
+  useEffect(
+    () => () => {
+      if (viewerUrlRef.current) URL.revokeObjectURL(viewerUrlRef.current);
+    },
+    []
+  );
+
+  const closeViewer = useCallback(() => {
+    viewerRequestRef.current += 1;
+    if (viewerUrlRef.current) {
+      URL.revokeObjectURL(viewerUrlRef.current);
+      viewerUrlRef.current = null;
+    }
+    setViewer(null);
+  }, []);
+
+  const showBlob = useCallback((filename: string, blob: Blob) => {
+    if (typeof URL.createObjectURL !== "function") return;
+    if (viewerUrlRef.current) URL.revokeObjectURL(viewerUrlRef.current);
+    const url = URL.createObjectURL(blob);
+    viewerUrlRef.current = url;
+    setViewer({ kind: "ready", filename, url, isPdf: isPdfName(filename) });
+  }, []);
 
   // The drawer is keyed by itemId by the caller; a different item remounts it.
   useEffect(() => {
@@ -473,22 +534,35 @@ export function RunResultDrawer({
     }
   }
 
-  async function downloadAttachment(
-    attachment: ResultAttachment
-  ): Promise<void> {
+  /** Staged files already live in memory, so the preview needs no fetch. */
+  function viewStaged(file: File): void {
+    showBlob(file.name, file);
+  }
+
+  /**
+   * Uploaded attachments are behind an authenticated endpoint, so the bytes
+   * are fetched into a blob first (the browser's own PDF viewer takes the URL
+   * from there). A close while the fetch is in flight wins: the request id is
+   * checked before the modal is filled.
+   */
+  async function viewAttachment(attachment: ResultAttachment): Promise<void> {
+    const request = viewerRequestRef.current + 1;
+    viewerRequestRef.current = request;
+    setViewer({ kind: "loading", filename: attachment.filename });
     try {
       const blob = await api.fetchAttachmentBlob(attachment.id);
-      if (typeof URL.createObjectURL !== "function") return;
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = attachment.filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      if (request !== viewerRequestRef.current) return;
+      showBlob(attachment.filename, blob);
     } catch (err) {
-      errorMessageFor(err, "Could not download the attachment.");
+      if (request !== viewerRequestRef.current) return;
+      setViewer({
+        kind: "error",
+        filename: attachment.filename,
+        message: errorMessage(
+          err,
+          "Could not open the attachment. Please try again."
+        ),
+      });
     }
   }
 
@@ -743,13 +817,25 @@ export function RunResultDrawer({
                         {staged.length > 0 && (
                           <ul className="rd-staged" aria-label="Staged files">
                             {staged.map((file) => (
-                              <li key={`${file.name}-${file.size}`}>
-                                <span>
-                                  {file.name}{" "}
-                                  <span className="muted t-nums">
+                              <li
+                                key={`${file.name}-${file.size}`}
+                                className="rd-file-card"
+                              >
+                                <button
+                                  type="button"
+                                  className="rd-file-open"
+                                  aria-label={`View ${file.name}`}
+                                  title={`View ${file.name}`}
+                                  onClick={() => viewStaged(file)}
+                                >
+                                  <FileTypeChip filename={file.name} />
+                                  <span className="rd-file-name">
+                                    {file.name}
+                                  </span>
+                                  <span className="rd-file-meta muted t-nums">
                                     {formatBytes(file.size)}
                                   </span>
-                                </span>
+                                </button>
                                 <button
                                   type="button"
                                   className="rd-icon-btn"
@@ -863,8 +949,8 @@ export function RunResultDrawer({
                         onDeleteAttachment={(attachment) =>
                           void removeAttachment(attachment)
                         }
-                        onDownloadAttachment={(attachment) =>
-                          void downloadAttachment(attachment)
+                        onViewAttachment={(attachment) =>
+                          void viewAttachment(attachment)
                         }
                         onAddAttachment={(files) =>
                           void uploadToLatest(files)
@@ -918,6 +1004,10 @@ export function RunResultDrawer({
           onCancel={() => setConfirmRemove(false)}
         />
       )}
+
+      {viewer && (
+        <AttachmentViewer preview={viewer} onClose={closeViewer} />
+      )}
     </>
   );
 }
@@ -931,7 +1021,7 @@ function HistoryRow({
   busy,
   onEdit,
   onDeleteAttachment,
-  onDownloadAttachment,
+  onViewAttachment,
   onAddAttachment,
 }: {
   result: Result;
@@ -942,7 +1032,7 @@ function HistoryRow({
   busy: string | null;
   onEdit: () => void;
   onDeleteAttachment: (attachment: ResultAttachment) => void;
-  onDownloadAttachment: (attachment: ResultAttachment) => void;
+  onViewAttachment: (attachment: ResultAttachment) => void;
   onAddAttachment: (files: FileList | null) => void;
 }) {
   return (
@@ -983,17 +1073,20 @@ function HistoryRow({
       {result.attachments.length > 0 && (
         <ul className="rd-attachments" aria-label="Attachments">
           {result.attachments.map((attachment) => (
-            <li key={attachment.id}>
+            <li key={attachment.id} className="rd-file-card">
               <button
                 type="button"
-                className="linklike"
-                onClick={() => onDownloadAttachment(attachment)}
+                className="rd-file-open"
+                aria-label={`View ${attachment.filename}`}
+                title={`View ${attachment.filename}`}
+                onClick={() => onViewAttachment(attachment)}
               >
-                {attachment.filename}
+                <FileTypeChip filename={attachment.filename} />
+                <span className="rd-file-name">{attachment.filename}</span>
+                <span className="rd-file-meta muted t-nums">
+                  {formatBytes(attachment.size_bytes)}
+                </span>
               </button>
-              <span className="muted t-nums">
-                {formatBytes(attachment.size_bytes)}
-              </span>
               {canEdit && (
                 <DisabledHint
                   hint={

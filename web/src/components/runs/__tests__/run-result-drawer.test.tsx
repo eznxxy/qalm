@@ -103,8 +103,14 @@ async function renderDrawer(options: RenderOptions = {}): Promise<{
   return { onChanged, onSaveAndNext, onRemoved };
 }
 
+const createObjectURL = jest.fn(() => "blob:preview");
+const revokeObjectURL = jest.fn();
+
 beforeEach(() => {
   Object.values(mockApi).forEach((fn) => fn.mockReset());
+  Object.assign(URL, { createObjectURL, revokeObjectURL });
+  createObjectURL.mockClear();
+  revokeObjectURL.mockClear();
   mockApi.getRunItem.mockResolvedValue(detail());
   mockApi.listItemResults.mockResolvedValue({
     data: [],
@@ -294,6 +300,64 @@ describe("RunResultDrawer", () => {
       await screen.findByRole("button", { name: "Remove Evidence.JPEG" })
     ).toBeInTheDocument();
     expect(screen.queryByText(/that file type is not allowed/)).toBeNull();
+  });
+
+  it("opens a staged image in a viewer and revokes the blob URL on close", async () => {
+    await renderDrawer();
+
+    const input = await screen.findByLabelText("Attachments");
+    const file = new File(["hello"], "shot.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    // The whole card is the affordance now: clicking the file opens it rather
+    // than doing nothing (and the × stays the destructive control beside it).
+    fireEvent.click(await screen.findByRole("button", { name: "View shot.png" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "shot.png" });
+    expect(
+      within(dialog).getByRole("img", { name: "shot.png" })
+    ).toHaveAttribute("src", "blob:preview");
+    expect(createObjectURL).toHaveBeenCalledWith(file);
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "shot.png" })).toBeNull()
+    );
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+  });
+
+  it("opens an uploaded PDF in an iframe after fetching its bytes", async () => {
+    mockApi.listItemResults.mockResolvedValue({
+      data: [
+        result({
+          attachments: [
+            {
+              id: "a-1",
+              filename: "report.pdf",
+              content_type: "application/pdf",
+              size_bytes: 2048,
+              created_at: "2026-10-25T09:00:00Z",
+            },
+          ],
+        }),
+      ],
+      meta: { page: 1, limit: 25, total: 1, total_pages: 1 },
+    });
+    const blob = new Blob(["%PDF-1.4"], { type: "application/pdf" });
+    mockApi.fetchAttachmentBlob.mockResolvedValue(blob);
+    await renderDrawer();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "View report.pdf" })
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "report.pdf" });
+    // PDFs go to the browser's inline viewer, not an <img>.
+    const frame = dialog.querySelector("iframe");
+    expect(frame?.tagName).toBe("IFRAME");
+    expect(frame).toHaveAttribute("src", "blob:preview");
+    expect(mockApi.fetchAttachmentBlob).toHaveBeenCalledWith("a-1");
   });
 
   it("removes a staged file through the × button, not a text link", async () => {
