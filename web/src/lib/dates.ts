@@ -166,3 +166,32 @@ export function formatDateOnly(
     year: "numeric",
   }).format(date);
 }
+
+/** A whole number of calendar days between two local dates, ignoring clock time. */
+function calendarDayDiff(target: Date, from: Date): number {
+  const t = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
+  const f = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  return Math.round((t - f) / DAY_MS);
+}
+
+/**
+ * The milestone countdown (DESIGN §4.5, PRD decision 11): "12 days left",
+ * "Due today", "3 days late". It compares calendar days in the user's zone, so
+ * a plain `YYYY-MM-DD` never shifts by a timezone. Returns `null` for a missing
+ * or malformed date — a milestone without a due date shows no countdown.
+ */
+export function formatDaysLeft(
+  ymd: string | null | undefined,
+  options: DateFormatOptions = {}
+): string | null {
+  if (!ymd || !isDateOnly(ymd)) return null;
+  const match = DATE_ONLY_RE.exec(ymd);
+  if (!match) return null;
+  const due = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const now = options.now ?? new Date();
+  const days = calendarDayDiff(due, now);
+  if (days === 0) return "Due today";
+  if (days > 0) return days === 1 ? "1 day left" : `${days} days left`;
+  const late = Math.abs(days);
+  return late === 1 ? "1 day late" : `${late} days late`;
+}

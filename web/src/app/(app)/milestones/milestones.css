@@ -1,0 +1,15 @@
+/*
+ * Milestones list (DESIGN §4.5). Tokens only; the table's own styling lives
+ * with its columns in components/milestones/milestoneTable.css.
+ */
+
+.milestones-heading h1 {
+  margin: 0;
+}
+
+.milestones-readonly {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
