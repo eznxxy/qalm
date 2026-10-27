@@ -337,8 +337,19 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   full pie with per-status shares.
 - **Card.** `.rd-summary` is a surface card — `--surface`, 1px `--border`, 10px
   radius, 16/24px padding — that hugs its content rather than spanning the page
-  (a full-width card left the legend swimming in white space). 565 × 224px with
+  (a full-width card left the legend swimming in white space). 713 × 224px with
   the 190px pie at both 1600px and 1024px wide.
+- **Headline beside the pie** (third review pass): the passed share as the card's
+  one big number — 40px/44px `--ink-900`, "passed" at 18px under it — then a
+  muted 13px footer "1 / 3 untested (33%).", matching the reviewer's reference.
+  It sits between the pie and the legend so the eye goes pie → overall figure →
+  breakdown, and the block is `white-space: nowrap` with centred text so it keeps
+  a steady 125px width as results land. Both shares use the legend's
+  `round(count / total × 100)`, so the footer can never disagree with the
+  `Untested` row; a run with no items reads "0% passed" and "0 / 0 untested
+  (0%)." The overall "done" figure the first cut put in the donut hole is not
+  lost — it is `percent_complete` on the run resource and `% complete` on the
+  runs list.
 - **Hover contrast on the result status buttons.** First pass (brand tint +
   darker border/label) was still too quiet on the real screen — the reviewer's
   screenshot showed the hovered button almost identical to its neighbours.

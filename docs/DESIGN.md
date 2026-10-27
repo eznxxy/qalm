@@ -204,7 +204,9 @@ assignee, due date. Filter by Open / Completed.
 
 ```
 ┌ Run: Release 2.4 smoke ──────────────────────── [Assign] [Close run]
-│ ◕ 31 Passed 50% · 3 Retest 5% · 2 Blocked 3% · 4 Failed 6% · 0 Skipped 0% · 13 Untested 21%
+│ (◔ pie)  46%                ● 31 Passed      ● 4 Failed
+│          passed             50% set to …     6% set to …
+│          91 / 239 untested (38%).
 │ [Status ▾] [Assignee ▾] [Section ▾]  Search…
 │ ┌───────┬─────────────────────────┬──────────┬────────────┬──────────────┐
 │ │ ID    │ Title                   │ Status   │ Assignee   │ Updated      │
@@ -220,6 +222,13 @@ assignee, due date. Filter by Open / Completed.
   a bold "110 Passed" line and a muted "46% set to Passed" line under it. Zeros
   stay listed at 0 / 0%, keeping their dot colour as the key. The status bar
   stays the element for tables (§4.3, §4.5).
+- **Headline beside the pie**: the passed share as the card's one big number
+  (40px) with "passed" under it, then a muted footer "91 / 239 untested (38%)."
+  — absolute and relative in one line, and the number a reviewer asks for first
+  without doing the arithmetic on the wedges. Its percentages are
+  `round(count / total × 100)`, the same rounding as the legend, so the two can
+  never disagree; a run with no items reads "0% passed" and "0 / 0 untested
+  (0%)."
 - **Add result** form: status (segmented buttons with shortcuts P, F, B, R, S),
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
   Hovering or focusing a status button previews that status — its tint as the
