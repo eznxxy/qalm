@@ -392,6 +392,17 @@ export interface PlanListQuery {
   limit?: number;
 }
 
+/** A run created inline with its plan (docs/api-plans.md § POST /plans). */
+export interface CreatePlanRunInput {
+  name: string;
+  /** Omit or `null` for none. */
+  description?: string | null;
+  /** Plain `YYYY-MM-DD`; omit or `null` for none. */
+  start_date?: string | null;
+  /** Plain `YYYY-MM-DD`; omit or `null` for none. */
+  due_date?: string | null;
+}
+
 /** POST /projects/:projectId/plans (docs/api-plans.md § Validation). */
 export interface CreatePlanInput {
   name: string;
@@ -399,6 +410,11 @@ export interface CreatePlanInput {
   description?: string | null;
   /** Plain `YYYY-MM-DD`; omit or `null` for none. */
   due_date?: string | null;
+  /**
+   * 1–20 runs, inserted with the plan in one transaction. The contract allows
+   * no runless plan, so this is required rather than optional.
+   */
+  runs: CreatePlanRunInput[];
 }
 
 /** PATCH /plans/:id — any non-empty subset; `null` clears an optional field. */

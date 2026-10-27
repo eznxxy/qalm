@@ -5,6 +5,7 @@ import { AuthUser, UserRole } from '../auth/current-user';
 import { ApiError, ErrorCode } from '../errors';
 import { Queryable } from '../db/queryable';
 import { PlansService } from './plans.service';
+import { RunsStore } from '../runs/runs.store';
 import {
   PlanAggRow,
   PlanListFilter,
@@ -33,16 +34,32 @@ interface FakePlan extends PlanRow {
   untested: number;
 }
 
+interface FakeRun {
+  id: string;
+  project_id: string;
+  plan_id: string | null;
+  name: string;
+  description: string | null;
+  start_date: string | null;
+  due_date: string | null;
+  created_by: string;
+}
+
 class FakeStore {
   projects: PlanProjectRef[] = [];
   plans: FakePlan[] = [];
+  /** Runs inserted by `create`, in insert order. */
+  runs: FakeRun[] = [];
   /** Live run counts per plan id, so `detachRuns` has something to clear. */
   runsOfPlan: Record<string, number> = {};
   detachCalls: string[] = [];
   /** Test hook: when true, `softDelete` throws to exercise rollback. */
   failSoftDelete = false;
+  /** Test hook: throw instead of the Nth run insert (0-based) — rollback. */
+  failInsertRunAt: number | null = null;
 
   private nextId = 1;
+  private nextRunId = 1;
   private clock = 0;
 
   seed(): void {
@@ -52,11 +69,14 @@ class FakeStore {
       { id: 'p-arch', status: 'archived' },
     ];
     this.plans = [];
+    this.runs = [];
     this.runsOfPlan = {};
     this.detachCalls = [];
     this.nextId = 1;
+    this.nextRunId = 1;
     this.clock = 0;
     this.failSoftDelete = false;
+    this.failInsertRunAt = null;
   }
 
   private tick(): Date {
@@ -102,18 +122,22 @@ class FakeStore {
   async transaction<T>(fn: (client: Queryable) => Promise<T>): Promise<T> {
     const snapshot = {
       plans: this.plans.map((row) => ({ ...row })),
+      runs: this.runs.map((row) => ({ ...row })),
       runsOfPlan: { ...this.runsOfPlan },
       detachCalls: [...this.detachCalls],
       nextId: this.nextId,
+      nextRunId: this.nextRunId,
       clock: this.clock,
     };
     try {
       return await fn({} as Queryable);
     } catch (error) {
       this.plans = snapshot.plans;
+      this.runs = snapshot.runs;
       this.runsOfPlan = snapshot.runsOfPlan;
       this.detachCalls = snapshot.detachCalls;
       this.nextId = snapshot.nextId;
+      this.nextRunId = snapshot.nextRunId;
       this.clock = snapshot.clock;
       throw error;
     }
@@ -183,6 +207,28 @@ class FakeStore {
     });
     this.plans.push(plan);
     return { ...plan };
+  }
+
+  /** Mirrors `RunsStore.insertRun` for the plan-create path. */
+  async insertRun(row: {
+    project_id: string;
+    plan_id: string | null;
+    name: string;
+    description: string | null;
+    start_date: string | null;
+    due_date: string | null;
+    created_by: string;
+  }): Promise<FakeRun> {
+    if (this.failInsertRunAt !== null && this.runs.length === this.failInsertRunAt) {
+      throw new ApiError('VALIDATION_ERROR', 'Request validation failed.', [
+        { field: `runs[${this.runs.length}].name`, issue: 'must be unique' },
+      ]);
+    }
+    const run: FakeRun = { id: `run-${this.nextRunId++}`, ...row };
+    this.runs.push(run);
+    const plan = this.plans.find((candidate) => candidate.id === row.plan_id);
+    if (plan) plan.run_count += 1;
+    return run;
   }
 
   async update(id: string, fields: PlanUpdateFields): Promise<PlanRow | null> {
@@ -314,7 +360,11 @@ describe('PlansService (unit, in-memory plans)', () => {
     store = new FakeStore();
     store.seed();
     const moduleRef = await Test.createTestingModule({
-      providers: [{ provide: PlansStore, useValue: store }, PlansService],
+      providers: [
+        { provide: PlansStore, useValue: store },
+        { provide: RunsStore, useValue: store },
+        PlansService,
+      ],
     }).compile();
     service = moduleRef.get(PlansService);
   });
@@ -377,17 +427,18 @@ describe('PlansService (unit, in-memory plans)', () => {
   });
 
   describe('create', () => {
-    it('stores blank description as null and zeroes the rollup', async () => {
+    it('stores blank description as null and inserts the plan with its run', async () => {
       const plan = await service.create(AS('lead'), 'p-1', {
         name: 'Release 2.4',
         description: '   ',
         due_date: '2026-11-14',
+        runs: [{ name: 'Smoke', description: '  ', start_date: '2026-11-01' }],
       });
       expect(plan).toMatchObject({
         name: 'Release 2.4',
         description: null,
         due_date: '2026-11-14',
-        run_count: 0,
+        run_count: 1,
         created_by: 'u-lead',
         updated_by: 'u-lead',
       });
@@ -401,24 +452,101 @@ describe('PlansService (unit, in-memory plans)', () => {
         untested: 0,
         percent_complete: 0,
       });
+      expect(store.runs).toEqual([
+        {
+          id: 'run-1',
+          project_id: 'p-1',
+          plan_id: plan.id,
+          name: 'Smoke',
+          description: null,
+          start_date: '2026-11-01',
+          due_date: null,
+          created_by: 'u-lead',
+        },
+      ]);
+    });
+
+    it('inserts every run in request order, all pointing at the new plan', async () => {
+      const plan = await service.create(AS('admin'), 'p-1', {
+        name: 'Release 2.4',
+        runs: [
+          { name: 'First' },
+          { name: 'Second', start_date: '2026-11-02', due_date: '2026-11-06' },
+          { name: 'Third' },
+        ],
+      });
+
+      expect(store.runs.map((run) => run.name)).toEqual(['First', 'Second', 'Third']);
+      expect(new Set(store.runs.map((run) => run.plan_id))).toEqual(new Set([plan.id]));
+      expect(plan.run_count).toBe(3);
+    });
+
+    it('rolls the plan back when a later run is rejected', async () => {
+      // Second run insert fails: neither the plan nor the first run may remain.
+      store.failInsertRunAt = 1;
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          runs: [{ name: 'First' }, { name: 'Second' }],
+        }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'runs[1].name' }],
+      });
+
+      expect(store.plans).toEqual([]);
+      expect(store.runs).toEqual([]);
+      await expectCode(service.detail(AS('admin'), 'plan-1'), 'NOT_FOUND');
+    });
+
+    it('names the indexed run field when start_date lands after due_date', async () => {
+      await expect(
+        service.create(AS('lead'), 'p-1', {
+          name: 'Release 2.4',
+          runs: [
+            { name: 'Fine', start_date: '2026-11-01', due_date: '2026-11-02' },
+            { name: 'Backwards', start_date: '2026-11-09', due_date: '2026-11-02' },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'runs[1].start_date', issue: 'must be on or before due_date' }],
+      });
+      expect(store.plans).toEqual([]);
+      expect(store.runs).toEqual([]);
     });
 
     it('is 409 for a duplicate name, ignoring case and spaces', async () => {
       store.addPlan({ name: 'Release 2.4' });
-      await expectCode(service.create(AS('admin'), 'p-1', { name: 'release 2.4' }), 'CONFLICT');
+      await expectCode(
+        service.create(AS('admin'), 'p-1', { name: 'release 2.4', runs: [{ name: 'R' }] }),
+        'CONFLICT',
+      );
+      expect(store.runs).toEqual([]);
     });
 
     it('frees the name once the plan is deleted', async () => {
       const existing = store.addPlan({ name: 'Release 2.4' });
       existing.deleted_at = new Date('2026-10-06T00:00:00Z');
       await expect(
-        service.create(AS('admin'), 'p-1', { name: 'Release 2.4' }),
-      ).resolves.toMatchObject({ name: 'Release 2.4' });
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          runs: [{ name: 'R' }],
+        }),
+      ).resolves.toMatchObject({ name: 'Release 2.4', run_count: 1 });
     });
 
     it('is 404 for an unknown project and 409 for an archived project', async () => {
-      await expectCode(service.create(AS('admin'), 'nope', { name: 'X' }), 'NOT_FOUND');
-      await expectCode(service.create(AS('admin'), 'p-arch', { name: 'X' }), 'CONFLICT');
+      await expectCode(
+        service.create(AS('admin'), 'nope', { name: 'X', runs: [{ name: 'R' }] }),
+        'NOT_FOUND',
+      );
+      await expectCode(
+        service.create(AS('admin'), 'p-arch', { name: 'X', runs: [{ name: 'R' }] }),
+        'CONFLICT',
+      );
+      expect(store.runs).toEqual([]);
     });
   });
 

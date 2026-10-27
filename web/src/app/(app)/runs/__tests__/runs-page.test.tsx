@@ -173,6 +173,8 @@ interface ApiOptions {
   plans?: Plan[];
   /** Make the create POST fail with a 400 so the field error shows. */
   createError?: boolean | "start_date";
+  /** Same for the plan-with-runs POST, keyed the API's way: `runs[1].name`. */
+  planCreateError?: boolean | "runs[0].name";
 }
 
 function mockApi({
@@ -181,6 +183,7 @@ function mockApi({
   runs = ROWS,
   plans = [PLAN],
   createError = false,
+  planCreateError = false,
 }: ApiOptions = {}): void {
   const user = makeUser({ role });
   fetchMock.mockImplementation(
@@ -219,6 +222,25 @@ function mockApi({
         return Promise.resolve(
           jsonResponse(201, { data: run({ id: "r-new", name: body.name }) })
         );
+      }
+      if (/\/projects\/[\w-]+\/plans$/.test(target) && method === "POST") {
+        if (planCreateError) {
+          const field = planCreateError === "runs[0].name" ? "runs[0].name" : "name";
+          const issue =
+            planCreateError === "runs[0].name"
+              ? "Run name is required."
+              : "Plan name is required.";
+          return Promise.resolve(
+            jsonResponse(400, {
+              error: {
+                code: "VALIDATION_ERROR",
+                message: "Validation failed.",
+                details: [{ field, issue }],
+              },
+            })
+          );
+        }
+        return Promise.resolve(jsonResponse(201, { data: PLAN }));
       }
       if (/\/projects\/[\w-]+\/runs(\?|$)/.test(target) && method === "GET") {
         return Promise.resolve(
@@ -285,6 +307,31 @@ function listRunCalls(): string[] {
         (init?.method ?? "GET") === "GET"
     )
     .map(({ url }) => url);
+}
+
+/** GET /plans calls — the Plan column's source, refreshed after a create. */
+function listPlanCalls(): string[] {
+  return fetchMock.mock.calls
+    .map(([url, init]) => ({ url: String(url), init }))
+    .filter(
+      ({ url, init }) =>
+        /\/projects\/[\w-]+\/plans(\?|$)/.test(url) &&
+        (init?.method ?? "GET") === "GET"
+    )
+    .map(({ url }) => url);
+}
+
+function planPosts(): { url: string; body: unknown }[] {
+  return fetchMock.mock.calls
+    .filter(
+      ([url, init]) =>
+        /\/projects\/[\w-]+\/plans$/.test(String(url)) &&
+        init?.method === "POST"
+    )
+    .map(([url, init]) => ({
+      url: String(url),
+      body: JSON.parse(String(init?.body ?? "{}")),
+    }));
 }
 
 function lastReplaceUrl(): string {
@@ -431,6 +478,19 @@ describe("runs list", () => {
     expect(mockRouterState.push).toHaveBeenCalledWith("/runs/r-1?project=p-1");
   });
 
+  it("opens a plan from the Plan column", async () => {
+    mockApi();
+    await renderPage();
+    const table = await screen.findByRole("table", { name: "Test runs" });
+
+    // With the plans list gone, this cell is the way into a plan's detail.
+    fireEvent.click(
+      await within(table).findByRole("button", { name: "Open plan Release 2.4" })
+    );
+
+    expect(mockRouterState.push).toHaveBeenCalledWith("/plans/pl-1?project=p-1");
+  });
+
   it("creates a run and opens it", async () => {
     mockApi();
     await renderPage();
@@ -537,6 +597,74 @@ describe("runs list", () => {
     expect(await screen.findByText("Name is required.")).toBeInTheDocument();
     expect(mockRouterState.push).not.toHaveBeenCalled();
   });
+
+  it("creates a plan together with its run, refreshes both lists and stays put", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+    const dialog = await screen.findByRole("dialog", { name: "New plan" });
+
+    // Plan fields are labelled apart from a run's, so "Name" stays unambiguous.
+    fireEvent.change(within(dialog).getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Release 2.5 smoke" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Start date"), {
+      target: { value: "2026-11-20" },
+    });
+
+    const plansBefore = listPlanCalls().length;
+    const runsBefore = listRunCalls().length;
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create plan" }));
+
+    await waitFor(() => expect(planPosts()).toHaveLength(1));
+    expect(planPosts()[0]?.body).toEqual({
+      name: "Release 2.5",
+      description: null,
+      due_date: null,
+      runs: [{ name: "Release 2.5 smoke", start_date: "2026-11-20" }],
+    });
+
+    // The new plan feeds the Plan column and the run picker; the new run is a
+    // row on this screen. A plan detail page would be a second step, not the
+    // point of creating it, so nothing navigates.
+    await waitFor(() => expect(listPlanCalls().length).toBeGreaterThan(plansBefore));
+    await waitFor(() => expect(listRunCalls().length).toBeGreaterThan(runsBefore));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "New plan" })).toBeNull()
+    );
+    expect(mockRouterState.push).not.toHaveBeenCalled();
+  });
+
+  it("shows a server error keyed to the run inside the New plan dialog", async () => {
+    mockApi({ planCreateError: "runs[0].name" });
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+    const dialog = await screen.findByRole("dialog", { name: "New plan" });
+    fireEvent.change(within(dialog).getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Release 2.5 smoke" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create plan" }));
+
+    expect(await screen.findByText("Run name is required.")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Name")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+    expect(mockRouterState.push).not.toHaveBeenCalled();
+  });
 });
 
 describe("roles and archived projects", () => {
@@ -546,6 +674,7 @@ describe("roles and archived projects", () => {
     await screen.findByRole("table", { name: "Test runs" });
 
     expect(screen.queryByRole("button", { name: "New run" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New plan" })).toBeNull();
     expect(
       screen.getByText(/needs the Admin or Lead role/)
     ).toBeInTheDocument();
@@ -557,6 +686,7 @@ describe("roles and archived projects", () => {
     await screen.findByRole("table", { name: "Test runs" });
 
     expect(screen.queryByRole("button", { name: "New run" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New plan" })).toBeNull();
     expect(
       screen.getByText(/This project is archived/)
     ).toBeInTheDocument();

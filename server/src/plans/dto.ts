@@ -1,4 +1,7 @@
 import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
   IsInt,
   IsOptional,
   IsString,
@@ -7,10 +10,21 @@ import {
   Min,
   registerDecorator,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
-import { Transform, TransformFnParams } from 'class-transformer';
-import { DATE_PATTERN, MAX_LIMIT } from '../runs/runs.constants';
-import { PLAN_DESCRIPTION_MAX, PLAN_NAME_MAX, PLAN_SORT_PATTERN } from './plans.constants';
+import { Transform, TransformFnParams, Type } from 'class-transformer';
+import {
+  DATE_PATTERN,
+  MAX_LIMIT,
+  RUN_DESCRIPTION_MAX,
+  RUN_NAME_MAX,
+} from '../runs/runs.constants';
+import {
+  PLAN_DESCRIPTION_MAX,
+  PLAN_NAME_MAX,
+  PLAN_RUNS_MAX,
+  PLAN_SORT_PATTERN,
+} from './plans.constants';
 
 /**
  * Request DTOs for the plans endpoints, docs/api-plans.md § Validation.
@@ -85,6 +99,32 @@ function IsPlanSort(): PropertyDecorator {
   };
 }
 
+/**
+ * One run created inside a plan create (docs/api-plans.md § POST). The run
+ * fields mirror the run's own create DTO, minus `plan_id` (it is the new plan)
+ * and minus `selection` (an embedded run starts empty).
+ */
+export class CreatePlanRunDto {
+  @IsString()
+  @Trimmed()
+  @Length(1, RUN_NAME_MAX)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @Trimmed()
+  @Length(0, RUN_DESCRIPTION_MAX)
+  description?: string | null;
+
+  @IsOptional()
+  @IsDateOnly()
+  start_date?: string | null;
+
+  @IsOptional()
+  @IsDateOnly()
+  due_date?: string | null;
+}
+
 export class CreatePlanDto {
   @IsString()
   @Trimmed()
@@ -100,6 +140,17 @@ export class CreatePlanDto {
   @IsOptional()
   @IsDateOnly()
   due_date?: string | null;
+
+  /**
+   * Required: a plan is a collection of runs, so a plan is born with 1–20 of
+   * them. Validation names the item, e.g. `runs[1].name`.
+   */
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(PLAN_RUNS_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => CreatePlanRunDto)
+  runs!: CreatePlanRunDto[];
 }
 
 export class UpdatePlanDto {

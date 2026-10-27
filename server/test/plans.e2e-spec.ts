@@ -133,7 +133,11 @@ describe('Plans API (integration)', () => {
     body: Record<string, unknown> = {},
     role: UserRole = 'admin',
   ): Promise<PlanData> => {
-    const res = await createPlan(role, { name: 'Release 2.4', ...body });
+    const res = await createPlan(role, {
+      name: 'Release 2.4',
+      runs: [{ name: 'Release 2.4 smoke' }],
+      ...body,
+    });
     expect(res.status).toBe(201);
     return res.body.data as PlanData;
   };
@@ -211,10 +215,13 @@ describe('Plans API (integration)', () => {
     });
 
     it('creates as Admin and Lead, and forbids Tester and Viewer', async () => {
-      const lead = await createPlan('lead', { name: 'By lead' });
+      const lead = await createPlan('lead', { name: 'By lead', runs: [{ name: 'Run' }] });
       expect(lead.status).toBe(201);
       for (const role of ['tester', 'viewer'] as UserRole[]) {
-        const res = await createPlan(role, { name: `By ${role}` });
+        const res = await createPlan(role, {
+          name: `By ${role}`,
+          runs: [{ name: 'Run' }],
+        });
         expect(res.status).toBe(403);
         expect(res.body.error.code).toBe('FORBIDDEN');
       }
@@ -235,7 +242,7 @@ describe('Plans API (integration)', () => {
       expect(plan.name).toBe('Release 2.4');
       expect(plan.description).toBeNull();
       expect(plan.due_date).toBeNull();
-      expect(plan.run_count).toBe(0);
+      expect(plan.run_count).toBe(1);
       expect(plan.counts).toEqual({
         total: 0,
         passed: 0,
@@ -249,45 +256,186 @@ describe('Plans API (integration)', () => {
     });
 
     it('rejects a missing name, an over-long name and a bad due_date', async () => {
-      const missing = await createPlan('admin', {});
+      const missing = await createPlan('admin', { runs: [{ name: 'Run' }] });
       expect(missing.status).toBe(400);
       expect(missing.body.error.code).toBe('VALIDATION_ERROR');
       expect(missing.body.error.details).toContainEqual(
         expect.objectContaining({ field: 'name' }),
       );
 
-      const long = await createPlan('admin', { name: 'x'.repeat(121) });
+      const long = await createPlan('admin', {
+        name: 'x'.repeat(121),
+        runs: [{ name: 'Run' }],
+      });
       expect(long.status).toBe(400);
       expect(long.body.error.details).toContainEqual(
         expect.objectContaining({ field: 'name' }),
       );
 
-      const badDate = await createPlan('admin', { name: 'Ok', due_date: '2026/11/14' });
+      const badDate = await createPlan('admin', {
+        name: 'Ok',
+        due_date: '2026/11/14',
+        runs: [{ name: 'Run' }],
+      });
       expect(badDate.status).toBe(400);
       expect(badDate.body.error.details).toContainEqual(
         expect.objectContaining({ field: 'due_date' }),
       );
     });
 
+    it('requires at least one run and caps them at 20', async () => {
+      for (const body of [
+        { name: 'No runs' },
+        { name: 'Empty runs', runs: [] },
+        {
+          name: 'Too many',
+          runs: Array.from({ length: 21 }, (_, index) => ({ name: `Run ${index}` })),
+        },
+      ]) {
+        const res = await createPlan('admin', body);
+        expect(res.status).toBe(400);
+        expect(res.body.error.details).toContainEqual(
+          expect.objectContaining({ field: 'runs' }),
+        );
+      }
+    });
+
+    it('names the offending run by index', async () => {
+      const blank = await createPlan('admin', {
+        name: 'Release 2.4',
+        runs: [{ name: 'Fine' }, { name: '   ' }],
+      });
+      expect(blank.status).toBe(400);
+      expect(blank.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'runs[1].name' }),
+      );
+
+      const backwards = await createPlan('admin', {
+        name: 'Release 2.4',
+        runs: [{ name: 'Fine', start_date: '2026-11-09', due_date: '2026-11-02' }],
+      });
+      expect(backwards.status).toBe(400);
+      expect(backwards.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'runs[0].start_date' }),
+      );
+    });
+
     it('rejects unknown fields (whitelist)', async () => {
-      const res = await createPlan('admin', { name: 'Ok', nope: true });
+      const res = await createPlan('admin', { name: 'Ok', nope: true, runs: [{ name: 'Run' }] });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('is 404 for an unknown project and 409 on an archived project', async () => {
-      const unknown = await createPlan('admin', { name: 'X' }, '00000000-0000-4000-8000-000000000000');
+      const unknown = await createPlan(
+        'admin',
+        { name: 'X', runs: [{ name: 'Run' }] },
+        '00000000-0000-4000-8000-000000000000',
+      );
       expect(unknown.status).toBe(404);
       await archiveProject(otherProjectId);
-      const archived = await createPlan('admin', { name: 'X' }, otherProjectId);
+      const archived = await createPlan(
+        'admin',
+        { name: 'X', runs: [{ name: 'Run' }] },
+        otherProjectId,
+      );
       expect(archived.status).toBe(409);
+    });
+  });
+
+  describe('create with runs', () => {
+    it('creates every run under the new plan with its own fields', async () => {
+      const plan = await createPlanOk({
+        name: 'Release 2.4',
+        runs: [
+          {
+            name: '  Smoke  ',
+            description: '  first  ',
+            start_date: '2026-11-02',
+            due_date: '2026-11-06',
+          },
+          { name: 'Full regression', description: '   ' },
+        ],
+      });
+      expect(plan.run_count).toBe(2);
+
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ plan_id: plan.id });
+      expect(runs.status).toBe(200);
+      const byName = new Map(
+        (runs.body.data as Array<Record<string, unknown>>).map((run) => [run['name'], run]),
+      );
+      expect(byName.size).toBe(2);
+      expect(byName.get('Smoke')).toMatchObject({
+        description: 'first',
+        start_date: '2026-11-02',
+        due_date: '2026-11-06',
+        plan_id: plan.id,
+        counts: expect.objectContaining({ total: 0 }),
+      });
+      expect(byName.get('Full regression')).toMatchObject({
+        description: null,
+        start_date: null,
+        due_date: null,
+        plan_id: plan.id,
+        counts: expect.objectContaining({ total: 0 }),
+      });
+    });
+
+    it('rolls the plan and earlier runs back when a later run is rejected', async () => {
+      const res = await createPlan('admin', {
+        name: 'Atomic plan',
+        runs: [
+          { name: 'Good run' },
+          { name: 'Backwards', start_date: '2026-11-09', due_date: '2026-11-02' },
+        ],
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'runs[1].start_date' }),
+      );
+
+      // The plan was inserted before the failing run, so this proves rollback.
+      const plans = await listPlans('admin', { query: 'atomic plan' });
+      expect(plans.body.meta.total).toBe(0);
+
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ query: 'Good run' });
+      expect(runs.body.meta.total).toBe(0);
+    });
+
+    it('allows later run deletion to leave a plan with no runs', async () => {
+      const plan = await createPlanOk({ name: 'Drained' });
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ plan_id: plan.id });
+      const runId = (runs.body.data as Array<{ id: string }>)[0]?.id;
+      expect(runId).toBeDefined();
+
+      expect(
+        (await test.req.delete(`/api/v1/runs/${runId}`).set(as('admin'))).status,
+      ).toBe(204);
+
+      // Create-only rule: the plan survives, now with zero runs.
+      const detail = await getPlan('admin', plan.id);
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.run_count).toBe(0);
+      expect(detail.body.data.counts).toMatchObject({ total: 0, percent_complete: 0 });
     });
   });
 
   describe('duplicate names', () => {
     it('is 409 naming the field, ignoring case and surrounding spaces', async () => {
       await createPlanOk({ name: 'Release 2.4' });
-      const res = await createPlan('admin', { name: '  release 2.4 ' });
+      const res = await createPlan('admin', {
+        name: '  release 2.4 ',
+        runs: [{ name: 'Run' }],
+      });
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe('CONFLICT');
       expect(res.body.error.details).toContainEqual(
@@ -297,11 +445,18 @@ describe('Plans API (integration)', () => {
 
     it('scopes uniqueness to the project and frees the name on delete', async () => {
       const plan = await createPlanOk({ name: 'Release 2.4' });
-      const sameName = await createPlan('admin', { name: 'Release 2.4' }, otherProjectId);
+      const sameName = await createPlan(
+        'admin',
+        { name: 'Release 2.4', runs: [{ name: 'Run' }] },
+        otherProjectId,
+      );
       expect(sameName.status).toBe(201);
 
       expect((await deletePlan('admin', plan.id)).status).toBe(204);
-      const reused = await createPlan('admin', { name: 'Release 2.4' });
+      const reused = await createPlan('admin', {
+        name: 'Release 2.4',
+        runs: [{ name: 'Run' }],
+      });
       expect(reused.status).toBe(201);
     });
   });
@@ -476,7 +631,8 @@ describe('Plans API (integration)', () => {
       ).toBe(201);
 
       const detail = await getPlan('admin', plan.id);
-      expect(detail.body.data.run_count).toBe(1);
+      // Two runs: the empty one created with the plan, plus this one.
+      expect(detail.body.data.run_count).toBe(2);
       expect(detail.body.data.counts).toMatchObject({
         total: 2,
         passed: 1,
@@ -494,7 +650,7 @@ describe('Plans API (integration)', () => {
       // A second, untested run adds two more items and bumps run_count.
       const extra = await createRun([passCase], plan.id);
       const withExtra = await getPlan('admin', plan.id);
-      expect(withExtra.body.data.run_count).toBe(2);
+      expect(withExtra.body.data.run_count).toBe(3);
       expect(withExtra.body.data.counts).toMatchObject({ total: 3, untested: 1, passed: 1 });
 
       // Soft-deleting a run removes it from the rollup (its results are kept).
@@ -503,13 +659,24 @@ describe('Plans API (integration)', () => {
         .set(as('admin'));
       expect(removeExtra.status).toBe(204);
       const afterDelete = await getPlan('admin', plan.id);
-      expect(afterDelete.body.data.run_count).toBe(1);
+      expect(afterDelete.body.data.run_count).toBe(2);
       expect(afterDelete.body.data.counts).toMatchObject({ total: 2, untested: 0 });
     });
 
     it('sums the plan list rollup per page (a zero-run plan shows zeroes)', async () => {
       const withRuns = await createPlanOk({ name: 'With runs' });
-      await createPlanOk({ name: 'Empty' });
+      const empty = await createPlanOk({ name: 'Empty' });
+      // A plan starts with a run, so make it zero-run by deleting that run.
+      const planRuns = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ plan_id: empty.id });
+      const planRunId = (planRuns.body.data as Array<{ id: string }>)[0]?.id;
+      expect(planRunId).toBeDefined();
+      expect(
+        (await test.req.delete(`/api/v1/runs/${planRunId}`).set(as('admin'))).status,
+      ).toBe(204);
+
       const caseId = await createCase('Case');
       const { runId, itemIds } = await createRun([caseId], withRuns.id);
       expect((await record(runId, itemIds[0]!, { status: 'passed' })).status).toBe(201);
@@ -518,13 +685,14 @@ describe('Plans API (integration)', () => {
       const byName = new Map(
         (res.body.data as PlanData[]).map((plan) => [plan.name, plan]),
       );
+      expect(byName.get('Empty')?.run_count).toBe(0);
       expect(byName.get('Empty')?.counts).toMatchObject({ total: 0, percent_complete: 0 });
       expect(byName.get('With runs')?.counts).toMatchObject({
         total: 1,
         passed: 1,
         percent_complete: 100,
       });
-      expect(byName.get('With runs')?.run_count).toBe(1);
+      expect(byName.get('With runs')?.run_count).toBe(2);
     });
   });
 });

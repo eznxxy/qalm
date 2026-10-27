@@ -16,6 +16,15 @@
 
 /* Table styling lives with the columns in components/runs/runTable.css. */
 
+/* Two ways out of an empty runs list: a plan (with its runs) or a bare run. */
+.runs-empty-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
 /* ---- New run dialog ---- */
 
 .run-dialog .field-hint {

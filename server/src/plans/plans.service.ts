@@ -3,10 +3,12 @@ import { AuthUser } from '../auth/current-user';
 import { ApiError } from '../errors';
 import { Queryable } from '../db/queryable';
 import { ListMeta, buildListMeta } from '../projects/projects.service';
+import { assertDateOrder } from '../runs/date-order';
+import { RunsStore } from '../runs/runs.store';
 import { DEFAULT_LIMIT, DEFAULT_PAGE } from '../runs/runs.constants';
 import { CreatePlanDto, ListPlansQuery, UpdatePlanDto } from './dto';
 import { PlanListFilter, PlansStore } from './plans.store';
-import { PlanDto, barePlanDto, toPlanDto } from './plans.types';
+import { PlanDto, toPlanDto } from './plans.types';
 
 function planNotFound(): ApiError {
   return new ApiError('NOT_FOUND', 'Plan not found.');
@@ -33,9 +35,12 @@ function blankToNull(value: string | null | undefined): string | null {
  */
 @Injectable()
 export class PlansService {
-  constructor(@Inject(PlansStore) private readonly store: PlansStore) {}
+  constructor(
+    @Inject(PlansStore) private readonly store: PlansStore,
+    @Inject(RunsStore) private readonly runs: RunsStore,
+  ) {}
 
-  /** Paginated plans list for the plans screen, docs/api-plans.md § Endpoints. */
+  /** Paginated plans list for plan pickers and the plan detail screen. */
   async list(
     caller: AuthUser,
     projectId: string,
@@ -57,7 +62,11 @@ export class PlansService {
     return { data: rows.map(toPlanDto), meta: buildListMeta(total, page, limit) };
   }
 
-  /** Creates a plan; a brand-new plan has no runs, so counts are zeroed. */
+  /**
+   * Creates a plan **and its runs** in one transaction (docs/api-plans.md §
+   * POST). A plan is never born empty: `runs` is required and non-empty, and a
+   * rejected run rolls the plan back with it.
+   */
   async create(caller: AuthUser, projectId: string, dto: CreatePlanDto): Promise<PlanDto> {
     await this.requireProject(projectId, caller, 'write');
     // Pre-check names the field; the partial unique index (catch path) closes
@@ -76,7 +85,24 @@ export class PlansService {
         },
         client,
       );
-      return barePlanDto(row);
+      for (const [index, run] of dto.runs.entries()) {
+        const startDate = run.start_date ?? null;
+        const dueDate = run.due_date ?? null;
+        assertDateOrder(startDate, dueDate, `runs[${index}].start_date`);
+        await this.runs.insertRun(
+          {
+            project_id: projectId,
+            plan_id: row.id,
+            name: run.name,
+            description: blankToNull(run.description),
+            start_date: startDate,
+            due_date: dueDate,
+            created_by: caller.id,
+          },
+          client,
+        );
+      }
+      return this.loadPlan(row.id, client);
     });
   }
 

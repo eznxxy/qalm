@@ -30,5 +30,7 @@ import { RunsStore } from './runs.store';
     AttachmentsController,
   ],
   providers: [RunsService, ResultsService, RunsStore, AttachmentStorage],
+  /** PlansModule inserts a plan's first runs through the same store. */
+  exports: [RunsStore],
 })
 export class RunsModule {}

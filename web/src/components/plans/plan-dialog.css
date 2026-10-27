@@ -1,0 +1,17 @@
+/*
+ * Plan dialog (backlog card 3.3). Scoped under .plan-dialog; tokens only.
+ * The New plan dialog on the runs screen is taller and has its own
+ * plan-with-runs-dialog.css, so the two do not share rules.
+ */
+
+.plan-dialog .field-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.plan-dialog textarea,
+.plan-dialog input[type="date"] {
+  width: 100%;
+}

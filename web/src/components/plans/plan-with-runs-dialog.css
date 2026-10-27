@@ -1,0 +1,94 @@
+/*
+ * New plan dialog (runs screen, backlog card 3.6). Scoped under
+ * .plan-with-runs-dialog; tokens only. Taller than the other dialogs because it
+ * stacks a fieldset per run, so it scrolls inside the viewport instead of
+ * clipping.
+ */
+
+.plan-with-runs-dialog {
+  max-width: 44rem;
+  max-height: calc(100vh - 2 * var(--space-6));
+  overflow-y: auto;
+}
+
+.plan-with-runs-dialog .field-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.plan-with-runs-dialog textarea,
+.plan-with-runs-dialog .pwr-run input[type="date"] {
+  width: 100%;
+}
+
+.pwr-runs {
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.pwr-runs-hint {
+  margin: 0 0 var(--space-3);
+}
+
+.pwr-runs-empty {
+  margin: 0 0 var(--space-3);
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.pwr-run-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* One run per fieldset: the legend names it and Remove sits top-right. */
+.pwr-run {
+  position: relative;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.pwr-run legend {
+  padding: 0 var(--space-1);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.pwr-run-remove {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  height: var(--control-height-small);
+  padding: 0 var(--space-2);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Name and description share a row each; the dates sit side by side. */
+.pwr-run-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0 var(--space-4);
+}
+
+.pwr-run-grid .field {
+  min-width: 0;
+  margin-bottom: var(--space-3);
+}
+
+.pwr-run-grid .pwr-wide {
+  grid-column: 1 / -1;
+}
+
+.pwr-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 var(--space-3);
+}

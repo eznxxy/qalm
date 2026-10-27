@@ -14,18 +14,27 @@
  * Runs are fetched from the runs list with `plan_id=<id>` as the contract
  * prescribes (docs/api-plans.md § GET /plans/:id — runs are not embedded).
  *
- * Nothing here writes: create/edit/delete live on the plans list, where the
- * role-gated controls and the delete confirmation already are.
+ * Creation moved to the runs screen (card 3.6: a plan is created with its runs
+ * in one dialog), so this page is where a plan is edited and deleted. Both need
+ * Admin or Lead, and archived projects are read-only for everyone; the plan
+ * resource carries no project status, hence the extra `GET /projects/:id`.
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import type { Plan, Run } from "@/lib/api-types";
+import type { Plan, Project, Run } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
+import { useSession } from "@/lib/session";
+import { canWritePlans } from "@/lib/plan-permissions";
 import { formatDateOnly } from "@/lib/dates";
 import { DataTable, StatusBar, TableSkeleton } from "@/components/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  PlanFormDialog,
+  type PlanFormValues,
+} from "@/components/plans/PlanFormDialog";
 import {
   RUN_TABLE_NO_PLAN_CLASS,
   runTableColumns,
@@ -51,6 +60,7 @@ function errorMessage(err: unknown, fallback: string): string {
 }
 
 export default function PlanDetailPage() {
+  const { user } = useSession();
   const router = useRouter();
   const routeParams = useParams();
   const rawId = routeParams.id;
@@ -137,15 +147,128 @@ export default function PlanDetailPage() {
   const runsHref = projectId
     ? `/runs?project=${encodeURIComponent(projectId)}`
     : "/runs";
-  const plansHref = projectId
-    ? `/plans?project=${encodeURIComponent(projectId)}`
-    : "/plans";
+
+  // ---- project (archived → read-only) ----
+  const [project, setProject] = useState<Project | null>(null);
+  useEffect(() => {
+    if (!runProjectId) return;
+    let active = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!active) return;
+      try {
+        const loaded = await api.getProject(runProjectId);
+        if (active) setProject(loaded);
+      } catch (err) {
+        if (isSessionDead(err)) return;
+        // Only the write controls depend on this; the plan itself still renders.
+        if (active) setProject(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [runProjectId]);
+
+  const archived = project?.status === "archived";
+  const role = user?.role;
+  const canWrite =
+    Boolean(project) && !archived && Boolean(role) && canWritePlans(role!);
+
+  // ---- edit dialog ----
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editFieldErrors, setEditFieldErrors] = useState<{
+    name?: string;
+    description?: string;
+    due_date?: string;
+  }>({});
+  const [editError, setEditError] = useState<string | null>(null);
+
+  function openEdit(): void {
+    setEditFieldErrors({});
+    setEditError(null);
+    setEditOpen(true);
+  }
+
+  async function submitEdit(values: PlanFormValues): Promise<void> {
+    if (!plan) return;
+    setEditBusy(true);
+    setEditFieldErrors({});
+    setEditError(null);
+    // Always sends all three fields: an emptied input clears the value on the
+    // server (`null`) rather than leaving it unchanged.
+    try {
+      await api.updatePlan(plan.id, {
+        name: values.name,
+        description: values.description || null,
+        due_date: values.dueDate || null,
+      });
+      setEditOpen(false);
+      setPlanRetry((n) => n + 1);
+    } catch (err) {
+      if (isSessionDead(err)) {
+        setEditOpen(false);
+        return;
+      }
+      const fieldErrors: typeof editFieldErrors = {};
+      let form: string | null = null;
+      for (const detail of err instanceof ApiError ? (err.details ?? []) : []) {
+        if (
+          detail.field === "name" ||
+          detail.field === "description" ||
+          detail.field === "due_date"
+        ) {
+          fieldErrors[detail.field] = detail.issue;
+        } else {
+          form = detail.issue;
+        }
+      }
+      setEditFieldErrors(fieldErrors);
+      setEditError(
+        form ??
+          (Object.keys(fieldErrors).length === 0
+            ? errorMessage(err, "Could not save the plan. Please try again.")
+            : null)
+      );
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  // ---- delete dialog ----
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function confirmDelete(): Promise<void> {
+    if (!plan) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await api.deletePlan(plan.id);
+      setDeleteOpen(false);
+      // The runs survive (PRD decision 7) — only the container is gone — so the
+      // runs list is the honest place to land.
+      router.push(runsHref);
+    } catch (err) {
+      if (isSessionDead(err)) {
+        setDeleteOpen(false);
+        return;
+      }
+      setDeleteError(
+        errorMessage(err, "Could not delete the plan. Please try again.")
+      );
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   if (planState.kind === "loading") {
     return (
       <div className="page plan-detail-page" aria-busy="true">
         <p className="pd-back">
-          <Link href={plansHref}>← Test plans</Link>
+          <Link href={runsHref}>← Test runs</Link>
         </p>
         <p className="pd-subtitle">Loading plan…</p>
         <TableSkeleton rows={5} columns={6} label="Loading plan runs" />
@@ -160,7 +283,7 @@ export default function PlanDetailPage() {
           <h1>Plan not found</h1>
           <p>This plan does not exist, or it was deleted.</p>
           <p>
-            <Link href={plansHref}>Back to test plans</Link>
+            <Link href={runsHref}>Back to test runs</Link>
           </p>
         </div>
       </div>
@@ -201,17 +324,45 @@ export default function PlanDetailPage() {
   return (
     <div className="page plan-detail-page">
       <p className="pd-back">
-        <Link href={plansHref}>← Test plans</Link>
+        <Link href={runsHref}>← Test runs</Link>
       </p>
 
       <div className="pd-heading">
         <h1 className="pd-title">{thePlan.name}</h1>
-        {thePlan.due_date && (
-          <p className="pd-due">
-            Due <time dateTime={thePlan.due_date}>{formatDateOnly(thePlan.due_date)}</time>
-          </p>
-        )}
+        <div className="pd-heading-side">
+          {thePlan.due_date && (
+            <p className="pd-due">
+              Due{" "}
+              <time dateTime={thePlan.due_date}>
+                {formatDateOnly(thePlan.due_date)}
+              </time>
+            </p>
+          )}
+          {canWrite && (
+            <div className="pd-actions">
+              <button type="button" className="secondary" onClick={openEdit}>
+                Edit plan
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteOpen(true);
+                }}
+              >
+                Delete plan
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {archived && (
+        <p className="pd-readonly">
+          This project is archived — this plan is read-only.
+        </p>
+      )}
 
       {thePlan.description && (
         <p className="pd-description">{thePlan.description}</p>
@@ -256,6 +407,45 @@ export default function PlanDetailPage() {
           </p>
         )}
       </section>
+
+      {editOpen && (
+        <PlanFormDialog
+          mode="edit"
+          initial={thePlan}
+          busy={editBusy}
+          serverFieldErrors={editFieldErrors}
+          formError={editError}
+          onSubmit={(values) => void submitEdit(values)}
+          onCancel={() => setEditOpen(false)}
+        />
+      )}
+
+      {deleteOpen && (
+        <ConfirmDialog
+          title={`Delete “${thePlan.name}”?`}
+          body={
+            <>
+              <p>
+                Its runs are kept: they stay in the project and simply stop being
+                part of this plan.
+              </p>
+              {deleteError && (
+                <p className="form-error" role="alert">
+                  {deleteError}
+                </p>
+              )}
+            </>
+          }
+          confirmLabel="Delete plan"
+          danger
+          busy={deleteBusy}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => {
+            setDeleteError(null);
+            setDeleteOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

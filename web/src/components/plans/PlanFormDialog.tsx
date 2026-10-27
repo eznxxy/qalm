@@ -15,6 +15,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Plan } from "@/lib/api-types";
 import { isDateOnly } from "@/lib/dates";
+import "./plan-dialog.css";
 
 export { isDateOnly };
 

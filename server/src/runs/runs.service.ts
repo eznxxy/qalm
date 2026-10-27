@@ -38,6 +38,7 @@ import {
   toRunItemDetailDto,
   toRunItemDto,
 } from './runs.types';
+import { assertDateOrder } from './date-order';
 
 function validationError(field: string, issue: string): ApiError {
   return new ApiError('VALIDATION_ERROR', 'Request validation failed.', [{ field, issue }]);
@@ -49,17 +50,6 @@ function runNotFound(): ApiError {
 
 function itemNotFound(): ApiError {
   return new ApiError('NOT_FOUND', 'Run item not found.');
-}
-
-/**
- * `start_date` and `due_date` are independent optional dates, except that a run
- * may not start after it is due (docs/api-runs.md § Validation). Both are plain
- * `YYYY-MM-DD` strings, so a lexical comparison is a date comparison.
- */
-function assertDateOrder(startDate: string | null, dueDate: string | null): void {
-  if (startDate === null || dueDate === null) return;
-  if (startDate <= dueDate) return;
-  throw validationError('start_date', 'must be on or before due_date');
 }
 
 function conflict(message: string, field = 'run_id'): ApiError {

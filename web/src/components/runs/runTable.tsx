@@ -15,7 +15,8 @@
  *
  * Two data gaps, surfaced rather than papered over:
  * - The run resource carries only `plan_id`, so the plan cell is filled from a
- *   caller-built `planId → name` map (falling back to "—").
+ *   caller-built `planId → name` map (falling back to "—"), and the caller's
+ *   `onOpenPlan` turns that cell into the way into a plan's detail screen.
  * - `assignee_ids` are ids and the API offers no per-project name lookup for
  *   non-Admins, so the assignee cell shows a count.
  */
@@ -42,6 +43,12 @@ export interface RunTableColumnsOptions {
   /** Plan id → name. Omit to leave the Plan column out. */
   planNames?: ReadonlyMap<string, string>;
   /**
+   * Opens the plan detail screen from the Plan cell. The plans list is gone
+   * (card 3.6: plans are created from the runs screen), so this cell is the
+   * only way into a plan without its id — omit only where the column is absent.
+   */
+  onOpenPlan?: (planId: string) => void;
+  /**
    * Server-side sorting only: the caller owns ?sort= and must pass
    * `sort`/`onSortChange` to DataTable, or the headers lie.
    */
@@ -53,6 +60,7 @@ type SortableProps = Pick<DataTableColumn<Run>, "sortable" | "sortValue">;
 export function runTableColumns({
   onOpenRun,
   planNames,
+  onOpenPlan,
   sortable = false,
 }: RunTableColumnsOptions): DataTableColumn<Run>[] {
   const sortProps = (
@@ -83,7 +91,22 @@ export function runTableColumns({
       key: "plan",
       header: "Plan",
       className: "run-col-plan",
-      render: (row) => (row.plan_id ? (planNames.get(row.plan_id) ?? "—") : "—"),
+      render: (row) => {
+        const planId = row.plan_id;
+        const name = planId ? planNames.get(planId) : undefined;
+        if (!planId || !name) return "—";
+        if (!onOpenPlan) return name;
+        return (
+          <button
+            type="button"
+            className="run-title-link"
+            aria-label={`Open plan ${name}`}
+            onClick={() => onOpenPlan(planId)}
+          >
+            {name}
+          </button>
+        );
+      },
     });
   }
 

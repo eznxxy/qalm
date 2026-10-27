@@ -1,16 +1,23 @@
 "use client";
 
 /**
- * Test runs — the project-scoped runs list (docs/DESIGN.md §4.3, backlog card
- * 3.1). One pane: toolbar (search + Open/Completed filter + New run), the runs
- * DataTable, and pagination.
+ * Test runs — the project-scoped runs list (docs/DESIGN.md §4.3, backlog cards
+ * 3.1 and 3.6). One pane: toolbar (search + Open/Completed filter + New plan +
+ * New run), the runs DataTable, and pagination.
+ *
+ * Plans are created here, not on a separate screen: a plan has no use without
+ * runs, so New plan opens one dialog that collects the plan and at least one
+ * run and posts them together (docs/api-plans.md § POST /plans). The plan's own
+ * detail route /plans/[id] still exists for its rollup, and its list endpoint
+ * is still read here for the Plan column and the New run dialog's plan picker.
  *
  * URL-as-state: ?project, ?query, ?status, ?sort and ?page. Reading
  * useSearchParams here is safe because the (app) layout's AppShell suspends
  * inside its own boundary.
  *
- * Roles: creating/editing runs needs Admin or Lead (docs/api-runs.md role
- * matrix). Archived projects are read-only for everyone, including Admins.
+ * Roles: creating/editing runs or plans needs Admin or Lead (docs/api-runs.md,
+ * docs/api-plans.md role matrices). Archived projects are read-only for
+ * everyone, including Admins.
  *
  * The table's columns live in @/components/runs/runTable, shared with a plan's
  * Runs section. The `planId → name` map the Plan column needs is still built
@@ -41,6 +48,7 @@ import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
 import { useSession } from "@/lib/session";
 import { canWriteRuns } from "@/lib/run-permissions";
+import { canWritePlans } from "@/lib/plan-permissions";
 import {
   DEFAULT_RUN_SORT,
   parseRunListParams,
@@ -57,6 +65,10 @@ import {
 } from "@/components/ui";
 import { RunFormDialog, type RunFormValues } from "@/components/runs/RunFormDialog";
 import {
+  PlanWithRunsDialog,
+  type PlanWithRunsValues,
+} from "@/components/plans/PlanWithRunsDialog";
+import {
   RUN_TABLE_CLASS,
   runTableColumns,
 } from "@/components/runs/runTable";
@@ -64,6 +76,15 @@ import "./runs.css";
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * `error.details[].field` values the New plan dialog can show inline. The API
+ * flattens nested validation as `runs[i].<field>` (docs/api-plans.md §
+ * Validation), so anything else — a conflict without a field, say — goes to the
+ * dialog's form-level error instead.
+ */
+const PLAN_FIELD_PATTERN =
+  /^(name|description|due_date|runs|runs\[\d+\]\.(name|description|start_date|due_date))$/;
 
 type ProjectState =
   | { kind: "loading" }
@@ -174,9 +195,14 @@ export default function RunsPage() {
   const archived = project?.status === "archived";
   const canWrite =
     Boolean(project) && !archived && Boolean(user) && canWriteRuns(user!.role);
+  // Same Admin/Lead gate as runs today, but read from the plans helper so this
+  // button follows the plans role matrix if the two ever diverge.
+  const canWritePlan =
+    Boolean(project) && !archived && Boolean(user) && canWritePlans(user!.role);
 
   // ---- plans (plan column + the New run dialog's plan select) ----
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansRetry, setPlansRetry] = useState(0);
   useEffect(() => {
     if (!projectId) return;
     let active = true;
@@ -196,7 +222,7 @@ export default function RunsPage() {
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [projectId, plansRetry]);
 
   // ---- suites (the New run dialog's suite picker) ----
   const [suites, setSuites] = useState<SuiteNode[]>([]);
@@ -366,6 +392,66 @@ export default function RunsPage() {
     }
   }
 
+  // ---- create plan dialog (the plan and its runs, one request) ----
+  const [creatingPlan, setCreatingPlan] = useState(false);
+  const [planCreateBusy, setPlanCreateBusy] = useState(false);
+  const [planFieldErrors, setPlanFieldErrors] = useState<
+    Record<string, string>
+  >({});
+  const [planFormError, setPlanFormError] = useState<string | null>(null);
+
+  async function submitPlanWithRuns(values: PlanWithRunsValues): Promise<void> {
+    if (!projectId) return;
+    setPlanCreateBusy(true);
+    setPlanFieldErrors({});
+    setPlanFormError(null);
+    try {
+      await api.createPlan(projectId, {
+        name: values.name,
+        description: values.description || null,
+        due_date: values.dueDate || null,
+        runs: values.runs.map((run) => ({
+          name: run.name,
+          ...(run.description ? { description: run.description } : {}),
+          ...(run.startDate ? { start_date: run.startDate } : {}),
+          ...(run.dueDate ? { due_date: run.dueDate } : {}),
+        })),
+      });
+      setCreatingPlan(false);
+      // The new plan feeds the Plan column and the New run picker; the new runs
+      // belong in this list. Stay on the screen: a plan's detail page is a
+      // second step, not the point of creating it.
+      setPlansRetry((n) => n + 1);
+      setRunsRetry((n) => n + 1);
+    } catch (err) {
+      if (isSessionDead(err)) {
+        setCreatingPlan(false);
+        return;
+      }
+      const fieldErrors: Record<string, string> = {};
+      let form: string | null = null;
+      for (const detail of err instanceof ApiError ? (err.details ?? []) : []) {
+        const field = detail.field;
+        // A detail without a field (or with an unexpected one) cannot be shown
+        // next to an input, so it becomes the dialog's form-level error.
+        if (field && PLAN_FIELD_PATTERN.test(field)) {
+          fieldErrors[field] = detail.issue;
+        } else {
+          form = detail.issue;
+        }
+      }
+      setPlanFieldErrors(fieldErrors);
+      setPlanFormError(
+        form ??
+          (Object.keys(fieldErrors).length === 0
+            ? errorMessage(err, "Could not create the plan. Please try again.")
+            : null)
+      );
+    } finally {
+      setPlanCreateBusy(false);
+    }
+  }
+
   const sortState = runSortState(url.sort);
   const dataSort: DataTableSort = { key: sortState.key, dir: sortState.dir };
   function onSortChange(next: DataTableSort | null): void {
@@ -377,6 +463,8 @@ export default function RunsPage() {
 
   const columns = runTableColumns({
     onOpenRun: (run) => router.push(`/runs/${run.id}?project=${projectId}`),
+    onOpenPlan: (planId) =>
+      router.push(`/plans/${planId}?project=${projectId}`),
     planNames,
     sortable: true,
   });
@@ -464,15 +552,23 @@ export default function RunsPage() {
       </button>
     );
   } else if (canWrite) {
-    emptyBody = "Create a run to pick the cases you want to test.";
+    emptyBody =
+      "Create a run to pick the cases you want to test, or start from a plan and its runs.";
     emptyAction = (
-      <button
-        type="button"
-        className="primary"
-        onClick={() => setCreating(true)}
-      >
-        New run
-      </button>
+      <div className="runs-empty-actions">
+        {canWritePlan && (
+          <button type="button" onClick={() => setCreatingPlan(true)}>
+            New plan
+          </button>
+        )}
+        <button
+          type="button"
+          className="primary"
+          onClick={() => setCreating(true)}
+        >
+          New run
+        </button>
+      </div>
     );
   }
 
@@ -510,6 +606,16 @@ export default function RunsPage() {
             ))}
           </select>
         </div>
+        {canWritePlan && (
+          <DisabledHint hint="Create a plan together with its runs">
+            <button
+              type="button"
+              onClick={() => setCreatingPlan(true)}
+            >
+              New plan
+            </button>
+          </DisabledHint>
+        )}
         {canWrite && (
           <DisabledHint hint="Create a run and pick its cases">
             <button
@@ -587,6 +693,16 @@ export default function RunsPage() {
           formError={createFormError}
           onSubmit={(values, selection) => void submitRun(values, selection)}
           onCancel={() => setCreating(false)}
+        />
+      )}
+
+      {creatingPlan && (
+        <PlanWithRunsDialog
+          busy={planCreateBusy}
+          serverFieldErrors={planFieldErrors}
+          formError={planFormError}
+          onSubmit={(values) => void submitPlanWithRuns(values)}
+          onCancel={() => setCreatingPlan(false)}
         />
       )}
     </div>

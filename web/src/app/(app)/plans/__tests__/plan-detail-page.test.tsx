@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import type { Plan, Project, Run, User } from "@/lib/api-types";
 
@@ -6,7 +6,8 @@ import type { Plan, Project, Run, User } from "@/lib/api-types";
  * Plan detail (card 3.3). A plan is a thin container: the screen shows its own
  * fields, the rollup headline and a read-only list of its runs, and it links a
  * run through to the run detail route. These tests pin the rollup copy, the
- * `plan_id` filter the page sends, the empty state and the 404.
+ * `plan_id` filter the page sends, the empty state and the 404 — plus the
+ * edit/delete pair that moved here when the plans list went away (card 3.6).
  */
 
 const mockRouteState = {
@@ -35,6 +36,10 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+function emptyResponse(status: number): Response {
+  return new Response(null, { status });
+}
+
 const USER: User = {
   id: "u-1",
   email: "ada@example.com",
@@ -44,6 +49,14 @@ const USER: User = {
   must_change_password: false,
   created_at: "2026-10-07T12:00:00Z",
   updated_at: "2026-10-07T12:00:00Z",
+};
+
+const LEAD: User = {
+  ...USER,
+  id: "u-2",
+  email: "lena@example.com",
+  name: "Lena Lead",
+  role: "lead",
 };
 
 const PROJECT: Project = {
@@ -134,13 +147,21 @@ const COMPLETED_RUN = makeRun({
 });
 
 const runCalls: string[] = [];
+const writeCalls = { update: [] as unknown[], del: [] as string[] };
 
 function mockApi({
   planStatus = 200,
   runs = [RUN, COMPLETED_RUN],
-}: { planStatus?: number; runs?: Run[] } = {}): jest.Mock {
+  user = USER,
+  project = PROJECT,
+}: {
+  planStatus?: number;
+  runs?: Run[];
+  user?: User;
+  project?: Project;
+} = {}): jest.Mock {
   const fetchMock = jest.fn(
-    (url: string, init?: { method?: string }) => {
+    (url: string, init?: { method?: string; body?: unknown }) => {
       const target = String(url);
       const method = init?.method ?? "GET";
 
@@ -156,7 +177,15 @@ function mockApi({
         );
       }
       if (target.includes("/auth/me")) {
-        return Promise.resolve(jsonResponse(200, { data: USER }));
+        return Promise.resolve(jsonResponse(200, { data: user }));
+      }
+      if (/\/plans\/[\w-]+$/.test(target) && method === "PATCH") {
+        writeCalls.update.push(JSON.parse(String(init?.body ?? "{}")));
+        return Promise.resolve(jsonResponse(200, { data: PLAN }));
+      }
+      if (/\/plans\/[\w-]+$/.test(target) && method === "DELETE") {
+        writeCalls.del.push(target);
+        return Promise.resolve(emptyResponse(204));
       }
       if (/\/plans\/[\w-]+$/.test(target) && method === "GET") {
         if (planStatus === 404) {
@@ -178,7 +207,7 @@ function mockApi({
         );
       }
       if (/\/projects\/[\w-]+$/.test(target) && method === "GET") {
-        return Promise.resolve(jsonResponse(200, { data: PROJECT }));
+        return Promise.resolve(jsonResponse(200, { data: project }));
       }
       return Promise.reject(new Error(`unexpected ${method} ${target}`));
     }
@@ -204,6 +233,8 @@ beforeEach(() => {
   mockRouteState.planId = "pl-1";
   mockRouteState.search = "project=p-1";
   runCalls.length = 0;
+  writeCalls.update.length = 0;
+  writeCalls.del.length = 0;
   mockPush.mockClear();
 });
 
@@ -294,7 +325,84 @@ describe("plan detail", () => {
       await screen.findByRole("heading", { level: 1, name: "Plan not found" })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Back to test plans" })
+      screen.getByRole("link", { name: "Back to test runs" })
     ).toBeInTheDocument();
+  });
+
+  it("shows the plan's own screen for edits and deletes", async () => {
+    mockApi({ user: LEAD });
+    await renderPage();
+
+    await screen.findByRole("heading", { level: 1, name: "Release 2.4" });
+    // Edit/Delete need the project too (the plan carries no status), so they
+    // appear one fetch after the heading.
+    expect(
+      await screen.findByRole("button", { name: "Edit plan" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Delete plan" })
+    ).toBeInTheDocument();
+  });
+
+  it("saves an edited plan and reloads it", async () => {
+    mockApi({ user: LEAD });
+    await renderPage();
+
+    await screen.findByRole("heading", { level: 1, name: "Release 2.4" });
+    fireEvent.click(await screen.findByRole("button", { name: "Edit plan" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Edit plan" });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save plan" }));
+
+    await waitFor(() => expect(writeCalls.update).toHaveLength(1));
+    expect(writeCalls.update[0]).toEqual({
+      name: "Release 2.5",
+      description: PLAN.description,
+      due_date: PLAN.due_date,
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Edit plan" })).toBeNull()
+    );
+  });
+
+  it("deletes the plan after confirming that the runs survive, then returns to runs", async () => {
+    mockApi({ user: LEAD });
+    await renderPage();
+
+    await screen.findByRole("heading", { level: 1, name: "Release 2.4" });
+    fireEvent.click(await screen.findByRole("button", { name: "Delete plan" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("Delete “Release 2.4”?");
+    expect(dialog).toHaveTextContent("Its runs are kept");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete plan" }));
+    await waitFor(() => expect(writeCalls.del[0]).toContain("/plans/pl-1"));
+    expect(mockPush).toHaveBeenCalledWith("/runs?project=p-1");
+  });
+
+  it("hides both write controls from a Tester", async () => {
+    mockApi();
+    await renderPage();
+
+    await screen.findByRole("table", { name: "Plan runs" });
+    expect(screen.queryByRole("button", { name: "Edit plan" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete plan" })).toBeNull();
+  });
+
+  it("tells a Lead the plan is read-only while the project is archived", async () => {
+    mockApi({ user: LEAD, project: { ...PROJECT, status: "archived" } });
+    await renderPage();
+
+    expect(
+      await screen.findByText(
+        "This project is archived — this plan is read-only."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit plan" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete plan" })).toBeNull();
   });
 });

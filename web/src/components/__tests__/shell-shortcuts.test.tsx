@@ -147,7 +147,7 @@ describe("§7 shortcuts", () => {
     expect(document.activeElement).toBe(box);
   });
 
-  it("g then c / r / p navigates (carrying the project scope), g then x does not", async () => {
+  it("g then c / r navigates (carrying the project scope), a bare key does not", async () => {
     mockRouterState.search = "project=p-2";
     await renderShell();
 
@@ -163,15 +163,20 @@ describe("§7 shortcuts", () => {
       expect(mockRouterState.push).toHaveBeenCalledWith("/runs?project=p-2")
     );
 
-    fireEvent.keyDown(window, { key: "g" });
-    fireEvent.keyDown(window, { key: "p" });
-    await waitFor(() =>
-      expect(mockRouterState.push).toHaveBeenCalledWith("/plans?project=p-2")
-    );
-
     // An unpaired trailing key arms nothing: a bare "c" is not a shortcut.
     fireEvent.keyDown(window, { key: "c" });
-    expect(mockRouterState.push).toHaveBeenCalledTimes(3);
+    expect(mockRouterState.push).toHaveBeenCalledTimes(2);
+  });
+
+  it("g then p has no list page to reach any more", async () => {
+    mockRouterState.search = "project=p-2";
+    await renderShell();
+
+    // Plans are created from the runs screen; the plans list is gone, so its
+    // chord went with it (card 3.6).
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: "p" });
+    expect(mockRouterState.push).not.toHaveBeenCalled();
   });
 
   it("a lone g navigates nowhere until a suffix arrives", async () => {
