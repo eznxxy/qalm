@@ -10,8 +10,9 @@ import type { RunFormValues } from "@/components/runs/RunFormDialog";
 
 /**
  * RunFormDialog (card 3.1): inline validation and the create-only case
- * selection it hands back — the suite subtree (with the descendants toggle,
- * on by default) and/or explicit cases picked from the debounced search.
+ * selection it hands back — one or more suite subtrees (one shared descendants
+ * toggle, on by default) and/or explicit cases picked from the debounced
+ * search.
  */
 
 const mockApi = {
@@ -44,6 +45,7 @@ const SUITES: SuiteNode[] = [
     name: "Checkout",
     children: [suite({ id: "s-2", parent_id: "s-1", name: "Payments", depth: 2 })],
   }),
+  suite({ id: "s-3", name: "Accounts", position: 2 }),
 ];
 
 const PLANS: Plan[] = [
@@ -104,9 +106,9 @@ async function renderDialog(
   );
 }
 
-/** Opens the suite combobox and commits the option with the given name. */
+/** Opens the suite picker and commits the option with the given name. */
 function chooseSuite(name: string): void {
-  const field = screen.getByLabelText("Whole suite");
+  const field = screen.getByLabelText("Whole suites");
   fireEvent.click(field);
   const option = screen.getByRole("option", { name });
   fireEvent.mouseDown(option);
@@ -244,12 +246,17 @@ describe("RunFormDialog", () => {
       target: { value: "Checkout smoke" },
     });
     chooseSuite("Checkout");
-    expect(screen.getByLabelText("Whole suite")).toHaveValue("Checkout");
+
+    // The picker stays a search box; the choice becomes a chip.
+    expect(screen.getByLabelText("Whole suites")).toHaveValue("");
+    const chips = screen.getByRole("list", { name: "Selected suites" });
+    expect(within(chips).getByText("Checkout")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Create run" }));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Checkout smoke" }),
-      { suite_id: "s-1", include_descendants: true }
+      { suite_ids: ["s-1"], include_descendants: true }
     );
   });
 
@@ -266,7 +273,89 @@ describe("RunFormDialog", () => {
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Checkout smoke" }),
-      { suite_id: "s-1", include_descendants: false }
+      { suite_ids: ["s-1"], include_descendants: false }
+    );
+  });
+
+  it("collects several suites in the order they were added", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit);
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Release smoke" },
+    });
+    chooseSuite("Checkout");
+    chooseSuite("Accounts");
+
+    const chips = screen.getByRole("list", { name: "Selected suites" });
+    expect(
+      within(chips)
+        .getAllByRole("listitem")
+        .map((row) => row.textContent)
+    ).toEqual(["Checkout×", "Accounts×"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create run" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Release smoke" }),
+      { suite_ids: ["s-1", "s-3"], include_descendants: true }
+    );
+  });
+
+  it("removes one suite and keeps the rest", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit);
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Release smoke" },
+    });
+    chooseSuite("Checkout");
+    chooseSuite("Accounts");
+    fireEvent.click(screen.getByRole("button", { name: "Remove suite Checkout" }));
+
+    expect(screen.queryByRole("button", { name: "Remove suite Checkout" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Create run" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Release smoke" }),
+      { suite_ids: ["s-3"], include_descendants: true }
+    );
+  });
+
+  it("does not offer a suite that is already on the run", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit);
+
+    chooseSuite("Checkout");
+    fireEvent.click(screen.getByLabelText("Whole suites"));
+
+    // The chosen root is gone from the list; its child and the other root stay.
+    expect(screen.queryByRole("option", { name: "Checkout" })).toBeNull();
+    expect(screen.getByRole("option", { name: /Payments/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Accounts" })).toBeInTheDocument();
+
+    // Removing it puts it back.
+    fireEvent.keyDown(screen.getByLabelText("Whole suites"), { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Remove suite Checkout" }));
+    fireEvent.click(screen.getByLabelText("Whole suites"));
+    expect(screen.getByRole("option", { name: "Checkout" })).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("sends no suite field when every suite was removed", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit);
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Release smoke" },
+    });
+    chooseSuite("Checkout");
+    fireEvent.click(screen.getByRole("button", { name: "Remove suite Checkout" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create run" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Release smoke" }),
+      undefined
     );
   });
 

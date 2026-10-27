@@ -14,6 +14,8 @@ export const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export const MAX_RUN_ITEMS = 2_000;
 /** Upper bound for one add-cases request. */
 export const ADD_CASES_MAX = 200;
+/** Upper bound for a create selection's `suite_ids` (docs/api-runs.md). */
+export const RUN_SELECTION_SUITES_MAX = 20;
 
 export const RESULT_STATUSES = ['passed', 'failed', 'blocked', 'retest', 'skipped'] as const;
 export type ResultStatus = (typeof RESULT_STATUSES)[number];

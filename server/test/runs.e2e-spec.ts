@@ -294,7 +294,7 @@ describe('Runs API (integration)', () => {
         name: '  Release 2.4 smoke  ',
         description: 'Smoke pass.',
         due_date: '2026-11-14',
-        selection: { case_ids: [c4.id, c1.id], suite_id: rootSuiteId },
+        selection: { case_ids: [c4.id, c1.id], suite_ids: [rootSuiteId] },
       });
 
       expect(res.status).toBe(201);
@@ -350,6 +350,33 @@ describe('Runs API (integration)', () => {
       expect(run.suite_ids).toEqual([]);
     });
 
+    it('unions several suites, tolerating a repeated id and a nested pick', async () => {
+      await createCaseIn(rootSuiteId, 'Root case');
+      await createCaseIn(childSuiteId, 'Child case');
+      const other = await createCaseIn(otherSuiteId, 'Other case');
+
+      const res = await createRun('lead', {
+        name: 'Two suites',
+        selection: {
+          // A repeated root and a child of it must not duplicate items.
+          suite_ids: [rootSuiteId, otherSuiteId, rootSuiteId, childSuiteId],
+          case_ids: [other.id],
+        },
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.counts.total).toBe(3);
+      expect([...res.body.data.suite_ids].sort()).toEqual(
+        [rootSuiteId, childSuiteId, otherSuiteId].sort(),
+      );
+      const items = itemData(await listItems('lead', res.body.data.id as string));
+      expect(items.map((row) => row.case_title).sort()).toEqual([
+        'Child case',
+        'Other case',
+        'Root case',
+      ]);
+    });
+
     it('stores start_date as a plain date and 400s a start date after the due date', async () => {
       const run = await createOk({
         name: 'Dated',
@@ -383,10 +410,13 @@ describe('Runs API (integration)', () => {
     it('400s an unknown selection suite, 400s a foreign plan_id and 409s an archived project', async () => {
       const badSuite = await createRun('admin', {
         name: 'Bad',
-        selection: { suite_id: '018f2a41-7c3d-7a1e-9b2f-4a5b6c7d8e9f' },
+        selection: { suite_ids: ['018f2a41-7c3d-7a1e-9b2f-4a5b6c7d8e9f'] },
       });
       expect(badSuite.status).toBe(400);
       expect(badSuite.body.error.code).toBe('VALIDATION_ERROR');
+      expect(badSuite.body.error.details).toEqual([
+        { field: 'selection.suite_ids[0]', issue: 'is not a suite in this project' },
+      ]);
 
       const foreignPlan = await createRun('admin', {
         name: 'Bad',
@@ -618,7 +648,7 @@ describe('Runs API (integration)', () => {
       await createCaseIn(rootSuiteId, 'Root case');
       await createCaseIn(childSuiteId, 'Child case');
       await createCaseIn(otherSuiteId, 'Other case');
-      const run = await createOk({ selection: { suite_id: rootSuiteId } });
+      const run = await createOk({ selection: { suite_ids: [rootSuiteId] } });
       const items = itemData(await listItems('admin', run.id));
       const childItem = items.find((row) => row.case_title === 'Child case')!;
       await insertResult(childItem.id, 'failed', 'boom');
@@ -638,7 +668,7 @@ describe('Runs API (integration)', () => {
     it('sorts by status severity and 404s an unknown run', async () => {
       await createCaseIn(rootSuiteId, 'A');
       await createCaseIn(childSuiteId, 'B');
-      const run = await createOk({ selection: { suite_id: rootSuiteId } });
+      const run = await createOk({ selection: { suite_ids: [rootSuiteId] } });
       const items = itemData(await listItems('admin', run.id));
       await insertResult(items[0]!.id, 'passed');
 

@@ -84,7 +84,8 @@
   border: none;
 }
 
-.run-case-chips {
+.run-case-chips,
+.run-suite-chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -93,7 +94,8 @@
   padding: 0;
 }
 
-.run-case-chips li {
+.run-case-chips li,
+.run-suite-chips li {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -106,7 +108,8 @@
   line-height: 18px;
 }
 
-.run-case-chips li > span {
+.run-case-chips li > span,
+.run-suite-chips li > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

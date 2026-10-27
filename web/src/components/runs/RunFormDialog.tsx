@@ -4,10 +4,15 @@
  * RunFormDialog — "New run" (docs/backlog-slice3-plans-runs.md card 3.1,
  * docs/api-runs.md § POST /projects/:projectId/runs).
  *
- * The form collects the run's own fields plus its case selection: a suite
- * (optionally with descendants) and/or a set of explicit cases, which the API
- * unions and de-duplicates. Field rules mirror the contract: `name` required
- * ≤ 120, `description` ≤ 1,000, `due_date` a plain `YYYY-MM-DD`.
+ * The form collects the run's own fields plus its case selection: one or more
+ * whole suites (optionally with descendants) and/or a set of explicit cases,
+ * which the API unions and de-duplicates. Field rules mirror the contract:
+ * `name` required ≤ 120, `description` ≤ 1,000, `due_date` a plain
+ * `YYYY-MM-DD`.
+ *
+ * The suite picker adds one suite per choice and keeps the chosen ones as
+ * removable chips, so the field itself always stays a search box — a run can
+ * cover several sibling areas (docs/api-runs.md `selection.suite_ids`).
  *
  * The explicit-case picker searches the project's cases itself (debounced
  * `api.listCases`), the same way CaseEditor talks to the API directly rather
@@ -33,6 +38,8 @@ import { Combobox, DisabledHint } from "@/components/ui";
 
 export const RUN_NAME_MAX = 120;
 export const RUN_DESCRIPTION_MAX = 1000;
+/** Mirrors `selection.suite_ids` 1–20 in docs/api-runs.md. */
+export const RUN_SELECTION_SUITES_MAX = 20;
 
 const CASE_SEARCH_DEBOUNCE_MS = 300;
 const CASE_SEARCH_LIMIT = 20;
@@ -109,7 +116,7 @@ export function RunFormDialog({
     startDate: "",
     dueDate: "",
   });
-  const [suiteId, setSuiteId] = useState("");
+  const [suiteIds, setSuiteIds] = useState<string[]>([]);
   const [includeDescendants, setIncludeDescendants] = useState(true);
   const [selectedCases, setSelectedCases] = useState<CaseListItem[]>([]);
   const [caseQuery, setCaseQuery] = useState("");
@@ -274,6 +281,26 @@ export function RunFormDialog({
     depth: option.depth,
     path: option.path,
   }));
+  const suiteLabelById = new Map(
+    suiteOptions.map((option) => [option.id, option.label])
+  );
+  // Chosen suites leave the list, so the same suite cannot be added twice.
+  const addableSuites = suiteOptions.filter(
+    (option) => !suiteIds.includes(option.id)
+  );
+  const suiteCapReached = suiteIds.length >= RUN_SELECTION_SUITES_MAX;
+
+  function addSuite(id: string): void {
+    setSuiteIds((current) =>
+      current.includes(id) || current.length >= RUN_SELECTION_SUITES_MAX
+        ? current
+        : [...current, id]
+    );
+  }
+
+  function removeSuite(id: string): void {
+    setSuiteIds((current) => current.filter((suite) => suite !== id));
+  }
 
   function addCase(row: CaseListItem): void {
     setSelectedCases((current) =>
@@ -290,11 +317,11 @@ export function RunFormDialog({
     if (selectedCases.length > 0) {
       selection.case_ids = selectedCases.map((item) => item.id);
     }
-    if (suiteId) {
-      selection.suite_id = suiteId;
+    if (suiteIds.length > 0) {
+      selection.suite_ids = [...suiteIds];
       selection.include_descendants = includeDescendants;
     }
-    return selection.case_ids || selection.suite_id ? selection : undefined;
+    return selection.case_ids || selection.suite_ids ? selection : undefined;
   }
 
   function handleSubmit(event: FormEvent): void {
@@ -475,20 +502,47 @@ export function RunFormDialog({
             <legend>Cases</legend>
 
             <div className="field">
-              <label htmlFor={suiteIdField}>Whole suite</label>
+              <label htmlFor={suiteIdField}>Whole suites</label>
               <Combobox
                 id={suiteIdField}
-                value={suiteId}
-                options={suiteOptions}
-                onChange={setSuiteId}
-                placeholder="Search suites…"
-                emptyMessage="No suites match."
-                disabled={busy}
+                value=""
+                options={addableSuites}
+                onChange={addSuite}
+                placeholder="Add a suite…"
+                emptyMessage={
+                  addableSuites.length === 0
+                    ? "Every suite is already selected."
+                    : "No suites match."
+                }
+                disabled={busy || suiteCapReached}
                 openOnFocus={false}
               />
+              {suiteIds.length > 0 && (
+                <ul className="run-suite-chips" aria-label="Selected suites">
+                  {suiteIds.map((id) => {
+                    const label = suiteLabelById.get(id) ?? id;
+                    return (
+                      <li key={id}>
+                        <span>{label}</span>
+                        <button
+                          type="button"
+                          className="run-case-remove"
+                          aria-label={`Remove suite ${label}`}
+                          title="Remove"
+                          disabled={busy}
+                          onClick={() => removeSuite(id)}
+                        >
+                          <span aria-hidden="true">×</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
               <p className="field-hint">
-                Adds every live case in the suite (and its descendants, unless
-                you turn that off). Optional.
+                {suiteCapReached
+                  ? `Up to ${RUN_SELECTION_SUITES_MAX} suites per run.`
+                  : "Each suite adds every live case inside it (and its descendants, unless you turn that off). Optional."}
               </p>
             </div>
 
@@ -497,7 +551,7 @@ export function RunFormDialog({
                 id={descendantsId}
                 type="checkbox"
                 checked={includeDescendants}
-                disabled={busy || !suiteId}
+                disabled={busy || suiteIds.length === 0}
                 onChange={(event) => setIncludeDescendants(event.target.checked)}
               />
               <label htmlFor={descendantsId}>Include descendants</label>

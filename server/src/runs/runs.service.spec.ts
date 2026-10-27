@@ -182,6 +182,27 @@ class FakeStore {
     return walk(suiteId);
   }
 
+  async findSuiteIds(projectId: string, suiteIds: string[]): Promise<Set<string>> {
+    return new Set(
+      this.suites
+        .filter((suite) => suite.project_id === projectId && suiteIds.includes(suite.id))
+        .map((suite) => suite.id),
+    );
+  }
+
+  async suiteSubtreeIdsMany(
+    projectId: string,
+    suiteIds: string[],
+    includeDescendants: boolean,
+  ): Promise<string[]> {
+    const ids = new Set<string>();
+    for (const suiteId of suiteIds) {
+      const subtree = await this.suiteSubtreeIds(projectId, suiteId, includeDescendants);
+      for (const id of subtree) ids.add(id);
+    }
+    return [...ids];
+  }
+
   // --- runs ---------------------------------------------------------------
 
   async findLiveById(id: string): Promise<RunRow | null> {
@@ -885,7 +906,7 @@ describe('RunsService (unit, in-memory runs)', () => {
 
       const dto = {
         name: 'Smoke',
-        selection: { case_ids: [c4.id, c1.id], suite_id: 's-root' },
+        selection: { case_ids: [c4.id, c1.id], suite_ids: ['s-root'] },
       };
       const run = await service.create(AS('lead'), 'p-1', dto);
 
@@ -895,6 +916,23 @@ describe('RunsService (unit, in-memory runs)', () => {
       expect(items.data.map((row) => row.position)).toEqual([1, 2, 3, 4]);
       expect(items.data[0]!.case_title).toBe('Root');
       expect(items.data[0]!.status).toBe('untested');
+    });
+
+    it('unions several suites, tolerating a repeated id and an overlapping subtree', async () => {
+      store.addCase({ caseNumber: 1, suiteId: 's-root', title: 'Root' });
+      store.addCase({ caseNumber: 2, suiteId: 's-child', title: 'Child' });
+      store.addCase({ caseNumber: 3, suiteId: 's-other', title: 'Other' });
+
+      const run = await service.create(AS('lead'), 'p-1', {
+        name: 'Two suites',
+        // s-root is repeated and s-child sits inside it; the union still holds
+        // one item per case.
+        selection: { suite_ids: ['s-root', 's-other', 's-root', 's-child'] },
+      });
+
+      expect(run.counts.total).toBe(3);
+      const items = await service.listItems(AS('lead'), run.id, {});
+      expect(items.data.map((row) => row.case_display_id)).toEqual(['C1', 'C2', 'C3']);
     });
 
     it('creates an empty run when the selection is omitted or matches nothing', async () => {
@@ -909,13 +947,15 @@ describe('RunsService (unit, in-memory runs)', () => {
     });
 
     it('400s an unknown selection suite and writes nothing', async () => {
-      await expectCode(
+      await expect(
         service.create(AS('admin'), 'p-1', {
           name: 'Bad suite',
-          selection: { suite_id: 's-other-project' },
+          selection: { suite_ids: ['s-other-project'] },
         }),
-        'VALIDATION_ERROR',
-      );
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: [{ field: 'selection.suite_ids[0]', issue: 'is not a suite in this project' }],
+      });
       expect(store.runs).toHaveLength(0);
     });
 
@@ -1015,7 +1055,7 @@ describe('RunsService (unit, in-memory runs)', () => {
       await expectCode(
         service.create(AS('admin'), 'p-1', {
           name: 'Too big',
-          selection: { suite_id: 's-root' },
+          selection: { suite_ids: ['s-root'] },
         }),
         'VALIDATION_ERROR',
       );

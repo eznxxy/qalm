@@ -498,13 +498,14 @@ export interface RunListQuery {
 }
 
 /**
- * Create-only case selection: explicit cases and/or a suite subtree. The API
- * unions and de-duplicates them; an omitted or empty selection creates an
- * empty run.
+ * Create-only case selection: explicit cases and/or one or more suite
+ * subtrees. The API unions and de-duplicates them; an omitted or empty
+ * selection creates an empty run.
  */
 export interface RunSelection {
   case_ids?: string[];
-  suite_id?: string;
+  /** 1–20 distinct suites; every subtree is unioned with `case_ids`. */
+  suite_ids?: string[];
   /** Server default is true; send false for direct cases only. */
   include_descendants?: boolean;
 }

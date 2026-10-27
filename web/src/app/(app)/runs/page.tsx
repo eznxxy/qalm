@@ -367,15 +367,19 @@ export default function RunsPage() {
       const fieldErrors: typeof createFieldErrors = {};
       let form: string | null = null;
       for (const detail of err instanceof ApiError ? (err.details ?? []) : []) {
+        // `selection.suite_ids[0]` is a selection problem; show it by the
+        // picker rather than as a bare form error.
+        const rawField = detail.field ?? "";
+        const field = rawField.startsWith("selection.") ? "selection" : rawField;
         if (
-          detail.field === "name" ||
-          detail.field === "description" ||
-          detail.field === "start_date" ||
-          detail.field === "due_date" ||
-          detail.field === "plan_id" ||
-          detail.field === "selection"
+          field === "name" ||
+          field === "description" ||
+          field === "start_date" ||
+          field === "due_date" ||
+          field === "plan_id" ||
+          field === "selection"
         ) {
-          fieldErrors[detail.field] = detail.issue;
+          fieldErrors[field] = detail.issue;
         } else {
           form = detail.issue;
         }

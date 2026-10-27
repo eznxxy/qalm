@@ -1,5 +1,6 @@
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
@@ -28,6 +29,7 @@ import {
   RESULT_STATUSES,
   RUN_DESCRIPTION_MAX,
   RUN_NAME_MAX,
+  RUN_SELECTION_SUITES_MAX,
   RUN_SORT_PATTERN,
   ItemStatus,
   ResultStatus,
@@ -199,7 +201,7 @@ export function IsHttpUrl(): PropertyDecorator {
   };
 }
 
-/** Create-only case selection: explicit ids and/or a suite subtree. */
+/** Create-only case selection: explicit ids and/or one or more suite subtrees. */
 export class RunSelectionDto {
   @IsOptional()
   @IsArray()
@@ -208,10 +210,13 @@ export class RunSelectionDto {
   case_ids?: string[];
 
   @IsOptional()
-  @IsUUID()
-  suite_id?: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(RUN_SELECTION_SUITES_MAX)
+  @IsUUID('all', { each: true })
+  suite_ids?: string[];
 
-  /** Defaults to true: the selected suite plus its descendants. */
+  /** Defaults to true: every selected suite plus its descendants. */
   @IsOptional()
   @ToBoolean()
   @IsBoolean()

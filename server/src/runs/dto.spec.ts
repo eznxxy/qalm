@@ -92,18 +92,36 @@ describe('runs DTOs', () => {
         .toContain('start_date');
     });
 
-    it('validates the nested selection and defaults include_descendants', async () => {
+    it('validates the nested selection and its suite list', async () => {
       const dto = await transform(CreateRunDto, validCreate({
-        selection: { case_ids: [UUID], suite_id: OTHER_UUID },
+        selection: { case_ids: [UUID], suite_ids: [OTHER_UUID] },
       }));
-      expect(dto.selection).toEqual({ case_ids: [UUID], suite_id: OTHER_UUID });
+      expect(dto.selection).toEqual({ case_ids: [UUID], suite_ids: [OTHER_UUID] });
       expect(await issuesFor(CreateRunDto, validCreate({ selection: {} }))).toEqual([]);
       expect(
         await fieldsOf(CreateRunDto, validCreate({ selection: { case_ids: ['nope'] } })),
       ).toContain('selection.case_ids');
       expect(
-        await fieldsOf(CreateRunDto, validCreate({ selection: { suite_id: 'nope' } })),
-      ).toContain('selection.suite_id');
+        await fieldsOf(CreateRunDto, validCreate({ selection: { suite_ids: ['nope'] } })),
+      ).toContain('selection.suite_ids');
+      // Present but empty is not "no suites": omit the field instead.
+      expect(
+        await fieldsOf(CreateRunDto, validCreate({ selection: { suite_ids: [] } })),
+      ).toContain('selection.suite_ids');
+    });
+
+    it('accepts 1–20 suite ids and rejects a 21st', async () => {
+      const id = (index: number): string =>
+        `018f2c55-1a2b-7c3d-9e4f-5a6b7c8d9e${String(index).padStart(2, '0')}`;
+      const twenty = Array.from({ length: 20 }, (_, index) => id(index));
+      expect(
+        await issuesFor(CreateRunDto, validCreate({ selection: { suite_ids: twenty } })),
+      ).toEqual([]);
+      expect(
+        await fieldsOf(CreateRunDto, validCreate({
+          selection: { suite_ids: [...twenty, id(20)] },
+        })),
+      ).toContain('selection.suite_ids');
     });
 
     it('parses include_descendants as a boolean and rejects anything else', async () => {

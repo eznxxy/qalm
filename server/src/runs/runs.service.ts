@@ -463,17 +463,31 @@ export class RunsService {
     if (selection === undefined) return [];
     const caseIds = selection.case_ids ?? [];
     let suiteIds: string[] | null = null;
-    if (selection.suite_id !== undefined) {
+    const requestedSuites = selection.suite_ids ?? [];
+    if (requestedSuites.length > 0) {
+      // Validate first so the error can name the row that is wrong; duplicates
+      // are dropped before the subtree query but keep the original index.
+      const known = await this.store.findSuiteIds(projectId, requestedSuites, q);
+      const seen = new Set<string>();
+      const distinct: string[] = [];
+      for (const [index, suiteId] of requestedSuites.entries()) {
+        if (seen.has(suiteId)) continue;
+        seen.add(suiteId);
+        if (!known.has(suiteId)) {
+          throw validationError(
+            `selection.suite_ids[${index}]`,
+            'is not a suite in this project',
+          );
+        }
+        distinct.push(suiteId);
+      }
       const includeDescendants = selection.include_descendants ?? true;
-      suiteIds = await this.store.suiteSubtreeIds(
+      suiteIds = await this.store.suiteSubtreeIdsMany(
         projectId,
-        selection.suite_id,
+        distinct,
         includeDescendants,
         q,
       );
-      if (suiteIds.length === 0) {
-        throw validationError('selection.suite_id', 'is not a suite in this project');
-      }
     }
     if (caseIds.length === 0 && suiteIds === null) return [];
     return this.store.selectCases(projectId, caseIds, suiteIds, q);

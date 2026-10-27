@@ -501,6 +501,53 @@ export class RunsStore {
     return result.rows.map((row) => row.id);
   }
 
+  /**
+   * Which of the given suite ids exist in the project — one query, so a create
+   * selection can name the offending row instead of failing generically.
+   */
+  async findSuiteIds(
+    projectId: string,
+    suiteIds: string[],
+    q: Queryable = this.db,
+  ): Promise<Set<string>> {
+    if (suiteIds.length === 0) return new Set();
+    const result = await q.query<{ id: string }>(
+      'SELECT id FROM suites WHERE project_id = $1 AND id = ANY($2::uuid[])',
+      [projectId, suiteIds],
+    );
+    return new Set(result.rows.map((row) => row.id));
+  }
+
+  /**
+   * Union of the subtrees of several suites (create selection). `UNION` rather
+   * than `UNION ALL` so a parent selected beside its child yields each id once.
+   */
+  async suiteSubtreeIdsMany(
+    projectId: string,
+    suiteIds: string[],
+    includeDescendants: boolean,
+    q: Queryable = this.db,
+  ): Promise<string[]> {
+    if (suiteIds.length === 0) return [];
+    if (!includeDescendants) {
+      const result = await q.query<{ id: string }>(
+        'SELECT id FROM suites WHERE project_id = $1 AND id = ANY($2::uuid[])',
+        [projectId, suiteIds],
+      );
+      return result.rows.map((row) => row.id);
+    }
+    const result = await q.query<{ id: string }>(
+      `WITH RECURSIVE sub AS (
+         SELECT id FROM suites WHERE project_id = $1 AND id = ANY($2::uuid[])
+         UNION
+         SELECT s.id FROM suites s JOIN sub ON s.parent_id = sub.id
+       )
+       SELECT id FROM sub`,
+      [projectId, suiteIds],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
   // --- runs ---------------------------------------------------------------
 
   async findLiveById(id: string, q: Queryable = this.db): Promise<RunRow | null> {
