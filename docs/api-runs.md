@@ -136,7 +136,7 @@ Paginated list for the runs screen (§4.3).
 | `plan_id` | optional UUID; restrict to one plan. `plan_id=none` selects runs with no plan |
 | `status` | optional: `open │ completed` |
 | `query` | optional, case-insensitive substring on `name` |
-| `sort` | optional: `created_at` (default), `updated_at`, `due_date`, `name`; prefix `-` for descending. Null `due_date` sorts last |
+| `sort` | optional: `created_at` (default), `updated_at`, `start_date`, `due_date`, `name`; prefix `-` for descending. Null `start_date`/`due_date` sort last in both directions |
 | `page`, `limit` | per api-conventions |
 
 - `200` → `{ "data": [ ...run ], "meta": { ... } }`
