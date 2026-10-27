@@ -367,8 +367,13 @@ export function RunResultDrawer({
   const item = state.kind === "ready" ? state.item : null;
   const historyRows = history.kind === "ready" ? history.rows : [];
   const latest = historyRows[0] ?? null;
+  // Editing a result's comment, time, defect link or attachments is a write, so
+  // it needs the same run-level gate as recording: a completed run (or an
+  // archived project) offers no editor. Without this the "Edit result" button
+  // would swap the heading and then show the read-only sentence instead
+  // (QA card 3.15).
   const canEditLatest = Boolean(
-    latest && canEditResult(role, userId, latest.created_by)
+    latest && canRecord && canEditResult(role, userId, latest.created_by)
   );
   // PRD acceptance criterion 5: a Tester may record only on an item assigned to
   // them. The drawer learns the assignee from the item it loads, so this holds

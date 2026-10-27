@@ -435,4 +435,19 @@ describe("RunResultDrawer", () => {
     expect(await screen.findByText("This run is completed.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save result" })).toBeNull();
   });
+
+  it("offers no edit affordance on a completed run", async () => {
+    // Card 3.15: the latest result is editable by its author, but the run is
+    // closed — clicking Edit would only swap the heading and leave the
+    // read-only sentence. The button (and Add attachment) stay hidden.
+    await renderDrawer({
+      canRecord: false,
+      recordHint: "This run is completed.",
+      role: "admin",
+    });
+
+    expect(await screen.findByText("This run is completed.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit result" })).toBeNull();
+    expect(screen.queryByText("Add attachment")).toBeNull();
+  });
 });
