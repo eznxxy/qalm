@@ -434,13 +434,15 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   `#263fa0`, active hovered `#ffffff` on `#1d3282`, unfilled hover
   `#17202e` on `#e9edfa` with a `#263fa0` edge on both the button and the
   label.
-- **The Assign items dialog got its own padding.** The shared `.dialog` frame is
-  16px all round (dense form dialogs want the height), which on a card that is
-  only two lines of copy and one select left the control 17px from the edge and
-  "Assignee" sitting on the sentence above it. `.assign-dialog` now pads 24px
-  and gives the field a 12px gap from the description. Measured in the browser:
+- **The Assign items dialog got its own padding and label gap.** The shared
+  `.dialog` frame is 16px all round (dense form dialogs want the height), which
+  on a card that is only two lines of copy and one select left the control 17px
+  from the edge and "Assignee" sitting on the sentence above it. `.assign-dialog`
+  now pads 24px, gives the field a 12px gap from the description, and raises the
+  field's internal gap from the shared 2px to 8px so the label reads as the
+  select's label rather than a line resting on it. Measured in the browser:
   416px wide, padding 24, select inset 25px each side (24 + 1px border), 12px
-  from the hint to the label.
+  hint → label, 8px label → select, 8px select → caveat.
 - Verified: web `tsc`/`eslint` clean, jest **571** (40 suites) including seven
   new `StatusPie` tests, four drawer attachment tests (staged image viewer +
   revoke, uploaded PDF `iframe` after a fetch, icon-only removal, the actions as

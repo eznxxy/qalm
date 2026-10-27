@@ -194,9 +194,11 @@
 
 /* The hint above the field has no bottom margin (it is description copy, not a
  * label), so the field needs its own separation or "Assignee" sits on the
- * sentence. */
+ * sentence. Inside the field the shared 2px gap puts the label on top of the
+ * select; 8px reads as a label that belongs to its control. */
 .assign-dialog .field {
   margin-top: var(--space-4);
+  gap: var(--space-3);
 }
 
 .assign-dialog select {
