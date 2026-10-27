@@ -1,8 +1,10 @@
 # Qalm — Slice 4 Backlog: Milestones
 
-Status: **in progress** (2026-10-27). Phase 1 contracts are approved
-(`docs/PRD-milestones.md`, `docs/api-milestones.md`, plus the additive run link
-in `docs/api-runs.md` and the note in `docs/api-plans.md`).
+Status: **implementation done, QA open** (2026-10-28). Phase 1 contracts are
+approved (`docs/PRD-milestones.md`, `docs/api-milestones.md`, plus the additive
+run link in `docs/api-runs.md` and the note in `docs/api-plans.md`); cards 2.1,
+3.1 and 3.2 have landed on `feature/slice4-milestones`, and card 4.1 is waiting
+for Argus.
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus
 (QA). Spec source: `docs/PRD-milestones.md` + `docs/api-milestones.md` +
 `docs/api-runs.md` + `docs/DESIGN.md` §4.3/§4.5/§5/§6/§7/§8/§9.
@@ -39,7 +41,7 @@ fields, and date rules between a run and its milestone (PRD decisions 1–9).
 
 ## Phase 2 — backend (Hephaestus)
 
-### Card 2.1 — Milestones schema, module and run link (medium) — TODO
+### Card 2.1 — Milestones schema, module and run link (medium) — DONE 2026-10-28
 - **Migration** `20261027000003_milestones.js`: `milestones` (`id`, `project_id`
   fk, `name`, `description`, `due_date date`, `created_by`/`updated_by`,
   `deleted_at`, timestamps), partial unique `(project_id, lower(name)) where
@@ -62,12 +64,20 @@ fields, and date rules between a run and its milestone (PRD decisions 1–9).
 - Tests: milestone service/store/dto specs and `test/milestones.e2e-spec.ts`,
   plus run-link cases in the existing runs specs.
 - DoD: endpoints per contract; unit + e2e green; lint/tsc/build clean.
+- **Landed** (`9062d4f`): `npx tsc --noEmit`, `npm run lint`, `npx jest`
+  (30 suites / 526 tests) and `npm run test:e2e` (42 milestone cases) green.
+  Two implementation notes, both recorded in `docs/api-milestones.md`: the
+  `status` filter is a `WHERE` on the same derived expression rather than a
+  `HAVING` (a real `HAVING` without `GROUP BY` would collapse the rows, and
+  grouping would then hide milestones with no runs); detach answers one 404
+  body (`Milestone or run not found.`) for unknown milestone, unknown run and
+  not-attached, because the contract does not distinguish them.
 
 ---
 
 ## Phase 3 — frontend (Iris)
 
-### Card 3.1 — Milestones list and detail (medium) — TODO
+### Card 3.1 — Milestones list and detail (medium) — DONE 2026-10-28
 - `/milestones` list: name, runs, status, status bar + `% complete`, due date,
   days left; search, Open/Completed filter, sort (due date default, undated
   last), pagination; empty state with **New milestone**.
@@ -75,12 +85,21 @@ fields, and date rules between a run and its milestone (PRD decisions 1–9).
   Milestone column dropped), New/Edit dialog, Add runs picker, per-row Detach,
   Delete confirm that names the kept runs.
 - Shared milestones dialog and hooks; `web/src/lib/dates.ts` for days left.
+- **Landed** (`df313ad`): `npx tsc --noEmit`, `npm run lint` and `npm test`
+  (44 suites / 658 tests) green. The filter defaults to **All** rather than
+  Open — the screen answers "what is coming up" as well as "what is done" — so
+  the canonical URL omits both the default status and the default sort, like
+  the runs list does for its own defaults.
 
-### Card 3.2 — Run surfaces (small/medium) — TODO
+### Card 3.2 — Run surfaces (small/medium) — DONE 2026-10-28
 - Milestone select in `RunFormDialog`; Milestone column (link or `—`) between
   Plan and Status in the shared runs table; milestone link on run detail.
 - Sidebar Milestones item, `g m` shortcut and `?` dialog entry; remove the
   `/wip/milestones` placeholder; Tester/Viewer see no write controls.
+- **Landed** (`29b09a8`): `npx tsc --noEmit`, `npm run lint` and `npm test`
+  green. The table's widths are now per-root CSS variables (`--run-w-*`),
+  because the milestone detail page drops the Milestone column and adds an
+  Actions column while the runs list and plan detail keep the full set.
 
 ---
 
