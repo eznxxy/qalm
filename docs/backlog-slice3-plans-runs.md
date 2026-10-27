@@ -733,6 +733,32 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ---
 
+### Card 3.12 — Test cases: the bulk selection must not survive leaving the screen (review feedback, small) — DONE 2026-10-27
+- **The bug, as reported:** "the selection did not reset when i select them then
+  move to test run page then comeback into test cases". Rows stayed ticked and
+  the bulk bar was still there, with the same cases selected as before.
+- **Cause.** `web/next.config.ts` enables `cacheComponents`, so Next hides a
+  route with React `<Activity>` instead of unmounting it. The page's `selection`
+  state therefore survived the trip, and because the URL (suite, filters, sort,
+  page) came back unchanged, the `resultKey` matched again and the old ids were
+  restored. Nothing in the code was "wrong" under the old unmount model — the
+  model changed underneath it.
+- **Fix (web only).** One `useLayoutEffect` in `cases/page.tsx` whose cleanup
+  clears `selection` when the page is hidden. That is the pattern the Next guide
+  recommends (`preserving-ui-state.md`), and `useLayoutEffect` runs the cleanup
+  synchronously on the hide transition, so nothing stale is painted on return.
+  Clearing the ids, not the key, means the next result set cannot resurrect
+  them either. Leaving the screen by any route (top nav, Link, Back) is covered,
+  since the cleanup belongs to the Activity boundary rather than to a click
+  handler.
+- Verified: web jest **590** (40 suites) — a new cases-page test renders the
+  page inside `<Activity>` and toggles visible → hidden → visible, which is what
+  Cache Components does on navigation, and asserts the bulk bar and the ticks
+  are gone. The test fails on the previous code (confirmed by temporarily
+  removing the cleanup). `tsc` and `eslint` clean. Nothing pushed.
+
+---
+
 ## Phase 4 — QA (Argus)
 
 ### Card 4.1 — E2E verification of plans & runs (medium) — PENDING
@@ -743,6 +769,9 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   requirement, Tester-on-assigned-item, append-only results, Save-and-next +
   shortcuts, close/reopen guard, item add/remove guard, attachment upload +
   survives reload, plan rollup + detach-on-delete, Linked runs tab, §6 states.
+- Also recheck the review-feedback fixes end to end: an attach-only plan saves
+  without a new-run name (3.11), and leaving Test cases for Test runs and coming
+  back starts with nothing selected (3.12).
 - Report + failure cards with repro steps if any.
 
 ---

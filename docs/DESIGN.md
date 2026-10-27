@@ -193,6 +193,9 @@ cases."
   result, reorderable), priority, type, tags, estimate. Steps are a numbered
   list because they are a real sequence.
 - Bulk action bar replaces the filter bar when rows are selected.
+- A selection is a step, not a view: leaving Test cases and coming back starts
+  with nothing selected. The route is kept alive in the background (React
+  Activity), so the page clears its selection when it is hidden.
 
 ### 4.3 Test runs list
 
