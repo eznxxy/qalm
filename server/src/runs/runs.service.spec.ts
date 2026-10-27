@@ -193,6 +193,21 @@ class FakeStore {
     return this.findLiveById(id);
   }
 
+  async findIdByNameIgnoreCase(
+    projectId: string,
+    name: string,
+    excludeId: string | null,
+  ): Promise<string | null> {
+    const row = this.runs.find(
+      (entry) =>
+        entry.project_id === projectId &&
+        entry.deleted_at === null &&
+        entry.name.toLowerCase() === name.toLowerCase() &&
+        (excludeId === null || entry.id !== excludeId),
+    );
+    return row?.id ?? null;
+  }
+
   async findWithCounts(id: string): Promise<RunWithCountsRow | null> {
     const row = await this.findLiveById(id);
     return row ? this.runWithCounts(row) : null;
@@ -958,6 +973,29 @@ describe('RunsService (unit, in-memory runs)', () => {
       expect(dueOnly).toMatchObject({ start_date: null, due_date: '2026-11-14' });
     });
 
+    it('409s a duplicate run name in the project, ignoring case', async () => {
+      store.addRun({ name: 'Smoke' });
+
+      await expect(service.create(AS('lead'), 'p-1', { name: 'SMOKE' })).rejects.toMatchObject({
+        code: 'CONFLICT',
+        details: [{ field: 'name', issue: 'already in use' }],
+      });
+      // Nothing was written by the rejected create.
+      expect(store.runs).toHaveLength(1);
+
+      // Another project is a separate namespace.
+      await expect(service.create(AS('lead'), 'p-2', { name: 'Smoke' })).resolves.toMatchObject({
+        name: 'Smoke',
+      });
+    });
+
+    it('frees a deleted run name for reuse', async () => {
+      store.addRun({ name: 'Smoke', deleted: true });
+      await expect(service.create(AS('lead'), 'p-1', { name: 'Smoke' })).resolves.toMatchObject({
+        name: 'Smoke',
+      });
+    });
+
     it('400s a selection larger than the 2,000-item cap and commits nothing', async () => {
       store.addCase({ caseNumber: 1, suiteId: 's-root' });
       const many = Array.from({ length: 2_001 }, (_, index) => `c-${index + 2}`);
@@ -1077,6 +1115,31 @@ describe('RunsService (unit, in-memory runs)', () => {
       expect(await service.detail(AS('lead'), run.id)).toMatchObject({
         start_date: '2026-11-01',
         due_date: '2026-11-14',
+      });
+    });
+
+    it('409s a rename onto another live run name, ignoring case', async () => {
+      store.addRun({ name: 'Smoke' });
+      const run = store.addRun({ name: 'Regression' });
+
+      await expect(service.update(AS('lead'), run.id, { name: 'sMoKe' })).rejects.toMatchObject({
+        code: 'CONFLICT',
+        details: [{ field: 'name', issue: 'already in use' }],
+      });
+
+      // The rejected rename wrote nothing.
+      expect((await service.detail(AS('lead'), run.id)).name).toBe('Regression');
+    });
+
+    it('allows changing the case of the run’s own name and taking a deleted run’s name', async () => {
+      const run = store.addRun({ name: 'Smoke' });
+      store.addRun({ name: 'Old', deleted: true });
+
+      await expect(service.update(AS('lead'), run.id, { name: 'SMOKE' })).resolves.toMatchObject({
+        name: 'SMOKE',
+      });
+      await expect(service.update(AS('lead'), run.id, { name: 'Old' })).resolves.toMatchObject({
+        name: 'Old',
       });
     });
 

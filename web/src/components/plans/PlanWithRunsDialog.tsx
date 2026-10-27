@@ -16,8 +16,11 @@
  *
  * Field rules are the same constants the other two dialogs use: plan name
  * required 1–120, descriptions ≤ 1,000, dates plain `YYYY-MM-DD` with start ≤
- * due. Uniqueness stays server-side, so errors arrive keyed exactly like the
- * API's `details[].field` — including the indexed `runs[0].name` form.
+ * due. Two runs in this dialog may not share a name (case-insensitive) — caught
+ * here so the form cannot send a request that would 409; a clash with a run
+ * that already exists in the project is server-side, so errors arrive keyed
+ * exactly like the API's `details[].field` — including the indexed
+ * `runs[0].name` form.
  *
  * Modal behaviour (focus trap, Escape, key shield) mirrors PlanFormDialog.
  */
@@ -123,12 +126,24 @@ export function PlanWithRunsDialog({
     localErrors.dueDate = "Use a valid date (YYYY-MM-DD).";
   }
 
+  const seenRunNames = new Map<string, number>();
   for (const [index, run] of runs.entries()) {
     const runName = run.name.trim();
     if (!runName) localErrors[`${index}.name`] = "Run name is required.";
     else if (runName.length > RUN_NAME_MAX) {
       localErrors[`${index}.name`] =
         `Run name must be at most ${RUN_NAME_MAX} characters.`;
+    } else {
+      // One live run per name in the project (docs/api-runs.md § Validation),
+      // so a repeat inside this dialog can never succeed. The first run keeps
+      // the name; the later ones carry the error.
+      const key = runName.toLowerCase();
+      const first = seenRunNames.get(key);
+      if (first === undefined) seenRunNames.set(key, index);
+      else {
+        localErrors[`${index}.name`] =
+          `Run name is already used by Run ${first + 1}.`;
+      }
     }
     if (run.description.trim().length > RUN_DESCRIPTION_MAX) {
       localErrors[`${index}.description`] =

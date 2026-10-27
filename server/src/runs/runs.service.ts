@@ -39,6 +39,7 @@ import {
   toRunItemDto,
 } from './runs.types';
 import { assertDateOrder } from './date-order';
+import { runNameConflict } from './run-name';
 
 function validationError(field: string, issue: string): ApiError {
   return new ApiError('VALIDATION_ERROR', 'Request validation failed.', [{ field, issue }]);
@@ -112,6 +113,11 @@ export class RunsService {
    */
   async create(caller: AuthUser, projectId: string, dto: CreateRunDto): Promise<RunDto> {
     await this.requireProject(projectId, caller, 'write');
+    // A live run's name is unique per project, ignoring case (docs/api-runs.md
+    // § Validation). The pre-check names the field; the unique index in the
+    // store closes the concurrent-insert race.
+    const duplicate = await this.store.findIdByNameIgnoreCase(projectId, dto.name, null);
+    if (duplicate !== null) throw runNameConflict();
     return this.store.transaction(async (client) => {
       const planId = await this.resolvePlan(projectId, dto.plan_id, client);
       const startDate = dto.start_date ?? null;
@@ -159,6 +165,17 @@ export class RunsService {
     return this.store.transaction(async (client) => {
       const row = await this.store.findLiveByIdForUpdate(id, client);
       if (!row) throw runNotFound();
+      if (dto.name !== undefined) {
+        // Renaming to a different case of the run's own name is allowed, so the
+        // run itself is excluded from the duplicate lookup.
+        const duplicate = await this.store.findIdByNameIgnoreCase(
+          row.project_id,
+          dto.name,
+          id,
+          client,
+        );
+        if (duplicate !== null) throw runNameConflict();
+      }
       const planId = await this.resolvePlan(row.project_id, dto.plan_id, client);
       const startDate = dto.start_date === undefined ? row.start_date : dto.start_date;
       const dueDate = dto.due_date === undefined ? row.due_date : dto.due_date;

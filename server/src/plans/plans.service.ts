@@ -4,6 +4,7 @@ import { ApiError } from '../errors';
 import { Queryable } from '../db/queryable';
 import { ListMeta, buildListMeta } from '../projects/projects.service';
 import { assertDateOrder } from '../runs/date-order';
+import { isRunNameConflict, runNameConflict } from '../runs/run-name';
 import { RunsStore } from '../runs/runs.store';
 import { DEFAULT_LIMIT, DEFAULT_PAGE } from '../runs/runs.constants';
 import { CreatePlanDto, ListPlansQuery, UpdatePlanDto } from './dto';
@@ -85,22 +86,44 @@ export class PlansService {
         },
         client,
       );
+      // Run names are unique per project (docs/api-runs.md), so an embedded run
+      // can clash either with a live run already in the project or with an
+      // earlier run in this same request. Both are reported against the run.
+      const seenNames = new Set<string>();
       for (const [index, run] of dto.runs.entries()) {
+        const field = `runs[${index}].name`;
+        const key = run.name.toLowerCase();
+        if (seenNames.has(key)) throw runNameConflict(field);
+        seenNames.add(key);
+        const duplicate = await this.runs.findIdByNameIgnoreCase(
+          projectId,
+          run.name,
+          null,
+          client,
+        );
+        if (duplicate !== null) throw runNameConflict(field);
+
         const startDate = run.start_date ?? null;
         const dueDate = run.due_date ?? null;
         assertDateOrder(startDate, dueDate, `runs[${index}].start_date`);
-        await this.runs.insertRun(
-          {
-            project_id: projectId,
-            plan_id: row.id,
-            name: run.name,
-            description: blankToNull(run.description),
-            start_date: startDate,
-            due_date: dueDate,
-            created_by: caller.id,
-          },
-          client,
-        );
+        try {
+          await this.runs.insertRun(
+            {
+              project_id: projectId,
+              plan_id: row.id,
+              name: run.name,
+              description: blankToNull(run.description),
+              start_date: startDate,
+              due_date: dueDate,
+              created_by: caller.id,
+            },
+            client,
+          );
+        } catch (error) {
+          // The store names the field `name`; from here it is one of the runs.
+          if (isRunNameConflict(error)) throw runNameConflict(field);
+          throw error;
+        }
       }
       return this.loadPlan(row.id, client);
     });

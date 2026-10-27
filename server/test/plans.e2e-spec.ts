@@ -72,6 +72,8 @@ describe('Plans API (integration)', () => {
   let suiteId: string;
   const tokens: Partial<Record<UserRole, string>> = {};
   const userIds: Partial<Record<UserRole, string>> = {};
+  /** Run names are unique per project, so each fixture gets its own. */
+  let fixtureRunSeq = 0;
 
   const as = (role: UserRole): { Authorization: string } => ({
     Authorization: `Bearer ${tokens[role]}`,
@@ -135,7 +137,7 @@ describe('Plans API (integration)', () => {
   ): Promise<PlanData> => {
     const res = await createPlan(role, {
       name: 'Release 2.4',
-      runs: [{ name: 'Release 2.4 smoke' }],
+      runs: [{ name: `Release 2.4 smoke ${++fixtureRunSeq}` }],
       ...body,
     });
     expect(res.status).toBe(201);
@@ -174,7 +176,7 @@ describe('Plans API (integration)', () => {
       .post(`/api/v1/projects/${projectId}/runs`)
       .set(as('admin'))
       .send({
-        name: 'Release smoke',
+        name: `Release smoke ${++fixtureRunSeq}`,
         ...(planId === undefined ? {} : { plan_id: planId }),
         selection: { case_ids: caseIds },
       });
@@ -408,6 +410,52 @@ describe('Plans API (integration)', () => {
       expect(runs.body.meta.total).toBe(0);
     });
 
+    it('409s a run name already live in the project, naming the indexed field', async () => {
+      const seeded = await test.req
+        .post(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .send({ name: 'Smoke' });
+      expect(seeded.status).toBe(201);
+
+      const res = await createPlan('admin', {
+        name: 'Clashing plan',
+        runs: [{ name: 'Fine' }, { name: ' smoke ' }],
+      });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatchObject({
+        code: 'CONFLICT',
+        message: 'A run with this name already exists.',
+        details: [{ field: 'runs[1].name', issue: 'already in use' }],
+      });
+
+      // Nothing was written: no plan, and only the seeded run exists.
+      expect((await listPlans('admin', { query: 'clashing plan' })).body.meta.total).toBe(0);
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'));
+      expect((runs.body.data as Array<{ name: string }>).map((run) => run.name)).toEqual([
+        'Smoke',
+      ]);
+    });
+
+    it('409s two same-named runs inside one request, before inserting either', async () => {
+      const res = await createPlan('admin', {
+        name: 'Repeated runs',
+        runs: [{ name: 'Smoke' }, { name: 'SMOKE' }],
+      });
+      expect(res.status).toBe(409);
+      expect(res.body.error.details).toContainEqual(
+        expect.objectContaining({ field: 'runs[1].name' }),
+      );
+
+      const runs = await test.req
+        .get(`/api/v1/projects/${projectId}/runs`)
+        .set(as('admin'))
+        .query({ query: 'Smoke' });
+      expect(runs.body.meta.total).toBe(0);
+      expect((await listPlans('admin', { query: 'repeated runs' })).body.meta.total).toBe(0);
+    });
+
     it('allows later run deletion to leave a plan with no runs', async () => {
       const plan = await createPlanOk({ name: 'Drained' });
       const runs = await test.req
@@ -434,7 +482,7 @@ describe('Plans API (integration)', () => {
       await createPlanOk({ name: 'Release 2.4' });
       const res = await createPlan('admin', {
         name: '  release 2.4 ',
-        runs: [{ name: 'Run' }],
+        runs: [{ name: `Run ${++fixtureRunSeq}` }],
       });
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe('CONFLICT');
@@ -447,7 +495,7 @@ describe('Plans API (integration)', () => {
       const plan = await createPlanOk({ name: 'Release 2.4' });
       const sameName = await createPlan(
         'admin',
-        { name: 'Release 2.4', runs: [{ name: 'Run' }] },
+        { name: 'Release 2.4', runs: [{ name: `Run ${++fixtureRunSeq}` }] },
         otherProjectId,
       );
       expect(sameName.status).toBe(201);
@@ -455,7 +503,7 @@ describe('Plans API (integration)', () => {
       expect((await deletePlan('admin', plan.id)).status).toBe(204);
       const reused = await createPlan('admin', {
         name: 'Release 2.4',
-        runs: [{ name: 'Run' }],
+        runs: [{ name: `Run ${++fixtureRunSeq}` }],
       });
       expect(reused.status).toBe(201);
     });

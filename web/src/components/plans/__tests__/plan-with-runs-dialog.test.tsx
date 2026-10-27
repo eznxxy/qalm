@@ -169,16 +169,35 @@ describe("PlanWithRunsDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("rejects two runs with the same name, ignoring case and spaces", () => {
+    const { onSubmit } = renderDialog();
+
+    fireEvent.change(screen.getByLabelText("Plan name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.change(runName(0), { target: { value: "Smoke" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add run" }));
+    fireEvent.change(runName(1), { target: { value: "  smoke  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Create plan" }));
+
+    // The first run keeps the name; the later one carries the error, so the
+    // payload never reaches the API's 409.
+    expect(
+      screen.getByText("Run name is already used by Run 1.")
+    ).toBeInTheDocument();
+    expect(runName(0)).not.toHaveAttribute("aria-invalid");
+    expect(runName(1)).toHaveAttribute("aria-invalid", "true");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("shows the server's indexed run error on the right run", () => {
     renderDialog({
-      serverFieldErrors: { "runs[1].name": "Run name must be unique in the plan." },
+      serverFieldErrors: { "runs[1].name": "already in use" },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Add run" }));
 
-    expect(
-      screen.getByText("Run name must be unique in the plan.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("already in use")).toBeInTheDocument();
     expect(runName(0)).not.toHaveAttribute("aria-invalid");
     expect(runName(1)).toHaveAttribute("aria-invalid", "true");
   });

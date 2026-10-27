@@ -78,6 +78,8 @@ describe('Runs API (integration)', () => {
   let otherSuiteId: string;
   const tokens: Partial<Record<UserRole, string>> = {};
   const userIds: Partial<Record<UserRole, string>> = {};
+  /** Run names are unique per project, so each fixture gets its own. */
+  let fixtureRunSeq = 0;
 
   const as = (role: UserRole): { Authorization: string } => ({
     Authorization: `Bearer ${tokens[role]}`,
@@ -188,7 +190,9 @@ describe('Runs API (integration)', () => {
     body: Record<string, unknown> = {},
     role: UserRole = 'admin',
   ): Promise<RunData> => {
-    const res = await createRun(role, { name: 'Release smoke', ...body });
+    // Unique per call: a run name is unique per project (docs/api-runs.md), and
+    // several tests create more than one run through this helper.
+    const res = await createRun(role, { name: `Release smoke ${++fixtureRunSeq}`, ...body });
     expect(res.status).toBe(201);
     return res.body.data as RunData;
   };
@@ -401,6 +405,32 @@ describe('Runs API (integration)', () => {
       expect(archived.body.error.code).toBe('CONFLICT');
     });
 
+    it('409s a duplicate run name in the same project, ignoring case and spaces', async () => {
+      const run = await createOk({ name: 'Release smoke' });
+
+      const duplicate = await createRun('lead', { name: '  release SMOKE  ' });
+      expect(duplicate.status).toBe(409);
+      expect(duplicate.body.error).toMatchObject({
+        code: 'CONFLICT',
+        message: 'A run with this name already exists.',
+        details: [{ field: 'name', issue: 'already in use' }],
+      });
+
+      // The rejected create wrote nothing.
+      const list = await listRuns('lead');
+      expect((list.body.data as RunData[]).map((row) => row.id)).toEqual([run.id]);
+
+      // Another project has its own namespace.
+      const elsewhere = await createRun('lead', { name: 'Release smoke' }, otherProjectId);
+      expect(elsewhere.status).toBe(201);
+
+      // Soft-deleting the run frees the name.
+      const deleted = await test.req.delete(`/api/v1/runs/${run.id}`).set(as('lead'));
+      expect(deleted.status).toBe(204);
+      const reused = await createRun('lead', { name: 'Release smoke' });
+      expect(reused.status).toBe(201);
+    });
+
     it('skips unknown case ids silently', async () => {
       const c1 = await createCaseIn(rootSuiteId, 'One');
       const run = await createOk({
@@ -523,6 +553,25 @@ describe('Runs API (integration)', () => {
 
       const cleared = await patchRun('lead', run.id, { start_date: null });
       expect(cleared.body.data).toMatchObject({ start_date: null, due_date: '2026-11-14' });
+    });
+
+    it('409s a rename onto another run name and allows changing its own case', async () => {
+      await createOk({ name: 'Smoke' });
+      const second = await createOk({ name: 'Regression' });
+
+      const clash = await patchRun('lead', second.id, { name: ' SMOKE ' });
+      expect(clash.status).toBe(409);
+      expect(clash.body.error).toMatchObject({
+        code: 'CONFLICT',
+        details: [{ field: 'name', issue: 'already in use' }],
+      });
+      // The rejected rename wrote nothing.
+      expect((await getRun('lead', second.id)).body.data.name).toBe('Regression');
+
+      // A different case of the run's own name is not a duplicate.
+      const recased = await patchRun('lead', second.id, { name: 'REGRESSION' });
+      expect(recased.status).toBe(200);
+      expect(recased.body.data.name).toBe('REGRESSION');
     });
 
     it('closes and reopens, 409ing a repeat', async () => {

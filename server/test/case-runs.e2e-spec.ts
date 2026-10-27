@@ -142,7 +142,7 @@ describe('Case → Linked runs API (integration)', () => {
     const plan = await test.req
       .post(`/api/v1/projects/${projectId}/plans`)
       .set(as('admin'))
-      .send({ name: 'Release 2.4' });
+      .send({ name: 'Release 2.4', runs: [{ name: 'Release 2.4 smoke' }] });
     expect(plan.status).toBe(201);
     const { runId, itemIds } = await createRun(
       'Release smoke',

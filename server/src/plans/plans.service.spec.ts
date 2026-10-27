@@ -115,6 +115,22 @@ class FakeStore {
     return plan;
   }
 
+  /** Test helper: seed a run as if it already existed in the project. */
+  addRun(overrides: Partial<FakeRun> = {}): FakeRun {
+    const run: FakeRun = {
+      id: `run-seed-${this.nextRunId++}`,
+      project_id: overrides.project_id ?? 'p-1',
+      plan_id: overrides.plan_id ?? null,
+      name: overrides.name ?? 'Run',
+      description: overrides.description ?? null,
+      start_date: overrides.start_date ?? null,
+      due_date: overrides.due_date ?? null,
+      created_by: overrides.created_by ?? 'u-admin',
+    };
+    this.runs.push(run);
+    return run;
+  }
+
   private agg(plan: FakePlan): PlanAggRow {
     return { ...plan };
   }
@@ -207,6 +223,22 @@ class FakeStore {
     });
     this.plans.push(plan);
     return { ...plan };
+  }
+
+  /** Mirrors `RunsStore.findIdByNameIgnoreCase` for the plan-create path. */
+  async findRunIdByNameIgnoreCase(
+    projectId: string,
+    name: string,
+    excludeId: string | null,
+  ): Promise<string | null> {
+    const wanted = name.toLowerCase();
+    const found = this.runs.find(
+      (row) =>
+        row.project_id === projectId &&
+        row.name.toLowerCase() === wanted &&
+        (excludeId === null || row.id !== excludeId),
+    );
+    return found?.id ?? null;
   }
 
   /** Mirrors `RunsStore.insertRun` for the plan-create path. */
@@ -337,6 +369,36 @@ class FakeStore {
   }
 }
 
+/**
+ * The slice of `RunsStore` PlansService touches, over the same fake state.
+ * A separate provider keeps the plan-name and run-name lookups apart — the
+ * real service injects two stores, and a test double that conflated them would
+ * "find" a plan when checking a run name.
+ */
+class FakeRunsStore {
+  constructor(private readonly store: FakeStore) {}
+
+  async findIdByNameIgnoreCase(
+    projectId: string,
+    name: string,
+    excludeId: string | null,
+  ): Promise<string | null> {
+    return this.store.findRunIdByNameIgnoreCase(projectId, name, excludeId);
+  }
+
+  async insertRun(row: {
+    project_id: string;
+    plan_id: string | null;
+    name: string;
+    description: string | null;
+    start_date: string | null;
+    due_date: string | null;
+    created_by: string;
+  }): Promise<FakeRun> {
+    return this.store.insertRun(row);
+  }
+}
+
 const USER: AuthUser = {
   id: 'u-admin',
   email: 'admin@example.com',
@@ -362,7 +424,7 @@ describe('PlansService (unit, in-memory plans)', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         { provide: PlansStore, useValue: store },
-        { provide: RunsStore, useValue: store },
+        { provide: RunsStore, useValue: new FakeRunsStore(store) },
         PlansService,
       ],
     }).compile();
@@ -515,6 +577,51 @@ describe('PlansService (unit, in-memory plans)', () => {
       });
       expect(store.plans).toEqual([]);
       expect(store.runs).toEqual([]);
+    });
+
+    it('409s a run name already used in the project, naming the indexed field', async () => {
+      store.addRun({ name: 'Smoke' });
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          runs: [{ name: 'Fine' }, { name: 'smoke' }],
+        }),
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'A run with this name already exists.',
+        details: [{ field: 'runs[1].name', issue: 'already in use' }],
+      });
+
+      // The whole request rolled back: no plan, and the seeded run is untouched.
+      expect(store.plans).toEqual([]);
+      expect(store.runs.map((run) => run.name)).toEqual(['Smoke']);
+    });
+
+    it('409s two runs with the same name in one request, before inserting either', async () => {
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          runs: [{ name: 'Smoke' }, { name: 'SMOKE' }],
+        }),
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        details: [{ field: 'runs[1].name', issue: 'already in use' }],
+      });
+
+      expect(store.plans).toEqual([]);
+      expect(store.runs).toEqual([]);
+    });
+
+    it('allows a run name another project already uses', async () => {
+      store.addRun({ project_id: 'p-2', name: 'Smoke' });
+
+      await expect(
+        service.create(AS('admin'), 'p-1', {
+          name: 'Release 2.4',
+          runs: [{ name: 'Smoke' }],
+        }),
+      ).resolves.toMatchObject({ name: 'Release 2.4', run_count: 1 });
     });
 
     it('is 409 for a duplicate name, ignoring case and spaces', async () => {

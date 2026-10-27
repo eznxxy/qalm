@@ -130,6 +130,9 @@ describe('Results & attachments API (integration)', () => {
     otherCaseId = await createCase(otherProjectId, await createSuite(otherProjectId, 'Mobile'));
   });
 
+  /** Run names are unique per project, so each fixture gets its own. */
+  let fixtureRunSeq = 0;
+
   /** A fresh open run holding exactly one item, ready to record results on. */
   const createRunWithItem = async (
     targetProjectId = projectId,
@@ -138,7 +141,7 @@ describe('Results & attachments API (integration)', () => {
     const run = await test.req
       .post(`/api/v1/projects/${targetProjectId}/runs`)
       .set(as('admin'))
-      .send({ name: 'Release smoke', selection: { case_ids: [targetCaseId] } });
+      .send({ name: `Release smoke ${++fixtureRunSeq}`, selection: { case_ids: [targetCaseId] } });
     expect(run.status).toBe(201);
     const runId = run.body.data.id as string;
 

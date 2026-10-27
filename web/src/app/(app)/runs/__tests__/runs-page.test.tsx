@@ -171,8 +171,8 @@ interface ApiOptions {
   project?: Project;
   runs?: Run[];
   plans?: Plan[];
-  /** Make the create POST fail with a 400 so the field error shows. */
-  createError?: boolean | "start_date";
+  /** Make the create POST fail with a 400 (or a 409 for a duplicate) field error. */
+  createError?: boolean | "start_date" | "conflict";
   /** Same for the plan-with-runs POST, keyed the API's way: `runs[1].name`. */
   planCreateError?: boolean | "runs[0].name";
 }
@@ -203,16 +203,20 @@ function mockApi({
       }
       if (/\/projects\/[\w-]+\/runs$/.test(target) && method === "POST") {
         if (createError) {
+          const conflict = createError === "conflict";
           const field = createError === "start_date" ? "start_date" : "name";
-          const issue =
-            createError === "start_date"
+          const issue = conflict
+            ? "already in use"
+            : createError === "start_date"
               ? "must be on or before due_date"
               : "Name is required.";
           return Promise.resolve(
-            jsonResponse(400, {
+            jsonResponse(conflict ? 409 : 400, {
               error: {
-                code: "VALIDATION_ERROR",
-                message: "Validation failed.",
+                code: conflict ? "CONFLICT" : "VALIDATION_ERROR",
+                message: conflict
+                  ? "A run with this name already exists."
+                  : "Validation failed.",
                 details: [{ field, issue }],
               },
             })
@@ -595,6 +599,32 @@ describe("runs list", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Create run" }));
 
     expect(await screen.findByText("Name is required.")).toBeInTheDocument();
+    expect(mockRouterState.push).not.toHaveBeenCalled();
+  });
+
+  it("shows a duplicate run name conflict on the Name field", async () => {
+    mockApi({ createError: "conflict" });
+    await renderPage();
+    await screen.findByRole("table", { name: "Test runs" });
+    await screen.findByText("Release 2.4 smoke");
+
+    fireEvent.click(screen.getByRole("button", { name: "New run" }));
+    const dialog = await screen.findByRole("dialog", { name: "New run" });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Release 2.4 smoke" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create run" }));
+
+    // A 409 names the field too, so the message lands on the input, not only
+    // in the dialog's form-level error.
+    expect(await screen.findByText("already in use")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Name")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+    expect(
+      within(dialog).queryByText("A run with this name already exists.")
+    ).not.toBeInTheDocument();
     expect(mockRouterState.push).not.toHaveBeenCalled();
   });
 

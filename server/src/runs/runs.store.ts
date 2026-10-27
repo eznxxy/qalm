@@ -4,6 +4,31 @@ import { DbService } from '../db/db.service';
 import { Queryable } from '../db/queryable';
 import { ItemStatus, ItemSortKey, ResultStatus, RunSortKey } from './runs.constants';
 import { statusRankSql } from './run-counts';
+import { runNameConflict } from './run-name';
+
+/** Postgres SQLSTATE for unique_index / unique_constraint violations. */
+const UNIQUE_VIOLATION = '23505';
+
+interface PgErrorShape {
+  code?: string;
+  constraint?: string;
+}
+
+/** The duplicate-name index added by 20261027000002_runs_name_unique. */
+const RUN_NAME_INDEX = 'runs_project_name_unique';
+
+/**
+ * A duplicate live run name, whether it surfaces from the service's pre-check
+ * or from the index under a concurrent insert. Restricted to that index so a
+ * primary-key clash is not mislabelled as a name conflict.
+ */
+function isRunNameViolation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error as PgErrorShape).code === UNIQUE_VIOLATION &&
+    (error as PgErrorShape).constraint === RUN_NAME_INDEX
+  );
+}
 
 /**
  * DB row shapes for runs (migrations 20261026000001 + 20261027000001).
@@ -503,6 +528,29 @@ export class RunsStore {
     return result.rows[0] ?? null;
   }
 
+  /**
+   * A live run id in the project with this name, ignoring case (dup check).
+   * `excludeId` lets a rename keep its own name while changing its case.
+   */
+  async findIdByNameIgnoreCase(
+    projectId: string,
+    name: string,
+    excludeId: string | null,
+    q: Queryable = this.db,
+  ): Promise<string | null> {
+    const values: unknown[] = [projectId, name];
+    let clause = 'project_id = $1 AND lower(name) = lower($2) AND deleted_at IS NULL';
+    if (excludeId !== null) {
+      values.push(excludeId);
+      clause += ` AND id <> $${values.length}`;
+    }
+    const result = await q.query<{ id: string }>(
+      `SELECT id FROM runs WHERE ${clause} LIMIT 1`,
+      values,
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
   async insertRun(
     row: {
       project_id: string;
@@ -515,23 +563,29 @@ export class RunsStore {
     },
     q: Queryable = this.db,
   ): Promise<RunRow> {
-    const result = await q.query<RunRow>(
-      `INSERT INTO runs (project_id, plan_id, name, description, start_date, due_date, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-       RETURNING ${runColumns()}`,
-      [
-        row.project_id,
-        row.plan_id,
-        row.name,
-        row.description,
-        row.start_date,
-        row.due_date,
-        row.created_by,
-      ],
-    );
-    const created = result.rows[0];
-    if (!created) throw new ApiError('INTERNAL', 'Run creation failed.');
-    return created;
+    try {
+      const result = await q.query<RunRow>(
+        `INSERT INTO runs (project_id, plan_id, name, description, start_date, due_date, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+         RETURNING ${runColumns()}`,
+        [
+          row.project_id,
+          row.plan_id,
+          row.name,
+          row.description,
+          row.start_date,
+          row.due_date,
+          row.created_by,
+        ],
+      );
+      const created = result.rows[0];
+      if (!created) throw new ApiError('INTERNAL', 'Run creation failed.');
+      return created;
+    } catch (error) {
+      // The pre-check names the field; this closes the concurrent-insert race.
+      if (isRunNameViolation(error)) throw runNameConflict();
+      throw error;
+    }
   }
 
   async updateRun(
@@ -552,13 +606,18 @@ export class RunsStore {
     if (fields.due_date !== undefined) assign('due_date', fields.due_date);
     assign('updated_by', fields.updated_by);
 
-    const result = await q.query<RunRow>(
-      `UPDATE runs SET ${assignments.join(', ')}, updated_at = now()
-       WHERE id = $1 AND deleted_at IS NULL
-       RETURNING ${runColumns()}`,
-      [id, ...values],
-    );
-    return result.rows[0] ?? null;
+    try {
+      const result = await q.query<RunRow>(
+        `UPDATE runs SET ${assignments.join(', ')}, updated_at = now()
+         WHERE id = $1 AND deleted_at IS NULL
+         RETURNING ${runColumns()}`,
+        [id, ...values],
+      );
+      return result.rows[0] ?? null;
+    } catch (error) {
+      if (isRunNameViolation(error)) throw runNameConflict();
+      throw error;
+    }
   }
 
   /** Close (completed=true) or reopen (false); touches only `runs`. */
