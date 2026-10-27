@@ -38,6 +38,12 @@ export interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   /**
+   * Multipart body for file uploads (attachments). When set it wins over
+   * `body` and the request omits `Content-Type` so the browser adds the
+   * multipart boundary itself.
+   */
+  formData?: FormData;
+  /**
    * Query values. Arrays are sent as repeated parameters
    * (`priority=high&priority=medium`) — the contract's shape for the
    * repeatable case filters.
@@ -85,6 +91,9 @@ export function createApiClient(deps: ApiClientDeps) {
     const token = deps.getToken();
     const url = buildUrl(API_BASE_URL, path, options.query);
     const method = options.method ?? "GET";
+    // A multipart body must not carry a JSON Content-Type — fetch would
+    // otherwise be unable to add its own multipart boundary.
+    const isMultipart = options.formData !== undefined;
 
     let response: Response;
     try {
@@ -92,10 +101,14 @@ export function createApiClient(deps: ApiClientDeps) {
         method,
         credentials: "include", // refresh cookie rides along on every call
         headers: {
-          "Content-Type": "application/json",
+          ...(isMultipart ? {} : { "Content-Type": "application/json" }),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+        body: isMultipart
+          ? options.formData
+          : options.body !== undefined
+            ? JSON.stringify(options.body)
+            : undefined,
         signal: options.signal,
       });
     } catch {
@@ -217,7 +230,57 @@ export function createApiClient(deps: ApiClientDeps) {
     return (await requestWithRetry<T>(path, options, true)) as Page<T[]>;
   }
 
-  return { apiFetch, apiFetchPage };
+  /**
+   * Fetches binary bytes (attachments) and returns them as a Blob. Split from
+   * the envelope path because the response is not JSON; a 401 still refreshes
+   * once and retries so a streamed file respects the access token.
+   */
+  async function apiFetchBlob(
+    path: string,
+    options: RequestOptions = {}
+  ): Promise<Blob> {
+    const token = deps.getToken();
+    const url = buildUrl(API_BASE_URL, path, options.query);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: options.method ?? "GET",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: options.signal,
+      });
+    } catch {
+      throw new ApiError({
+        code: "REQUEST_FAILED",
+        message: "Cannot reach the server. Check your connection and try again.",
+        status: 0,
+      });
+    }
+
+    if (!response.ok) {
+      if (response.status === 401 && !options.skipAuthRetry) {
+        const newToken = await deps.refresh();
+        if (newToken) {
+          return apiFetchBlob(path, { ...options, skipAuthRetry: true });
+        }
+      }
+      let code = "REQUEST_FAILED";
+      let message = "Something went wrong. Please try again.";
+      try {
+        const body = (await response.json()) as Partial<ApiErrorBody> | null;
+        code = body?.error?.code ?? code;
+        message = body?.error?.message ?? message;
+      } catch {
+        // A non-JSON error body (e.g. an HTML gateway page) — keep the default.
+      }
+      throw new ApiError({ code, message, status: response.status });
+    }
+
+    return await response.blob();
+  }
+
+  return { apiFetch, apiFetchPage, apiFetchBlob };
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;

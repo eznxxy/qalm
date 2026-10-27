@@ -1,0 +1,810 @@
+/*
+ * Run detail (DESIGN §4.4) + the result drawer. Tokens only — every colour and
+ * spacing step comes from styles/tokens.css; no hard-coded values. The drawer's
+ * classes are self-contained `rd-*` names (deliberately not reusing the case
+ * drawer's `.drawer-state` / `.history-*`), so the two screens evolve apart.
+ */
+
+/* ---------- page shell ---------- */
+
+.rd-back {
+  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.rd-back a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.rd-back a:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.rd-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.rd-heading-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.rd-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Run status (open/completed) is a plain word chip, not a result StatusBadge
+ * (StatusBadge only accepts the six test-status names). */
+.rd-run-status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-badge);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  color: var(--ink-700);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rd-run-open {
+  background: var(--brand-tint);
+  border-color: var(--border);
+  color: var(--ink-900);
+}
+
+.rd-run-completed {
+  background: var(--canvas);
+  color: var(--ink-500);
+}
+
+.rd-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.rd-subtitle {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.rd-readonly {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* The rollup row: the pie card and the headline card side by side (review
+ * feedback — the overall figure gets its own surface, not a column inside the
+ * breakdown). The pair spans the page: a third review pass pointed at the dead
+ * space to their right, so both cards grow to fill the row (the pie taking the
+ * larger share, it has more content) instead of leaving the right half empty. */
+.rd-summary {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.rd-summary > * {
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
+}
+
+/* Grow, but never narrower than their content: the pie card needs 36rem for the
+ * pie and the two legend columns to stay side by side (at 1024px the pair still
+ * fits on one line), and the row wraps rather than crushing the pie on
+ * anything narrower. */
+.rd-summary > .stp-root {
+  flex: 1 1 36rem;
+}
+
+.rd-summary > .sts-root {
+  flex: 1 1 20rem;
+}
+
+/* ---------- filter bar ---------- */
+
+.rd-toolbar .rd-field-grow {
+  flex: 1 1 16rem;
+  min-width: 14rem;
+}
+
+/* ---------- items table ---------- */
+
+.rd-col-id,
+.rd-col-status,
+.rd-col-assignee,
+.rd-col-updated {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.rd-col-status {
+  min-width: 8rem;
+}
+
+.rd-col-assignee {
+  min-width: 8rem;
+}
+
+/* The title cell opens the result drawer. */
+.rd-item-title {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.rd-item-title:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+/* ---------- assign dialog ---------- */
+
+/* The shared `.dialog` frame is 16px of padding (globals.css) because most
+ * dialogs are dense forms that want the height. This one is two lines of copy
+ * and a single control, so the frame can breathe: 24px all round, which puts
+ * the same 24px between the select and the card edge as the fields have
+ * between each other. */
+.assign-dialog {
+  padding: var(--space-6);
+}
+
+.assign-dialog .field-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* The hint above the field has no bottom margin (it is description copy, not a
+ * label), so the field needs its own separation or "Assignee" sits on the
+ * sentence. Inside the field the shared 2px gap puts the label on top of the
+ * select; 8px reads as a label that belongs to its control. */
+.assign-dialog .field {
+  margin-top: var(--space-4);
+  gap: var(--space-3);
+}
+
+.assign-dialog select {
+  width: 100%;
+}
+
+/* ---------- result drawer ---------- */
+
+.rd-scope {
+  display: contents;
+}
+
+.rd-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.rd-state p {
+  margin: 0;
+}
+
+.rd-skeleton {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: 12px;
+  border-radius: var(--radius-badge);
+  background: var(--canvas);
+  animation: rd-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.rd-skeleton:nth-child(2) {
+  max-width: 240px;
+}
+
+.rd-skeleton:nth-child(3) {
+  max-width: 180px;
+}
+
+@keyframes rd-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-skeleton {
+    animation: none;
+  }
+}
+
+.rd-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.rd-meta-priority {
+  color: var(--ink-700);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rd-section {
+  margin-bottom: var(--space-4);
+}
+
+.rd-section h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.rd-preconditions {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rd-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rd-steps li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.rd-steps li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.rd-step-number {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: right;
+}
+
+.rd-steps p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rd-step-expected {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* ---- add-result form ---- */
+
+.rd-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.rd-field label,
+.rd-field-label {
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.rd-field textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font: inherit;
+  resize: vertical;
+}
+
+.rd-hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Segmented status buttons (P F B R S). */
+.rd-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.rd-seg {
+  height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-raised);
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 18px;
+  /* Per-status hover colours, set by the .rd-seg-<status> classes below. */
+  --seg: var(--ink-500);
+  --seg-tint: var(--canvas);
+}
+
+/* Hover and keyboard focus preview the status you are about to pick: that
+ * status's tint as the fill, its solid as a 2px edge (1px border + 1px inset
+ * ring, so nothing shifts) and --ink-900 for the label. The label stays ink
+ * because 13px text in the status colour on its own tint only reaches ~3.4:1
+ * (--passed on --passed-tint); the solid sits on the edge instead, where the
+ * floor is 3:1. The selected button keeps its solid brand fill and is excluded.
+ * Review feedback: the old hover changed only the border and read as nothing. */
+.rd-seg:hover:not(:disabled):not(.is-active),
+.rd-seg:focus-visible:not(:disabled):not(.is-active),
+/* `button` prefix only to out-rank the global secondary-button hover in
+ * globals.css, which also sets border-color on hover. */
+button.rd-seg:hover:not(:disabled):not(.is-active),
+button.rd-seg:focus-visible:not(:disabled):not(.is-active) {
+  background: var(--seg-tint);
+  border-color: var(--seg);
+  color: var(--ink-900);
+  box-shadow: inset 0 0 0 1px var(--seg);
+}
+
+.rd-seg-passed {
+  --seg: var(--passed);
+  --seg-tint: var(--passed-tint);
+}
+
+.rd-seg-retest {
+  --seg: var(--retest);
+  --seg-tint: var(--retest-tint);
+}
+
+.rd-seg-blocked {
+  --seg: var(--blocked);
+  --seg-tint: var(--blocked-tint);
+}
+
+.rd-seg-failed {
+  --seg: var(--failed);
+  --seg-tint: var(--failed-tint);
+}
+
+.rd-seg-skipped {
+  --seg: var(--skipped);
+  --seg-tint: var(--skipped-tint);
+}
+
+button.rd-seg.is-active,
+.rd-seg.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-brand);
+}
+
+/* The chosen status is the only filled button, so its label must survive hover.
+ * The global un-filled hover in globals.css
+ * (`button:hover:not(:disabled):not(.primary):not(.danger)`, specificity
+ * 0,4,1) sets `color: var(--ink-900)` and out-ranks a plain
+ * `button.rd-seg.is-active:hover` (0,4,0). That was a real bug: clicking a
+ * status and then pointing at it turned the label black on the navy fill.
+ * Mirroring the same `:not()` chain puts this at 0,5,1 and keeps the label on
+ * the brand fill white in both themes (`--text-on-brand`). */
+button.rd-seg.is-active:hover:not(:disabled):not(.primary):not(.danger),
+button.rd-seg.is-active:focus-visible:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--text-on-brand);
+}
+
+.rd-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0 var(--space-3);
+}
+
+.rd-row .rd-field {
+  min-width: 0;
+}
+
+/* Attachment cards (review feedback, card 3.7): a staged file and a saved
+ * attachment use the same card, so the two read as one idea. The name/size
+ * button fills the card and opens the viewer; the × sits beside it. */
+.rd-staged,
+.rd-attachments {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.rd-file-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 8px 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.rd-file-card:hover,
+.rd-file-card:focus-within {
+  background: var(--brand-tint);
+  border-color: var(--brand);
+}
+
+.rd-file-open {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rd-file-open:focus-visible {
+  outline-offset: 2px;
+}
+
+.rd-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rd-file-meta {
+  flex: 0 0 auto;
+}
+
+.rd-file-ext {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-badge);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.rd-file-ext.is-image {
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.rd-file-ext.is-pdf {
+  background: var(--failed-tint);
+  color: var(--failed);
+}
+
+/* Square "×" control for removing an attachment (review feedback, card 3.7):
+ * the file name beside it is the label, so the button itself stays icon-only
+ * with an aria-label and a native title. */
+.rd-icon-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-badge);
+  background: none;
+  color: var(--text-muted);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rd-icon-btn:hover:not(:disabled) {
+  border-color: var(--failed);
+  background: var(--failed-tint);
+  color: var(--failed);
+}
+
+.rd-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rd-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+/* ---- history ---- */
+
+.rd-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.rd-history-row {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.rd-history-row.is-editing {
+  border-color: var(--accent);
+  background: var(--brand-tint);
+}
+
+.rd-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.rd-history-head time {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rd-history-actor {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rd-history-comment {
+  margin: var(--space-2) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rd-history-defect {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* The two actions under a kept result are controls, not links (eighth review
+ * pass): compact secondary buttons with a 12px glyph, set off from the result
+ * body by a hairline so they read as the row's footer. */
+.rd-history-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.rd-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  color: var(--ink-700);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease,
+    color 120ms ease;
+}
+
+.rd-action-btn svg {
+  flex: 0 0 auto;
+}
+
+/* The global un-filled button hover in globals.css is
+ * `button:hover:not(:disabled):not(.primary):not(.danger)` — (0,4,1), which
+ * out-ranks `button.rd-action-btn:hover:not(:disabled)` at (0,3,1) and would
+ * leave the Edit button with the muted ink-500 edge while the Add attachment
+ * label next to it turned brand. Mirroring the same `:not()` chain puts this at
+ * (0,5,1) so both buttons hover identically. */
+button.rd-action-btn:hover:not(:disabled):not(.primary):not(.danger),
+label.rd-action-btn:hover {
+  background: var(--brand-tint);
+  border-color: var(--brand);
+  color: var(--ink-900);
+}
+
+/* "Add attachment" is a label over a visually hidden file input, so the ring
+ * is drawn on the label while the input itself keeps focus. */
+.rd-attach-add {
+  position: relative;
+  cursor: pointer;
+}
+
+.rd-attach-add:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rd-action-btn.is-busy {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rd-attach-add input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- attachment viewer ---------- */
+
+/* Wider than the confirm dialog: images and the PDF viewer need room. The
+ * dialog keeps its chrome but hands the body to the file. */
+.rd-viewer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: min(72rem, 94vw);
+  max-height: 92vh;
+  padding: 0;
+  overflow: hidden;
+}
+
+.rd-viewer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.rd-viewer-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rd-viewer-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+  max-height: 72vh;
+  overflow: auto;
+  padding: var(--space-4);
+  background: var(--canvas);
+}
+
+.rd-viewer-image {
+  display: block;
+  max-width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+  border-radius: var(--radius-badge);
+}
+
+.rd-viewer-frame {
+  width: 100%;
+  height: 68vh;
+  border: 0;
+  background: var(--surface);
+}
+
+.rd-viewer-state {
+  margin: 0;
+  padding: var(--space-5);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.rd-viewer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.rd-viewer-actions .button-link {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.rd-manage {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 575px) {
+  .rd-row {
+    grid-template-columns: 1fr;
+  }
+}

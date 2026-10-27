@@ -112,3 +112,57 @@ export function describeTimestamp(
     title: formatFullTimestamp(iso, options),
   };
 }
+
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * True for a real calendar date in `YYYY-MM-DD` form (2026-02-30 is not).
+ * The form dialogs use this to gate a date input before it reaches the API.
+ */
+export function isDateOnly(value: string): boolean {
+  const match = DATE_ONLY_RE.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+/**
+ * A calendar date (`YYYY-MM-DD`) rendered in the user's locale, e.g.
+ * "14 Nov 2026". Date-only values carry no instant, so parsing them with
+ * `new Date("2026-11-14")` would treat them as UTC midnight and print 13 Nov
+ * in negative-offset zones. This rebuilds the date from its parts in the local
+ * zone instead, so the printed day always matches the value the API sent.
+ * Anything that is not a real `YYYY-MM-DD` day (bad shape, or a rollover like
+ * `2026-02-30`) is returned unchanged rather than guessed at.
+ */
+export function formatDateOnly(
+  ymd: string,
+  options: DateFormatOptions = {}
+): string {
+  const match = DATE_ONLY_RE.exec(ymd);
+  if (!match) return ymd;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  // JS normalises out-of-range parts (2026-02-30 → 2 Mar); reject those.
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return ymd;
+  }
+  return new Intl.DateTimeFormat(options.locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}

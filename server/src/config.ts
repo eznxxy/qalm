@@ -19,6 +19,12 @@ export interface AppConfig {
    * credentials). Empty = CORS disabled (no ACAO headers). Dev-only.
    */
   corsOrigins: string[];
+  /**
+   * Directory holding result-attachment bytes (docs/api-runs.md
+   * § Implementation notes). A relative value resolves against the process
+   * working directory; default `./storage`. Never logged; gitignored.
+   */
+  storageDir: string;
 }
 
 export class ConfigError extends Error {
@@ -138,6 +144,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
 
   const corsOrigins = parseCorsOrigins(env['CORS_DEV_ORIGINS'] ?? '', problems);
 
+  const storageRaw = env['STORAGE_DIR'] ?? './storage';
+  const storageDir = storageRaw.trim();
+  if (storageDir === '' || storageDir.includes('\0')) {
+    problems.push('STORAGE_DIR must be a non-empty path');
+  }
+
   if (problems.length > 0) {
     throw new ConfigError(problems);
   }
@@ -151,6 +163,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     jwtSecret,
     refreshCookieSecure: secureRaw === 'true',
     corsOrigins,
+    storageDir,
   };
 }
 

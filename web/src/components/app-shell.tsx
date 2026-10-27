@@ -34,11 +34,10 @@ import {
   type ShortcutDefinition,
 } from "@/lib/keymap";
 
-/** §7 go-to sequences: `g` then the section's initial (g then c/r/p). */
+/** §7 go-to sequences: `g` then the section's initial (g then c/r). */
 const GOTO_ROUTES: Record<string, string> = {
   c: "/cases",
-  r: "/wip/runs",
-  p: "/wip/plans",
+  r: "/runs",
 };
 
 /** How long the armed `g` chord waits for its second key. */
@@ -81,8 +80,7 @@ function navGroups(isAdmin: boolean): ReadonlyArray<ReadonlyArray<{ href: string
       // placeholder at /wip/[slug]; the sidebar always points somewhere real.
       { href: "/wip/overview", label: "Overview", icon: <NavIcon icon="overview" /> },
       { href: "/cases", label: "Test cases", icon: <NavIcon icon="cases" /> },
-      { href: "/wip/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
-      { href: "/wip/plans", label: "Test plans", icon: <NavIcon icon="plans" /> },
+      { href: "/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
       { href: "/wip/milestones", label: "Milestones", icon: <NavIcon icon="milestones" /> },
       { href: "/wip/reports", label: "Reports", icon: <NavIcon icon="reports" /> },
     ],
@@ -99,7 +97,7 @@ function navGroups(isAdmin: boolean): ReadonlyArray<ReadonlyArray<{ href: string
 const PROJECT_SWITCHER_LIMIT = 100;
 
 /** Minimal 16px stroke glyphs (§8: decorative — the text label carries meaning). */
-function NavIcon({ icon }: { icon: "overview" | "cases" | "runs" | "plans" | "milestones" | "reports" | "settings" | "users" }) {
+function NavIcon({ icon }: { icon: "overview" | "cases" | "runs" | "milestones" | "reports" | "settings" | "users" }) {
   const common = {
     width: 16,
     height: 16,
@@ -133,13 +131,6 @@ function NavIcon({ icon }: { icon: "overview" | "cases" | "runs" | "plans" | "mi
       return (
         <svg {...common}>
           <path d="M4.5 2.5l8 5.5-8 5.5z" />
-        </svg>
-      );
-    case "plans":
-      return (
-        <svg {...common}>
-          <rect x="2" y="3" width="12" height="11" rx="1" />
-          <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" />
         </svg>
       );
     case "milestones":
@@ -487,12 +478,12 @@ function AppShellInner({ children }: { children: ReactNode }) {
           }}
         >
           <label htmlFor="topbar-search-input" className="sr-only">
-            Search cases and runs
+            Search projects
           </label>
           <input
             id="topbar-search-input"
             type="search"
-            placeholder="Search cases, runs…"
+            placeholder="Search projects…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             /* §7: '/' from anywhere lands here. Marked out of the shell's

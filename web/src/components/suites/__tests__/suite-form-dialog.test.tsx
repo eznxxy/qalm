@@ -8,6 +8,28 @@ import { SuiteFormDialog } from "@/components/suites/SuiteFormDialog";
  */
 
 describe("SuiteFormDialog", () => {
+  it("does not flag the empty name while the dialog opens", () => {
+    // StrictMode re-runs the mount effect once; its cleanup must not steal
+    // focus from the auto-focused Name field and trip the blur validation.
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    render(
+      <React.StrictMode>
+        <SuiteFormDialog
+          mode="create"
+          onSubmit={jest.fn()}
+          onCancel={jest.fn()}
+        />
+      </React.StrictMode>
+    );
+
+    expect(screen.queryByText("Name is required.")).toBeNull();
+    expect(screen.getByLabelText("Name")).toHaveFocus();
+    trigger.remove();
+  });
+
   it("requires a name before submitting", () => {
     const onSubmit = jest.fn();
     render(

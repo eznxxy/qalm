@@ -262,6 +262,15 @@
   line-height: 16px;
 }
 
+/* Linked runs: the run name is the row's title (it opens the run). */
+.linked-run-name {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink-900);
+  overflow-wrap: anywhere;
+}
+
 .history-changes {
   list-style: none;
   margin: var(--space-2) 0 0;

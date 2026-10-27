@@ -20,5 +20,13 @@ exists and is approved (see `/AGENTS.md`).
   steps, fixed type list, estimate in minutes, project-scoped `C####` ids,
   history, bulk move.
 
+## Slice 3 (plans & runs) — status: contracts approved (Arif, 2026-10-26)
+- `PRD-plans-runs.md` / `api-runs.md` / `api-plans.md` — test plans (thin
+  containers over runs), test runs over selected cases, run items with a case
+  snapshot and assignee, append-only results (Passed/Failed/Blocked/Retest/
+  Skipped; failed needs a comment), attachments on the API server's disk, run
+  close/reopen, and the case drawer's Linked runs feed. Ten decisions (Q1–Q10)
+  are recorded in the PRD.
+
 ## Later slices (no docs yet)
-Plans & runs → milestones → dashboards/reports → CSV import/export.
+Milestones → dashboards/reports → CSV import/export.

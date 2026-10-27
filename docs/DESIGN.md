@@ -139,11 +139,10 @@ Case IDs use the form `C1042`, tabular figures, weight 500.
 │ Overview   │  Page title                         [Secondary] [Primary]   │
 │ Test cases │  ─ tabs ─────────────────────────────────────────────────── │
 │ Test runs  │  Filter bar                                                 │
-│ Test plans │  ┌───────────────────────────────────────────────────────┐  │
-│ Milestones │  │ Content (table / two-pane / report)                   │  │
-│ Reports    │  │                                                       │  │
-│ ────────── │  └───────────────────────────────────────────────────────┘  │
-│ Settings   │                                                             │
+│ Milestones │  ┌───────────────────────────────────────────────────────┐  │
+│ Reports    │  │ Content (table / two-pane / report)                   │  │
+│ ────────── │  │                                                       │  │
+│ Settings   │  └───────────────────────────────────────────────────────┘  │
 └────────────┴─────────────────────────────────────────────────────────────┘
   Sidebar 232px (collapses to 56px icons)          Content max-width: none
 ```
@@ -194,17 +193,56 @@ cases."
   result, reorderable), priority, type, tags, estimate. Steps are a numbered
   list because they are a real sequence.
 - Bulk action bar replaces the filter bar when rows are selected.
+- A selection is a step, not a view: leaving Test cases and coming back starts
+  with nothing selected. The route is kept alive in the background (React
+  Activity), so the page clears its selection when it is hidden.
 
 ### 4.3 Test runs list
 
-Columns: name, milestone, status bar (the memorable element), % complete,
-assignee, due date. Filter by Open / Completed.
+Columns: name, plan, status bar (the memorable element), % complete,
+assignee, start date, due date. Filter by Open / Completed.
+
+- **The toolbar creates both things, and a plan is created with its runs.** A
+  plan with no runs is an empty folder, so "New plan" opens one dialog that
+  collects the plan's own fields and one or more runs (name, description,
+  dates) and posts them as a single request; nothing is saved until there is at
+  least one run, and the API inserts the plan and its runs in one transaction.
+  The runs screen stays where it is after a save. There is no plans list: the
+  runs list's Plan column and the plan detail screen are the way to a plan,
+  which carries its rollup and its Edit/Delete actions.
+- **Existing runs can join the plan.** Below the run rows, the same dialog
+  lists the project's runs that have no plan yet, each with a checkbox, its
+  status and its progress; ticking one adds it to the plan as a read-only row
+  (name, dates and item count, no fields to edit) with a Remove action. Only
+  unplanned runs are offered — a run already in another plan is not listed and
+  the API refuses it — so a save never moves work out of someone else's plan.
+  The "at least one run, at most 20" rule counts new and attached runs
+  together, and a rejected request points at the offending row. The untouched
+  first run row is a placeholder: attaching a run drops it, so a plan built
+  only from existing runs can be saved without filling in a new-run name.
+- **One live run per name per project.** A run name another live run in the
+  project already uses — ignoring case — is refused on create and rename, with
+  the message on the Name field and nothing saved. A deleted run stops holding
+  its name, and changing only the case of a run's own name is allowed. The New
+  plan dialog catches a repeat among its own run rows before sending, so that
+  case never reaches the API.
+- **New run takes whole suites, and several of them.** The Cases fieldset's
+  suite picker adds one suite per choice and lists the chosen ones as removable
+  chips under the search field; a single "Include descendants" checkbox applies
+  to all of them. The run is the union of those subtrees plus any specific cases
+  added by hand, so overlapping picks never duplicate an item. A search field
+  with chips keeps the fieldset short — the full suite tree already lives on
+  Test cases, and a run needs a handful of suites, not the hierarchy.
 
 ### 4.4 Run detail (the most-used screen)
 
 ```
 ┌ Run: Release 2.4 smoke ──────────────────────── [Assign] [Close run]
-│ [██████████▓▓▓▓▒▒░░░░░░]  62% done · 31 passed · 4 failed · 2 blocked · 13 untested
+│ ┌─ pie card ────────────────┐ ┌─ headline card ────────┐
+│ │ (◔)  ● 31 Passed    ● 4 Failed │ │       46%         │
+│ │      │ 50% set to …  6% set to …│ │      passed       │
+│ │      │ ● 0 Skipped    ● 13 Untested│ │ 91 / 239 untested (38%). │
+│ └──────────────────────────┘ └────────────────────────┘
 │ [Status ▾] [Assignee ▾] [Section ▾]  Search…
 │ ┌───────┬─────────────────────────┬──────────┬────────────┬──────────────┐
 │ │ ID    │ Title                   │ Status   │ Assignee   │ Updated      │
@@ -214,15 +252,87 @@ assignee, due date. Filter by Open / Completed.
 └ Click a row → result drawer (480px): case steps, [Add result] form, history
 ```
 
+- **Header rollup** is a full pie (190px) on its own surface card: one wedge per
+  status, in the fixed status order, with no hole and no number in the middle.
+  The legend carries the numbers — two columns of three, each row a status dot,
+  a bold "110 Passed" line and a muted "46% set to Passed" line under it. Zeros
+  stay listed at 0 / 0%, keeping their dot colour as the key. The status bar
+  stays the element for tables (§4.3, §4.5).
+- **Headline card beside it**: a second surface, same height, holding the passed
+  share as the card's one big number (40px) with "passed" under it and a muted
+  footer "91 / 239 untested (38%)." — absolute and relative in one line, the
+  number a reviewer asks for first without doing arithmetic on the wedges. Both
+  shares are `round(count / total × 100)`, the legend's rounding, so the two
+  cards can never disagree; a run with no items reads "0% passed" and
+  "0 / 0 untested (0%)."
+- **The pair fills the row.** Both cards flex-grow (`36rem` / `20rem` flex
+  bases) so they span the content width instead of leaving the right half of the
+  header empty; the pie card takes the larger share because it holds more. The
+  pie and legend stay a centred group inside their card rather than being pushed
+  to opposite edges. Below ~900px of content width the row wraps and the
+  headline drops under the pie.
 - **Add result** form: status (segmented buttons with shortcuts P, F, B, R, S),
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
+  Hovering or focusing a status button previews that status — its tint as the
+  fill, its solid as the edge, ink label — so the choice is legible before the
+  click; the chosen button is the only one filled solid, and its label stays
+  `--text-on-brand` on hover and focus as well. The filled variant must carry
+  more specificity than the global un-filled `button:hover` rule, otherwise
+  hovering a status you already picked flips its label to ink on the navy fill
+  (`button.rd-seg.is-active:hover` with the same `:not(:disabled):not(.primary):
+  not(.danger)` chain as globals.css, i.e. 0,5,1).
+- **Attachments state their limits up front**: "Up to 5 files, 10 MB each.
+  Allowed: PNG, JPG, JPEG, WebP, PDF. Uploaded when you save." Those five
+  extensions are the whole allow-list (PRD §Attachment) and the same array
+  drives `accept`, the hint and the pick-time check, so the three cannot drift;
+  picking anything else fails inline ("<file>: that file type is not allowed.").
+  The check is **extension-based, not MIME-based**, so it behaves identically on
+  every OS: the browser's own type string is OS data (Windows reports `.zip` as
+  `application/x-zip-compressed` and `.csv` as `application/vnd.ms-excel`),
+  while the name is the same everywhere. The server derives the stored
+  `content_type` from the same extension. The history row's "Add attachment"
+  **button** carries the same list as a tooltip instead of a second hint line.
+- **Attachments are cards, and clicking one opens it.** A staged file and a
+  saved attachment render the same way — an extension chip (images in the brand
+  tint, PDF in the failed tint), the name, the size, and the icon-only `×`
+  beside them — so what you picked and what you saved read as one idea. The
+  card is the affordance: the click (or Enter, on the name button) opens the
+  attachment in a modal instead of downloading it. Images show in an `<img>`;
+  PDFs go to the browser's own viewer inside an `<iframe>`. The modal is the
+  one place in the run detail that *is* modal — scrim, focus moved in, Tab
+  trapped, Escape closes, other keys swallowed — because a 480px drawer leaves
+  no room for the file itself. Its footer keeps "Open in new tab" and
+  "Download" for the copy you actually want to keep. Staged files preview from
+  the `File` already in memory; saved attachments are fetched as a blob first,
+  and the blob URL is revoked on close, on replace and on unmount.
+- **The two actions under a kept result are buttons.** "Edit result" and "Add
+  attachment" were underlined text links; they are now compact secondary buttons
+  (28px, 13px label, 12px pencil/paperclip glyph) under a hairline that closes
+  the row, so the result's footer reads as controls rather than more prose.
+  "Add attachment" stays a `<label>` over a visually hidden `<input type="file">`
+  — the styling moved onto the label and the focus ring is drawn on it with
+  `:focus-within`, so the picker keeps its accessible name and its keyboard
+  path.
+- **The Section filter offers only the suites this run has items from.** The
+  bar above the table narrows the items, so a suite with no items in the run
+  can only ever filter down to nothing; listing all ten project suites invited
+  dead ends. The options come from the new `Run.suite_ids` (the distinct
+  non-null `case_suite_id` snapshots among the run's items), ordered by the
+  suite tree rather than by the aggregate, and each keeps its real tree depth so
+  the `— ` indentation still says where it sits. A `?suite=` already in the URL
+  for a suite the run no longer touches stays selectable as "Selected section"
+  — otherwise a shared link would silently reset to "All sections".
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
 - Failed results require a comment. Show the reason inline, not in a toast.
 
 ### 4.5 Plans, milestones
 
-Plan: a table of runs with an aggregate status bar per row and in the header.
+Plan: created from the runs screen together with at least one run (§4.3); its
+own screen shows the plan's fields, the aggregate rollup, the Edit/Delete pair
+(Admin/Lead, read-only when archived) and a table of its runs — the runs list's
+columns minus Plan, sorted by the server.
+
 Milestone: name, due date, progress bar, linked runs, days left.
 
 ### 4.6 Reports and dashboard
@@ -257,7 +367,7 @@ Do not add a UI library without Daedalus's approval.
 |---|---|
 | **Button** | Primary (`--brand`), secondary (outline), ghost, danger. One primary per view. Label is a verb: "Save case", "Add result", never "Submit". |
 | **Status badge** | Tint background, `--ink-900` text, status-solid icon (untested icon uses `--ink-700`) — exact rules in §2.2. 4px radius, 22px high. Same markup everywhere. |
-| **Status bar** | Segmented horizontal bar, 8px high in tables, 16px on dashboards. Segment order: Passed, Retest, Blocked, Failed, Skipped, Untested. Hover shows counts. Include `role="img"` and an `aria-label` that spells out the numbers. |
+| **Status bar** | Segmented horizontal bar, 8px high in tables, 16px on dashboards. Segment order: Passed, Retest, Blocked, Failed, Skipped, Untested. Hover shows counts. Include `role="img"` and an `aria-label` that spells out the numbers. The run detail header uses the **pie** variant instead (§4.4): donut, completion in the middle, legend of all six statuses. |
 | **Data table** | Plain (non-sticky) header, sortable columns, column resize, row selection, row hover `--canvas`, selected row `--brand-tint`. Virtualise above 200 rows. Pagination or infinite scroll must keep scroll position. |
 | **Tree** | ARIA treeview, arrow-key navigation, counts right-aligned, drag handle on hover. |
 | **Tabs** | Underline style, active tab has a 2px `--brand` underline. |
@@ -292,8 +402,8 @@ Do not add a UI library without Daedalus's approval.
   expands (120 ms), toast appears. No page-load animations, no hover animations
   on rows or cards.
 - Respect `prefers-reduced-motion`: replace motion with instant changes.
-- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`/`p`
-  go to cases, runs, plans, `n` new, `Ctrl+Enter` save, `P F B R S` set status
+- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`
+  go to cases, runs, `n` new, `Ctrl+Enter` save, `P F B R S` set status
   in a result form, `j`/`k` move between rows, `Esc` close.
 
 ---

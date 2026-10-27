@@ -1,0 +1,111 @@
+/*
+ * StatusPie — stylesheet for web/src/components/ui/StatusPie.tsx.
+ *
+ * A full pie on the left, a two-column legend on the right (review feedback,
+ * matching the reviewer's reference): dot, then a count + status line over a
+ * muted "n% set to <status>" line. Colours are var() references into
+ * web/src/styles/tokens.css (status solids, §2.2 — tints stay reserved for
+ * badge backgrounds).
+ */
+
+.stp-root {
+  display: flex;
+  align-items: center;
+  /* The pair stays a group in the middle of the card: on a wide card it keeps
+   * pie and legend adjacent (the colour mapping reads better at 24px than
+   * across an open gap) and centres the leftover space instead of pooling it
+   * in one corner. */
+  justify-content: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.stp-chart {
+  display: block;
+  flex: 0 0 auto;
+  width: 190px;
+  height: 190px;
+}
+
+/* Backing disc — visible only where no status has a wedge. */
+.stp-track {
+  fill: var(--canvas);
+}
+
+.stp-slice {
+  fill: currentColor;
+}
+
+/* Every legend row keeps its status colour, zeros included, so the dot stays
+ * the colour key rather than a presence indicator. */
+.stp-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Six statuses: three rows, filled down each column. */
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  gap: var(--space-4) var(--space-6);
+}
+
+.stp-legend-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.stp-dot {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.stp-legend-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.stp-legend-title {
+  color: var(--ink-900);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stp-legend-sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ solid per status */
+
+.stp-passed {
+  color: var(--passed);
+}
+
+.stp-retest {
+  color: var(--retest);
+}
+
+.stp-blocked {
+  color: var(--blocked);
+}
+
+.stp-failed {
+  color: var(--failed);
+}
+
+.stp-skipped {
+  color: var(--skipped);
+}
+
+.stp-untested {
+  color: var(--untested);
+}

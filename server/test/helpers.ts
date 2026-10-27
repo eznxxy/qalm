@@ -100,7 +100,9 @@ export async function createTestApp(): Promise<TestApp> {
 /** Cleans all state between tests (suites/cases reference users; scratch DB only). */
 export async function resetDb(db: DbService): Promise<void> {
   await db.query(
-    'TRUNCATE case_history, case_steps, cases, project_case_counters, suites, refresh_tokens, projects, users',
+    'TRUNCATE result_attachments, results, run_items, runs, plans, ' +
+      'case_history, case_steps, cases, project_case_counters, suites, ' +
+      'refresh_tokens, projects, users',
   );
 }
 

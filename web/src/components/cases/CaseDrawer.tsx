@@ -9,17 +9,20 @@
  *   numbered step list and preconditions.
  * - History: GET /cases/:id/history, paginated, one line per changed field
  *   (no raw JSON).
- * - Linked runs: honest placeholder — runs are a later slice and there is no
- *   contract endpoint yet.
+ * - Linked runs: GET /cases/:id/runs, paginated — every run that contains the
+ *   case, with the case's status inside it and a link to the run.
  * - §6 states for every load; destructive delete asks first and names the
  *   case. Esc/focus return live in the shared Drawer primitive.
  */
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import Link from "next/link";
 import {
   PRIORITY_LABELS,
   CASE_TYPE_LABELS,
+  RUN_STATUS_LABELS,
   type CaseDetail,
   type CaseHistoryEntry,
+  type LinkedRun,
   type SuiteNode,
 } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
@@ -27,7 +30,7 @@ import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
 import { Drawer } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { PriorityIcon } from "@/components/ui";
+import { PriorityIcon, StatusBadge } from "@/components/ui";
 import { formatEstimateInput } from "@/lib/case-form";
 import {
   CASE_ACTION_LABELS,
@@ -55,6 +58,13 @@ type DetailState =
 
 interface HistoryState {
   entries: CaseHistoryEntry[];
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
+interface LinkedRunsState {
+  entries: LinkedRun[];
   page: number;
   totalPages: number;
   total: number;
@@ -94,6 +104,12 @@ export function CaseDrawer({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRetry, setHistoryRetry] = useState(0);
+
+  const [linkedPage, setLinkedPage] = useState(1);
+  const [linked, setLinked] = useState<LinkedRunsState | null>(null);
+  const [linkedLoading, setLinkedLoading] = useState(false);
+  const [linkedError, setLinkedError] = useState<string | null>(null);
+  const [linkedRetry, setLinkedRetry] = useState(0);
 
   // The drawer is keyed by caseId, so a different case remounts this
   // component and every block starts fresh (no reset-in-effect needed).
@@ -162,6 +178,42 @@ export function CaseDrawer({
       active = false;
     };
   }, [tab, caseId, historyPage, historyRetry]);
+
+  useEffect(() => {
+    if (tab !== "linked") return;
+    let active = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!active) return;
+      setLinkedLoading(true);
+      setLinkedError(null);
+      try {
+        const result = await api.listCaseRuns(caseId, {
+          page: linkedPage,
+          limit: 25,
+        });
+        if (!active) return;
+        setLinked({
+          entries: result.data,
+          page: result.meta?.page ?? linkedPage,
+          totalPages: result.meta?.total_pages ?? 1,
+          total: result.meta?.total ?? result.data.length,
+        });
+      } catch (err) {
+        if (!active || isSessionDead(err)) return;
+        setLinkedError(
+          err instanceof ApiError
+            ? err.message
+            : "Could not load linked runs. Check your connection and retry."
+        );
+      } finally {
+        if (active) setLinkedLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [tab, caseId, linkedPage, linkedRetry]);
 
   const detail = state.kind === "ready" ? state.detail : null;
   const title = editing && detail
@@ -380,15 +432,68 @@ export function CaseDrawer({
                 id="case-panel-linked"
                 aria-labelledby="case-tab-linked"
               >
-                <div className="drawer-state">
-                  <p>
-                    <strong>No linked runs yet.</strong>
-                  </p>
-                  <p>
-                    Runs that include this case will appear here once the runs
-                    slice ships.
-                  </p>
-                </div>
+                {linkedError ? (
+                  <div className="drawer-state" role="alert">
+                    <p>{linkedError}</p>
+                    <button
+                      type="button"
+                      onClick={() => setLinkedRetry((n) => n + 1)}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : linkedLoading ? (
+                  <div className="drawer-state" role="status" aria-live="polite">
+                    <span className="drawer-skeleton" />
+                    <span className="drawer-skeleton" />
+                    <span className="sr-only">Loading linked runs…</span>
+                  </div>
+                ) : !linked || linked.entries.length === 0 ? (
+                  <div className="drawer-state">
+                    <p>
+                      <strong>Not in any run yet.</strong>
+                    </p>
+                    <p>
+                      Select this case on the cases screen and choose Add to
+                      run… to include it.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <ol className="history-list">
+                      {linked.entries.map((run) => (
+                        <LinkedRunRow
+                          key={run.item_id}
+                          run={run}
+                          projectId={projectId}
+                        />
+                      ))}
+                    </ol>
+                    {linked.totalPages > 1 && (
+                      <div className="history-pagination">
+                        <button
+                          type="button"
+                          disabled={linked.page <= 1}
+                          onClick={() =>
+                            setLinkedPage((page) => Math.max(1, page - 1))
+                          }
+                        >
+                          Previous
+                        </button>
+                        <span className="t-nums">
+                          Page {linked.page} of {linked.totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={linked.page >= linked.totalPages}
+                          onClick={() => setLinkedPage((page) => page + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </>
@@ -538,6 +643,36 @@ function CaseDetails({
         </div>
       )}
     </div>
+  );
+}
+
+function LinkedRunRow({
+  run,
+  projectId,
+}: {
+  run: LinkedRun;
+  projectId: string;
+}) {
+  const at = describeTimestamp(run.updated_at);
+
+  return (
+    <li className="history-row linked-run-row">
+      <div className="history-head">
+        <Link
+          className="linked-run-name"
+          href={`/runs/${run.run_id}?project=${encodeURIComponent(projectId)}`}
+        >
+          {run.run_name}
+        </Link>
+        <StatusBadge status={run.status} />
+      </div>
+      <p className="history-actor">
+        {RUN_STATUS_LABELS[run.run_status]} run · updated{" "}
+        <time dateTime={run.updated_at} title={at.title}>
+          {at.label}
+        </time>
+      </p>
+    </li>
   );
 }
 
