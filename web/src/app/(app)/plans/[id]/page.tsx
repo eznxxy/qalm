@@ -310,8 +310,9 @@ export default function PlanDetailPage() {
   const rows = runsState.kind === "ready" ? runsState.rows : [];
   const runTotal = runsState.kind === "ready" ? runsState.total : 0;
 
-  // Same columns as the runs list; no Plan column (every row is this plan),
-  // and no sort control (see the file header).
+  // Same columns as the runs list; no Plan column (every row is this plan) and
+  // no sort control (see the file header). The Milestone column stays: it is how
+  // a run's checkpoint is reached from the plan it belongs to.
   const columns = runTableColumns({
     onOpenRun: (run) =>
       router.push(
@@ -319,6 +320,13 @@ export default function PlanDetailPage() {
           ? `/runs/${run.id}?project=${encodeURIComponent(projectId)}`
           : `/runs/${run.id}`
       ),
+    onOpenMilestone: (milestoneId) =>
+      router.push(
+        projectId
+          ? `/milestones/${milestoneId}?project=${encodeURIComponent(projectId)}`
+          : `/milestones/${milestoneId}`
+      ),
+    showMilestone: true,
   });
 
   return (

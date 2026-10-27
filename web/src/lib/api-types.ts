@@ -428,6 +428,93 @@ export interface UpdatePlanInput {
   due_date?: string | null;
 }
 
+// ---- milestones (docs/api-milestones.md) ----
+
+/**
+ * A milestone's state is derived on read, never stored (docs/api-milestones.md
+ * § Resource: Milestone): `completed` when it has at least one run and every
+ * attached live run is completed, `open` otherwise.
+ */
+export type MilestoneStatus = "open" | "completed";
+
+export const MILESTONE_STATUSES: readonly MilestoneStatus[] = [
+  "open",
+  "completed",
+] as const;
+
+export const MILESTONE_STATUS_LABELS: Record<MilestoneStatus, string> = {
+  open: "Open",
+  completed: "Completed",
+};
+
+export type MilestoneSortKey =
+  | "due_date"
+  | "created_at"
+  | "updated_at"
+  | "name";
+
+/** Undated milestones (`due_date` null) sort last regardless of direction. */
+export type MilestoneSort =
+  | "due_date"
+  | "-due_date"
+  | "created_at"
+  | "-created_at"
+  | "updated_at"
+  | "-updated_at"
+  | "name"
+  | "-name";
+
+/** A project-scoped, dated checkpoint over runs (docs/api-milestones.md). */
+export interface Milestone {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  /** Plain `YYYY-MM-DD`, never an instant. */
+  due_date: string | null;
+  status: MilestoneStatus;
+  /** Attached live runs; completed ones included. */
+  run_count: number;
+  counts: StatusCounts;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MilestoneListQuery {
+  query?: string;
+  status?: MilestoneStatus;
+  sort?: MilestoneSort;
+  page?: number;
+  limit?: number;
+}
+
+/** Create is fields-only; runs are attached afterwards. */
+export interface CreateMilestoneInput {
+  name: string;
+  /** Omit or `null` for none. */
+  description?: string | null;
+  /** Plain `YYYY-MM-DD`; omit or `null` for none. */
+  due_date?: string | null;
+}
+
+/** PATCH /milestones/:id — any non-empty subset; `null` clears an optional field. */
+export interface UpdateMilestoneInput {
+  name?: string;
+  description?: string | null;
+  due_date?: string | null;
+}
+
+/** POST /milestones/:id/runs — 1–50 live, unattached runs of the project. */
+export interface AttachMilestoneRunsInput {
+  run_ids: string[];
+}
+
+export interface AttachMilestoneRunsResult {
+  attached: number;
+}
+
 /** A run is `open` until it is closed; `completed_at` drives the status. */
 export type RunStatus = "open" | "completed";
 
@@ -446,6 +533,10 @@ export interface Run {
   id: string;
   project_id: string;
   plan_id: string | null;
+  /** One milestone per run (docs/api-milestones.md). */
+  milestone_id: string | null;
+  /** Current milestone name from a join; `null` when the run has none. */
+  milestone_name: string | null;
   name: string;
   description: string | null;
   status: RunStatus;
@@ -490,6 +581,8 @@ export type RunSort =
 export interface RunListQuery {
   /** UUID, or the literal `"none"` for runs with no plan. */
   plan_id?: string;
+  /** UUID, or the literal `"none"` for runs with no milestone. */
+  milestone_id?: string;
   status?: RunStatus;
   query?: string;
   sort?: RunSort;
@@ -514,6 +607,8 @@ export interface CreateRunInput {
   name: string;
   description?: string;
   plan_id?: string;
+  /** Optional live milestone of the same project. */
+  milestone_id?: string;
   /** Plain `YYYY-MM-DD`; server 400s a start date after `due_date`. */
   start_date?: string;
   due_date?: string;
@@ -526,6 +621,8 @@ export interface UpdateRunInput {
   description?: string | null;
   /** `null` detaches the run from its plan. */
   plan_id?: string | null;
+  /** `null` detaches the run from its milestone; another id moves it. */
+  milestone_id?: string | null;
   start_date?: string | null;
   due_date?: string | null;
 }

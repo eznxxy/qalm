@@ -752,8 +752,18 @@ export default function RunDetailPage() {
     emptyBody = "A Lead or Admin adds cases to a run.";
   }
 
-  const subtitleParts = [project.name];
+  const subtitleParts: ReactNode[] = [project.name];
   if (planName) subtitleParts.push(planName);
+  if (run.milestone_id && run.milestone_name) {
+    subtitleParts.push(
+      <Link
+        key="milestone"
+        href={`/milestones/${run.milestone_id}?project=${projectId}`}
+      >
+        {run.milestone_name}
+      </Link>
+    );
+  }
   if (run.start_date) subtitleParts.push(`Starts ${formatDateOnly(run.start_date)}`);
   if (run.due_date) subtitleParts.push(`Due ${formatDateOnly(run.due_date)}`);
 
@@ -810,7 +820,14 @@ export default function RunDetailPage() {
         </div>
       </div>
 
-      <p className="rd-subtitle">{subtitleParts.join(" · ")}</p>
+      <p className="rd-subtitle">
+        {subtitleParts.map((part, index) => (
+          <span key={index}>
+            {index > 0 && " · "}
+            {part}
+          </span>
+        ))}
+      </p>
       {readOnlyReason && <p className="rd-readonly">{readOnlyReason}</p>}
 
       <div className="rd-summary">

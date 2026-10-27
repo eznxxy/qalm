@@ -208,7 +208,7 @@ describe("sidebar navigation", () => {
       ["Overview", "/wip/overview"],
       ["Test cases", "/cases"],
       ["Test runs", "/runs"],
-      ["Milestones", "/wip/milestones"],
+      ["Milestones", "/milestones"],
       ["Reports", "/wip/reports"],
       ["Settings", "/settings"],
     ] as const) {
@@ -548,17 +548,17 @@ describe("not-built-yet placeholder (/wip/[slug])", () => {
 
   it("renders the §6 one-sentence empty state, no fake screens", async () => {
     const { default: NotBuiltPage } = await import("@/app/(app)/wip/[slug]/page");
-    mockRouterState.slug = "milestones";
+    mockRouterState.slug = "reports";
     render(<NotBuiltPage />);
 
-    expect(screen.getByRole("heading", { name: "Milestones" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("This screen is not built yet.")).toBeInTheDocument();
   });
 
-  it("has no entry for sections that shipped (cases, runs, plans)", async () => {
+  it("has no entry for sections that shipped (cases, runs, plans, milestones)", async () => {
     // Those routes are real now; /wip/<them> must not masquerade as a screen.
     const { default: NotBuiltPage } = await import("@/app/(app)/wip/[slug]/page");
-    for (const slug of ["cases", "runs", "plans", "settings"]) {
+    for (const slug of ["cases", "runs", "plans", "milestones", "settings"]) {
       mockRouterState.slug = slug;
       const { unmount } = render(<NotBuiltPage />);
       expect(

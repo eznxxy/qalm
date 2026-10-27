@@ -125,6 +125,8 @@ function run(overrides: Partial<Run> = {}): Run {
     id: "r-1",
     project_id: "p-1",
     plan_id: "pl-1",
+    milestone_id: null,
+    milestone_name: null,
     name: "Release 2.4 smoke",
     description: "Smoke pass.",
     status: "open",
@@ -378,11 +380,9 @@ describe("run detail", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
     // Subtitle stitches project · plan · start date · due date.
-    expect(
-      screen.getByText(
-        "Payments · Release 2.4 · Starts 1 Nov 2026 · Due 14 Nov 2026"
-      )
-    ).toBeInTheDocument();
+    expect(document.querySelector("p.rd-subtitle")?.textContent).toBe(
+      "Payments · Release 2.4 · Starts 1 Nov 2026 · Due 14 Nov 2026"
+    );
 
     const table = await screen.findByRole("table", { name: "Run items" });
     expect(
@@ -402,7 +402,9 @@ describe("run detail", () => {
     await renderPage();
 
     await screen.findByRole("heading", { level: 1, name: "Release 2.4 smoke" });
-    expect(screen.getByText("Payments · Release 2.4")).toBeInTheDocument();
+    expect(document.querySelector("p.rd-subtitle")?.textContent).toBe(
+      "Payments · Release 2.4"
+    );
   });
 
   it("rolls the run up as a pie with every status in the legend", async () => {

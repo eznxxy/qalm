@@ -24,6 +24,8 @@ function makeRun(overrides: Partial<Run> & { id: string; name: string }): Run {
   return {
     project_id: "p-1",
     plan_id: null,
+    milestone_id: null,
+    milestone_name: null,
     description: null,
     status: "open",
     start_date: null,

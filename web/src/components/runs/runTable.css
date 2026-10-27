@@ -1,7 +1,8 @@
 /*
- * Runs table (DESIGN §4.3) — shared by the runs list and a plan's Runs section
- * (card 3.3) so the two screens keep the same columns AND the same proportions.
- * Tokens only; scoped under .run-table so it never leaks into other tables.
+ * Runs table (DESIGN §4.3) — shared by the runs list, a plan's Runs section
+ * (card 3.3) and a milestone's Runs section (card 3.1) so the screens keep the
+ * same columns AND the same proportions. Tokens only; scoped under .run-table
+ * so it never leaks into other tables.
  */
 
 /* The name cell opens the run (card 3.2 owns the destination screen). */
@@ -29,64 +30,109 @@
  * ends up floating in a half-empty cell. Fixed widths pin the Name column to a
  * share of the table and let a long name wrap inside its cell. The shares must
  * total 100% and leave each non-text column room for its header and its widest
- * fixed-shape value (a status bar, or `Oct 28, 2026`). */
+ * fixed-shape value (a status bar, or `Oct 28, 2026`).
+ *
+ * Each variant owns its own percentages through variables, so a column can be
+ * added or dropped without a rule per column per variant; a variant that does
+ * not render a column simply leaves its variable unused. */
 .run-table .dt-table {
   table-layout: fixed;
 }
 
-/* With the Plan column: 7 columns. */
-.run-table--with-plan .run-col-name {
-  width: 22%;
+.run-table {
+  --run-w-name: 20%;
+  --run-w-plan: 11%;
+  --run-w-milestone: 12%;
+  --run-w-status: 14%;
+  --run-w-percent: 11%;
+  --run-w-assignees: 10%;
+  --run-w-start: 11%;
+  --run-w-due: 11%;
 }
 
-.run-table--with-plan .run-col-plan {
-  width: 12%;
-}
-
-.run-table--with-plan .run-col-status {
-  width: 16%;
-}
-
-.run-table--with-plan .run-col-percent {
-  width: 12%;
-}
-
-.run-table--with-plan .run-col-assignees {
-  width: 11%;
-}
-
-.run-table--with-plan .run-col-start {
-  width: 13%;
-}
-
-.run-table--with-plan .run-col-due {
-  width: 14%;
-}
-
-/* Without the Plan column: 6 columns, and the 12% it frees goes to the name
+/* Without the Plan column: 7 columns, and the 11% it frees goes to the name
  * and status cells, which are the two that actually need the room. */
-.run-table--no-plan .run-col-name {
-  width: 26%;
+.run-table--no-plan {
+  --run-w-name: 24%;
+  --run-w-milestone: 14%;
+  --run-w-status: 17%;
+  --run-w-percent: 12%;
+  --run-w-assignees: 11%;
+  --run-w-start: 11%;
+  --run-w-due: 11%;
 }
 
-.run-table--no-plan .run-col-status {
-  width: 20%;
+/* A milestone's runs section: 7 visible columns (no Milestone) plus the
+ * Actions column that holds "Remove". */
+.run-table--milestone-runs {
+  --run-w-name: 20%;
+  --run-w-plan: 12%;
+  --run-w-status: 15%;
+  --run-w-percent: 10%;
+  --run-w-assignees: 9%;
+  --run-w-start: 9%;
+  --run-w-due: 9%;
+  --run-w-actions: 16%;
 }
 
-.run-table--no-plan .run-col-percent {
-  width: 13%;
+.run-table .run-col-name {
+  width: var(--run-w-name);
 }
 
-.run-table--no-plan .run-col-assignees {
-  width: 13%;
+.run-table .run-col-plan {
+  width: var(--run-w-plan);
 }
 
-.run-table--no-plan .run-col-start {
-  width: 14%;
+.run-table .run-col-milestone {
+  width: var(--run-w-milestone);
 }
 
-.run-table--no-plan .run-col-due {
-  width: 14%;
+.run-table .run-col-status {
+  width: var(--run-w-status);
+}
+
+.run-table .run-col-percent {
+  width: var(--run-w-percent);
+}
+
+.run-table .run-col-assignees {
+  width: var(--run-w-assignees);
+}
+
+.run-table .run-col-start {
+  width: var(--run-w-start);
+}
+
+.run-table .run-col-due {
+  width: var(--run-w-due);
+}
+
+.run-table .run-col-actions {
+  width: var(--run-w-actions);
+}
+
+/* One text action per row ("Remove from milestone"). */
+.run-row-action {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.run-row-action:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.run-row-action-danger,
+.run-row-action-danger:hover:not(:disabled) {
+  color: var(--danger);
 }
 
 /* A date is one token — "28 Oct" / "2026" on two lines reads as two values.

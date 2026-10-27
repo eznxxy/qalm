@@ -25,6 +25,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type {
   CaseListItem,
+  Milestone,
   Plan,
   RunSelection,
   SuiteNode,
@@ -49,6 +50,8 @@ export interface RunFormValues {
   description: string;
   /** Empty string = no plan. */
   planId: string;
+  /** Empty string = no milestone. */
+  milestoneId: string;
   /** Empty string = no start date; otherwise `YYYY-MM-DD`. */
   startDate: string;
   /** Empty string = no due date; otherwise `YYYY-MM-DD`. */
@@ -59,6 +62,8 @@ export interface RunFormDialogProps {
   projectId: string;
   suites: readonly SuiteNode[];
   plans: readonly Plan[];
+  /** The project's milestones for the optional Milestone select. */
+  milestones?: readonly Milestone[];
   busy?: boolean;
   serverFieldErrors?: {
     name?: string;
@@ -66,6 +71,7 @@ export interface RunFormDialogProps {
     start_date?: string;
     due_date?: string;
     plan_id?: string;
+    milestone_id?: string;
     selection?: string;
   };
   formError?: string | null;
@@ -103,6 +109,7 @@ export function RunFormDialog({
   projectId,
   suites,
   plans,
+  milestones = [],
   busy = false,
   serverFieldErrors,
   formError,
@@ -113,6 +120,7 @@ export function RunFormDialog({
     name: "",
     description: "",
     planId: "",
+    milestoneId: "",
     startDate: "",
     dueDate: "",
   });
@@ -139,6 +147,7 @@ export function RunFormDialog({
   const nameId = useId();
   const descriptionId = useId();
   const planId = useId();
+  const milestoneId = useId();
   const startDateId = useId();
   const dueDateId = useId();
   const suiteIdField = useId();
@@ -333,6 +342,7 @@ export function RunFormDialog({
         name: trimmedName,
         description: values.description.trim(),
         planId: values.planId,
+        milestoneId: values.milestoneId,
         startDate: values.startDate,
         dueDate: values.dueDate,
       },
@@ -445,6 +455,47 @@ export function RunFormDialog({
               </select>
             </div>
 
+            <div className="field">
+              <label htmlFor={milestoneId}>Milestone</label>
+              <select
+                id={milestoneId}
+                value={values.milestoneId}
+                disabled={busy}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    milestoneId: event.target.value,
+                  }))
+                }
+                aria-invalid={
+                  serverFieldErrors?.milestone_id ? true : undefined
+                }
+                aria-describedby={
+                  serverFieldErrors?.milestone_id
+                    ? `${milestoneId}-error`
+                    : `${milestoneId}-hint`
+                }
+              >
+                <option value="">No milestone</option>
+                {milestones.map((milestone) => (
+                  <option key={milestone.id} value={milestone.id}>
+                    {milestone.name}
+                  </option>
+                ))}
+              </select>
+              {serverFieldErrors?.milestone_id ? (
+                <p className="field-error" id={`${milestoneId}-error`}>
+                  {serverFieldErrors.milestone_id}
+                </p>
+              ) : (
+                <p className="field-hint" id={`${milestoneId}-hint`}>
+                  Optional. A run can belong to one milestone.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="run-dialog-row">
             <div className="field">
               <label htmlFor={startDateId}>Start date</label>
               <input

@@ -3,6 +3,8 @@ import {
   AddRunItemsInput,
   AddRunItemsResult,
   AssignRunItemsInput,
+  AttachMilestoneRunsInput,
+  AttachMilestoneRunsResult,
   AuthSession,
   BootstrapInput,
   BulkMoveCasesInput,
@@ -12,6 +14,7 @@ import {
   CaseHistoryQuery,
   CaseListQuery,
   CaseListItem,
+  CreateMilestoneInput,
   CreateProjectInput,
   CreateResultInput,
   CreateRunInput,
@@ -19,10 +22,13 @@ import {
   CreateUserInput,
   CreateCaseInput,
   CreatePlanInput,
+  UpdateMilestoneInput,
   UpdatePlanInput,
   LinkedRun,
   LinkedRunQuery,
   LoginInput,
+  Milestone,
+  MilestoneListQuery,
   PatchMeInput,
   Plan,
   PlanListQuery,
@@ -267,6 +273,53 @@ export const api = {
   deletePlan: (id: string) =>
     client.apiFetch<void>(`/plans/${encodeURIComponent(id)}`, opts("DELETE")),
 
+  // ---- milestones (docs/api-milestones.md) ----
+  listMilestones: (projectId: string, query: MilestoneListQuery = {}) =>
+    client.apiFetchPage<Milestone>(
+      `/projects/${encodeURIComponent(projectId)}/milestones`,
+      {
+        query: {
+          query: query.query,
+          status: query.status,
+          sort: query.sort,
+          page: query.page,
+          limit: query.limit,
+        },
+      }
+    ),
+
+  getMilestone: (id: string) =>
+    client.apiFetch<Milestone>(`/milestones/${encodeURIComponent(id)}`),
+
+  createMilestone: (projectId: string, input: CreateMilestoneInput) =>
+    client.apiFetch<Milestone>(
+      `/projects/${encodeURIComponent(projectId)}/milestones`,
+      opts("POST", input)
+    ),
+
+  updateMilestone: (id: string, input: UpdateMilestoneInput) =>
+    client.apiFetch<Milestone>(
+      `/milestones/${encodeURIComponent(id)}`,
+      opts("PATCH", input)
+    ),
+
+  deleteMilestone: (id: string) =>
+    client.apiFetch<void>(`/milestones/${encodeURIComponent(id)}`, opts("DELETE")),
+
+  /** Attaches runs that have no milestone yet; never moves one. */
+  attachMilestoneRuns: (id: string, input: AttachMilestoneRunsInput) =>
+    client.apiFetch<AttachMilestoneRunsResult>(
+      `/milestones/${encodeURIComponent(id)}/runs`,
+      opts("POST", input)
+    ),
+
+  /** Detaches one run; the run itself is untouched. */
+  detachMilestoneRun: (id: string, runId: string) =>
+    client.apiFetch<void>(
+      `/milestones/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}`,
+      opts("DELETE")
+    ),
+
   // ---- runs (docs/api-runs.md) ----
   listRuns: (projectId: string, query: RunListQuery = {}) =>
     client.apiFetchPage<Run>(
@@ -274,6 +327,7 @@ export const api = {
       {
         query: {
           plan_id: query.plan_id,
+          milestone_id: query.milestone_id,
           status: query.status,
           query: query.query,
           sort: query.sort,

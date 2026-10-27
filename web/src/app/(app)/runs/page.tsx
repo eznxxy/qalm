@@ -36,6 +36,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   RUN_STATUSES,
   RUN_STATUS_LABELS,
+  type Milestone,
   type Plan,
   type Project,
   type Run,
@@ -224,6 +225,28 @@ export default function RunsPage() {
     };
   }, [projectId, plansRetry]);
 
+  // ---- milestones (the New run dialog's milestone select) ----
+  // Non-essential: a failed load hides the select instead of failing the page.
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    let active = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!active) return;
+      try {
+        const result = await api.listMilestones(projectId, { limit: 100 });
+        if (active) setMilestones(result.data);
+      } catch (err) {
+        if (isSessionDead(err)) return;
+        if (active) setMilestones([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+
   // ---- suites (the New run dialog's suite picker) ----
   const [suites, setSuites] = useState<SuiteNode[]>([]);
   useEffect(() => {
@@ -335,6 +358,7 @@ export default function RunsPage() {
     start_date?: string;
     due_date?: string;
     plan_id?: string;
+    milestone_id?: string;
     selection?: string;
   }>({});
   const [createFormError, setCreateFormError] = useState<string | null>(null);
@@ -365,6 +389,7 @@ export default function RunsPage() {
         name: values.name,
         ...(values.description ? { description: values.description } : {}),
         ...(values.planId ? { plan_id: values.planId } : {}),
+        ...(values.milestoneId ? { milestone_id: values.milestoneId } : {}),
         ...(values.startDate ? { start_date: values.startDate } : {}),
         ...(values.dueDate ? { due_date: values.dueDate } : {}),
         ...(selection ? { selection } : {}),
@@ -390,6 +415,7 @@ export default function RunsPage() {
           field === "start_date" ||
           field === "due_date" ||
           field === "plan_id" ||
+          field === "milestone_id" ||
           field === "selection"
         ) {
           fieldErrors[field] = detail.issue;
@@ -533,7 +559,10 @@ export default function RunsPage() {
     onOpenRun: (run) => router.push(`/runs/${run.id}?project=${projectId}`),
     onOpenPlan: (planId) =>
       router.push(`/plans/${planId}?project=${projectId}`),
+    onOpenMilestone: (milestoneId) =>
+      router.push(`/milestones/${milestoneId}?project=${projectId}`),
     planNames,
+    showMilestone: true,
     sortable: true,
   });
 
@@ -756,6 +785,7 @@ export default function RunsPage() {
           projectId={projectId}
           suites={suites}
           plans={plans}
+          milestones={milestones}
           busy={createBusy}
           serverFieldErrors={createFieldErrors}
           formError={createFormError}
