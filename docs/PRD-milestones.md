@@ -1,7 +1,7 @@
 # PRD — Milestones (MVP)
 
-Status: **Draft — awaiting approval** (Arif, 2026-10-27). The decisions at the
-end are proposals; nothing is built until they are accepted.
+Status: **Approved** (Arif, 2026-10-27). The nine decisions at the end are
+accepted; implementation is tracked in `docs/backlog-slice4-milestones.md`.
 Owner: Daedalus
 Slice: 4 (next after `PRD-plans-runs.md`; see `docs/README.md` "Slice 4")
 API contract: `docs/api-milestones.md`; the additive run link is in
