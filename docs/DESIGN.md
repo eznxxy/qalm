@@ -324,6 +324,13 @@ assignee, start date, due date. Filter by Open / Completed.
   — otherwise a shared link would silently reset to "All sections".
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
+- **Assign is per item.** The items table has a selection column for Admin/Lead
+  on an open run; ticking rows scopes the dialog to those items ("2 selected
+  items") and sends their ids, while an empty selection keeps the whole-run
+  default ("All 6 items"). The selection belongs to the current result set — a
+  different filter, sort or page starts with nothing ticked, and it is consumed
+  by the assign — so a bulk action never reaches an item the reviewer cannot
+  see. Roles that cannot assign see no checkboxes.
 - Failed results require a comment. Show the reason inline, not in a toast.
 
 ### 4.5 Plans, milestones
