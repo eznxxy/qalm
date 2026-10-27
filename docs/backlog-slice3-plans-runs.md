@@ -409,20 +409,30 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   `File`; saved ones are fetched through `api.fetchAttachmentBlob` first, and
   a close during the fetch wins on a request id. The blob URL is revoked on
   close, on replace and on unmount.
-- Verified: web `tsc`/`eslint` clean, jest **570** (40 suites) including seven
-  new `StatusPie` tests, three drawer attachment tests (staged image viewer +
-  revoke, uploaded PDF `iframe` after a fetch, icon-only removal) and the
-  run-detail pie test. Live as Tester on `Run October` — header
+- **The kept-result actions became buttons** (eighth review pass: the reviewer
+  boxed "Edit result  Add attachment"). Both were underlined `.linklike` text;
+  they are now compact secondary buttons — 28px tall, 13px label, a 12px
+  pencil / paperclip glyph — sitting under a `1px` hairline that closes the
+  result row, so the footer reads as controls instead of more prose. "Add
+  attachment" is still a `<label>` wrapping the visually hidden file input: the
+  button chrome and the `:focus-within` ring live on the label, so the picker
+  keeps its name and its keyboard path. Hover is the same brand tint + brand
+  edge the status preview uses; the label goes `.is-busy` (55% opacity, not
+  allowed) while an upload is in flight.
+- Verified: web `tsc`/`eslint` clean, jest **571** (40 suites) including seven
+  new `StatusPie` tests, four drawer attachment tests (staged image viewer +
+  revoke, uploaded PDF `iframe` after a fetch, icon-only removal, the actions as
+  buttons) and the run-detail pie test. Live as Tester on `Run October` — header
   group reads "Run October results by status", centre `33% done`, legend
   `Passed 1 · Retest 0 · Blocked 0 · Failed 0 · Skipped 0 · Untested 2`.
   **Verification note:** the reviewer's Admin session showed the first hover pass
   was too quiet, so the second pass was checked in the browser against the app's
   own served stylesheet (button classes rendered on the run page, pointer over
   Failed): fill `#fbe9e9`, border and inset ring `#c23a3a`, label `#17202e`.
-  The `×` control and the attachment cards/viewer are still unit-tested only —
-  they need a writer session with an item open or a saved attachment, and the
-  Tester account never gets the result form because every item in these runs is
-  unassigned.
+  The `×` control, the attachment cards/viewer and the two action buttons are
+  still unit-tested only — they need a writer session with an item open or a
+  saved attachment, and the Tester account never gets the result form because
+  every item in these runs is unassigned.
 
 ---
 

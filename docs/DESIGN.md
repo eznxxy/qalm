@@ -252,7 +252,7 @@ assignee, due date. Filter by Open / Completed.
   `application/x-zip-compressed` and `.csv` as `application/vnd.ms-excel`),
   while the name is the same everywhere. The server derives the stored
   `content_type` from the same extension. The history row's "Add attachment"
-  link carries the same list as a tooltip instead of a second hint line.
+  **button** carries the same list as a tooltip instead of a second hint line.
 - **Attachments are cards, and clicking one opens it.** A staged file and a
   saved attachment render the same way — an extension chip (images in the brand
   tint, PDF in the failed tint), the name, the size, and the icon-only `×`
@@ -266,6 +266,14 @@ assignee, due date. Filter by Open / Completed.
   "Download" for the copy you actually want to keep. Staged files preview from
   the `File` already in memory; saved attachments are fetched as a blob first,
   and the blob URL is revoked on close, on replace and on unmount.
+- **The two actions under a kept result are buttons.** "Edit result" and "Add
+  attachment" were underlined text links; they are now compact secondary buttons
+  (28px, 13px label, 12px pencil/paperclip glyph) under a hairline that closes
+  the row, so the result's footer reads as controls rather than more prose.
+  "Add attachment" stays a `<label>` over a visually hidden `<input type="file">`
+  — the styling moved onto the label and the focus ring is drawn on it with
+  `:focus-within`, so the picker keeps its accessible name and its keyboard
+  path.
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
 - Failed results require a comment. Show the reason inline, not in a toast.
