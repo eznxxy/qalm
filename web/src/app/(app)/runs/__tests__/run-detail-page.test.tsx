@@ -404,6 +404,12 @@ describe("run detail", () => {
     ]);
     // The old progress bar is gone from this screen.
     expect(summary.querySelector(".stb-root")).toBeNull();
+    // The headline beside the pie: passed share, then the untouched footer.
+    expect(within(summary).getByText("50%")).toBeInTheDocument();
+    expect(within(summary).getByText("passed")).toBeInTheDocument();
+    expect(
+      within(summary).getByText("1 / 4 untested (25%).")
+    ).toBeInTheDocument();
   });
 
   it("opens the result drawer through ?item in the URL", async () => {

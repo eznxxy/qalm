@@ -10,6 +10,9 @@
  *   the reader gets both the absolute and the relative size in one glance.
  * - Wedge order is FIXED (STATUS_ORDER: Passed, Retest, Blocked, Failed,
  *   Skipped, Untested) — never sorted by size; position is memory.
+ * - Beside the pie sits the headline figure: the passed share as a large
+ *   number, then "untested / total (share)" — the two numbers a reviewer asks
+ *   for before reading the breakdown.
  * - Wedges use the status SOLIDS (--passed …) from tokens.css; tints stay
  *   reserved for badge backgrounds (§2.2).
  * - Zero-count statuses render no wedge (an empty arc would read as data) but
@@ -77,6 +80,9 @@ export function StatusPie({ counts, label }: StatusPieProps): ReactElement {
     };
   });
 
+  const passed = counts.passed ?? 0;
+  const untested = counts.untested ?? 0;
+
   return (
     <div
       className="stp-root"
@@ -110,6 +116,21 @@ export function StatusPie({ counts, label }: StatusPieProps): ReactElement {
           )
         )}
       </svg>
+
+      {/* The headline figures, beside the pie: how much has passed, and how
+       * much of the run is still untouched — the two numbers a reviewer asks
+       * for first (review feedback). */}
+      <div className="stp-stat">
+        <p className="stp-stat-headline">
+          <span className="stp-stat-percent t-nums">
+            {sharePercent(passed, total)}%
+          </span>{" "}
+          <span className="stp-stat-label">passed</span>
+        </p>
+        <p className="stp-stat-sub t-nums">
+          {untested} / {total} untested ({sharePercent(untested, total)}%).
+        </p>
+      </div>
 
       <ul className="stp-legend">
         {STATUS_ORDER.map((status) => {

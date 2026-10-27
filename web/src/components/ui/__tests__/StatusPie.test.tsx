@@ -97,6 +97,32 @@ describe("StatusPie", () => {
     expect(container.querySelector("path")).toBeNull();
   });
 
+  it("puts the passed share and the untested footer beside the pie", () => {
+    const { container } = render(
+      <StatusPie counts={{ passed: 1, failed: 1, untested: 2 }} />
+    );
+    const stat = container.querySelector(".stp-stat") as HTMLElement;
+    expect(stat).toBeInTheDocument();
+    expect(stat.querySelector(".stp-stat-percent")?.textContent).toBe("25%");
+    expect(stat.querySelector(".stp-stat-label")?.textContent).toBe("passed");
+    expect(stat.querySelector(".stp-stat-sub")?.textContent).toBe(
+      "2 / 4 untested (50%)."
+    );
+    // It sits between the pie and the breakdown, not below them.
+    const root = container.querySelector(".stp-root") as HTMLElement;
+    expect(
+      Array.from(root.children).map((el) => el.getAttribute("class"))
+    ).toEqual(["stp-chart", "stp-stat", "stp-legend"]);
+  });
+
+  it("reads 0% passed and 0 / 0 untested for a run with no items", () => {
+    const { container } = render(<StatusPie counts={{}} />);
+    expect(container.querySelector(".stp-stat-percent")?.textContent).toBe("0%");
+    expect(container.querySelector(".stp-stat-sub")?.textContent).toBe(
+      "0 / 0 untested (0%)."
+    );
+  });
+
   it("names the group after the run and stays decorative for the SVG", () => {
     const { container } = render(
       <StatusPie counts={{ passed: 2, untested: 1 }} label="Release 2.4 smoke" />
