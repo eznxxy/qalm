@@ -1,0 +1,98 @@
+/*
+ * Runs table (DESIGN §4.3) — shared by the runs list and a plan's Runs section
+ * (card 3.3) so the two screens keep the same columns AND the same proportions.
+ * Tokens only; scoped under .run-table so it never leaks into other tables.
+ */
+
+/* The name cell opens the run (card 3.2 owns the destination screen). */
+.run-title-link {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.run-title-link:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+/* Column widths are a fixed layout, not an auto one: with `table-layout: auto`
+ * the table hands every spare pixel to the widest columns, so a short run name
+ * ends up floating in a half-empty cell. Fixed widths pin the Name column to a
+ * share of the table and let a long name wrap inside its cell. The shares must
+ * total 100% and leave each non-text column room for its header and its widest
+ * fixed-shape value (a status bar, or `Oct 28, 2026`). */
+.run-table .dt-table {
+  table-layout: fixed;
+}
+
+/* With the Plan column: 7 columns. */
+.run-table--with-plan .run-col-name {
+  width: 22%;
+}
+
+.run-table--with-plan .run-col-plan {
+  width: 12%;
+}
+
+.run-table--with-plan .run-col-status {
+  width: 16%;
+}
+
+.run-table--with-plan .run-col-percent {
+  width: 12%;
+}
+
+.run-table--with-plan .run-col-assignees {
+  width: 11%;
+}
+
+.run-table--with-plan .run-col-start {
+  width: 13%;
+}
+
+.run-table--with-plan .run-col-due {
+  width: 14%;
+}
+
+/* Without the Plan column: 6 columns, and the 12% it frees goes to the name
+ * and status cells, which are the two that actually need the room. */
+.run-table--no-plan .run-col-name {
+  width: 26%;
+}
+
+.run-table--no-plan .run-col-status {
+  width: 20%;
+}
+
+.run-table--no-plan .run-col-percent {
+  width: 13%;
+}
+
+.run-table--no-plan .run-col-assignees {
+  width: 13%;
+}
+
+.run-table--no-plan .run-col-start {
+  width: 14%;
+}
+
+.run-table--no-plan .run-col-due {
+  width: 14%;
+}
+
+/* A date is one token — "28 Oct" / "2026" on two lines reads as two values.
+ * The fixed widths above leave room for the longest locale form at the
+ * narrowest supported layout, so nowrap never has to clip. */
+.run-table .run-col-start,
+.run-table .run-col-due {
+  white-space: nowrap;
+}

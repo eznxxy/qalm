@@ -3,9 +3,13 @@
 /**
  * Plan detail (docs/backlog-slice3-plans-runs.md card 3.3). A plan is a thin
  * container over runs, so this screen is the plan's own fields plus a rollup and
- * a read-only list of its runs — deliberately not an extracted copy of the runs
- * table (that table stays private to the runs screen until a third caller needs
- * it).
+ * a read-only list of its runs.
+ *
+ * The Runs table is the runs list's table, minus the Plan column (docs/DESIGN.md
+ * §4.3): the columns come from @/components/runs/runTable, so a column added or
+ * re-ordered on the runs screen cannot leave this copy behind. Sorting stays
+ * off — it would be client-side over one page of rows, while the runs list sorts
+ * on the server through ?sort=.
  *
  * Runs are fetched from the runs list with `plan_id=<id>` as the contract
  * prescribes (docs/api-plans.md § GET /plans/:id — runs are not embedded).
@@ -15,22 +19,17 @@
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
-import {
-  RUN_STATUS_LABELS,
-  type Plan,
-  type Run,
-} from "@/lib/api-types";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import type { Plan, Run } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
 import { formatDateOnly } from "@/lib/dates";
+import { DataTable, StatusBar, TableSkeleton } from "@/components/ui";
 import {
-  DataTable,
-  StatusBar,
-  TableSkeleton,
-  type DataTableColumn,
-} from "@/components/ui";
+  RUN_TABLE_NO_PLAN_CLASS,
+  runTableColumns,
+} from "@/components/runs/runTable";
 import "./plan-detail.css";
 
 /** One page of runs is enough for a plan in the MVP; the cap is the API's max. */
@@ -52,6 +51,7 @@ function errorMessage(err: unknown, fallback: string): string {
 }
 
 export default function PlanDetailPage() {
+  const router = useRouter();
   const routeParams = useParams();
   const rawId = routeParams.id;
   const planId = Array.isArray(rawId) ? (rawId[0] ?? "") : (rawId ?? "");
@@ -148,7 +148,7 @@ export default function PlanDetailPage() {
           <Link href={plansHref}>← Test plans</Link>
         </p>
         <p className="pd-subtitle">Loading plan…</p>
-        <TableSkeleton rows={5} columns={4} label="Loading plan runs" />
+        <TableSkeleton rows={5} columns={6} label="Loading plan runs" />
       </div>
     );
   }
@@ -187,56 +187,16 @@ export default function PlanDetailPage() {
   const rows = runsState.kind === "ready" ? runsState.rows : [];
   const runTotal = runsState.kind === "ready" ? runsState.total : 0;
 
-  const columns: DataTableColumn<Run>[] = [
-    {
-      key: "name",
-      header: "Run",
-      render: (row) => (
-        <Link
-          className="pd-run-link"
-          href={
-            projectId
-              ? `/runs/${row.id}?project=${encodeURIComponent(projectId)}`
-              : `/runs/${row.id}`
-          }
-        >
-          {row.name}
-        </Link>
+  // Same columns as the runs list; no Plan column (every row is this plan),
+  // and no sort control (see the file header).
+  const columns = runTableColumns({
+    onOpenRun: (run) =>
+      router.push(
+        projectId
+          ? `/runs/${run.id}?project=${encodeURIComponent(projectId)}`
+          : `/runs/${run.id}`
       ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      className: "pd-col-status",
-      render: (row) => (
-        <span className={`pd-run-status pd-run-${row.status}`}>
-          {RUN_STATUS_LABELS[row.status]}
-        </span>
-      ),
-    },
-    {
-      key: "progress",
-      header: "Progress",
-      className: "pd-col-progress",
-      render: (row) =>
-        row.counts.total > 0 ? (
-          <StatusBar counts={row.counts} label={row.name} />
-        ) : (
-          <span className="muted">No items</span>
-        ),
-    },
-    {
-      key: "due_date",
-      header: "Due date",
-      className: "pd-col-due",
-      render: (row) =>
-        row.due_date ? (
-          <time dateTime={row.due_date}>{formatDateOnly(row.due_date)}</time>
-        ) : (
-          <span className="muted">—</span>
-        ),
-    },
-  ];
+  });
 
   return (
     <div className="page plan-detail-page">
@@ -274,6 +234,7 @@ export default function PlanDetailPage() {
           columns={columns}
           rows={rows}
           getRowId={(row) => row.id}
+          className={RUN_TABLE_NO_PLAN_CLASS}
           caption={`Runs in ${thePlan.name}`}
           ariaLabel="Plan runs"
           loading={runsState.kind === "loading"}

@@ -12,12 +12,9 @@
  * Roles: creating/editing runs needs Admin or Lead (docs/api-runs.md role
  * matrix). Archived projects are read-only for everyone, including Admins.
  *
- * Two data gaps, flagged in the handoff, not papered over:
- * - The contract's run resource carries only `plan_id`, so the plan column is
- *   filled from a best-effort `planId → name` map built from `GET /plans`
- *   (falling back to "—").
- * - `assignee_ids` are ids; the API offers no per-project name lookup for
- *   non-Admins, so the column shows a count, not names.
+ * The table's columns live in @/components/runs/runTable, shared with a plan's
+ * Runs section. The `planId → name` map the Plan column needs is still built
+ * here (best effort, from `GET /plans`; a missing name falls back to "—").
  */
 import {
   useCallback,
@@ -52,16 +49,17 @@ import {
   runSortState,
   type RunListUrlPatch,
 } from "@/lib/run-url";
-import { formatDateOnly } from "@/lib/dates";
 import {
   DataTable,
   DisabledHint,
-  StatusBar,
   TableSkeleton,
-  type DataTableColumn,
   type DataTableSort,
 } from "@/components/ui";
 import { RunFormDialog, type RunFormValues } from "@/components/runs/RunFormDialog";
+import {
+  RUN_TABLE_CLASS,
+  runTableColumns,
+} from "@/components/runs/runTable";
 import "./runs.css";
 
 const PAGE_SIZE = 25;
@@ -85,12 +83,6 @@ type RunsState =
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message || fallback : fallback;
-}
-
-/** `assignee_ids` cannot be resolved to names here (see the file header). */
-function assigneeLabel(ids: readonly string[]): string {
-  if (ids.length === 0) return "—";
-  return `${ids.length} assignee${ids.length === 1 ? "" : "s"}`;
 }
 
 export default function RunsPage() {
@@ -383,84 +375,11 @@ export default function RunsPage() {
     });
   }
 
-  const columns: DataTableColumn<Run>[] = [
-    {
-      key: "name",
-      header: "Name",
-      sortable: true,
-      className: "run-col-name",
-      sortValue: (row) => row.name,
-      render: (row) => (
-        <button
-          type="button"
-          className="run-title-link"
-          aria-label={`Open run ${row.name}`}
-          onClick={() => router.push(`/runs/${row.id}?project=${projectId}`)}
-        >
-          {row.name}
-        </button>
-      ),
-    },
-    {
-      key: "plan",
-      header: "Plan",
-      className: "run-col-plan",
-      render: (row) =>
-        row.plan_id ? (planNames.get(row.plan_id) ?? "—") : "—",
-    },
-    {
-      key: "status_bar",
-      header: "Status",
-      className: "run-col-status",
-      render: (row) =>
-        row.counts.total > 0 ? (
-          <StatusBar counts={row.counts} label={row.name} />
-        ) : (
-          <span className="muted">No items</span>
-        ),
-    },
-    {
-      key: "percent_complete",
-      header: "% complete",
-      align: "number",
-      className: "run-col-percent",
-      render: (row) => `${row.counts.percent_complete}%`,
-    },
-    {
-      key: "assignees",
-      header: "Assignees",
-      className: "run-col-assignees",
-      render: (row) => assigneeLabel(row.assignee_ids),
-    },
-    {
-      key: "start_date",
-      header: "Start date",
-      sortable: true,
-      className: "run-col-start",
-      sortValue: (row) => row.start_date,
-      render: (row) =>
-        row.start_date ? (
-          <time dateTime={row.start_date}>
-            {formatDateOnly(row.start_date)}
-          </time>
-        ) : (
-          <span className="muted">—</span>
-        ),
-    },
-    {
-      key: "due_date",
-      header: "Due date",
-      sortable: true,
-      className: "run-col-due",
-      sortValue: (row) => row.due_date,
-      render: (row) =>
-        row.due_date ? (
-          <time dateTime={row.due_date}>{formatDateOnly(row.due_date)}</time>
-        ) : (
-          <span className="muted">—</span>
-        ),
-    },
-  ];
+  const columns = runTableColumns({
+    onOpenRun: (run) => router.push(`/runs/${run.id}?project=${projectId}`),
+    planNames,
+    sortable: true,
+  });
 
   // ---- project-level states ----
   if (projectState.kind === "loading") {
@@ -608,6 +527,7 @@ export default function RunsPage() {
         columns={columns}
         rows={rows}
         getRowId={(row) => row.id}
+        className={RUN_TABLE_CLASS}
         caption={`Test runs in ${project?.name ?? "project"}`}
         ariaLabel="Test runs"
         loading={runsState.kind === "loading"}

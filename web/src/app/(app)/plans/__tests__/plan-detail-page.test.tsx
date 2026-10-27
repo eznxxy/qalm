@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import type { Plan, Project, Run, User } from "@/lib/api-types";
 
@@ -14,10 +14,12 @@ const mockRouteState = {
   search: "project=p-1",
 };
 
+const mockPush = jest.fn();
+
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     replace: jest.fn(),
-    push: jest.fn(),
+    push: mockPush,
     back: jest.fn(),
     prefetch: jest.fn(),
   }),
@@ -110,7 +112,10 @@ function makeRun(overrides: Partial<Run> = {}): Run {
   };
 }
 
-const RUN = makeRun();
+const RUN = makeRun({
+  assignee_ids: ["u-1", "u-2"],
+  start_date: "2026-11-01",
+});
 const COMPLETED_RUN = makeRun({
   id: "run-2",
   name: "Release 2.4 regression",
@@ -199,6 +204,7 @@ beforeEach(() => {
   mockRouteState.planId = "pl-1";
   mockRouteState.search = "project=p-1";
   runCalls.length = 0;
+  mockPush.mockClear();
 });
 
 describe("plan detail", () => {
@@ -218,7 +224,7 @@ describe("plan detail", () => {
     ).toBeInTheDocument();
   });
 
-  it("asks for this plan's runs and links each one to run detail", async () => {
+  it("renders the runs table exactly like the runs list, minus the Plan column", async () => {
     mockApi();
     await renderPage();
 
@@ -230,11 +236,45 @@ describe("plan detail", () => {
     expect(runCalls[0]).toContain("plan_id=pl-1");
     expect(runCalls[0]).toContain("sort=-created_at");
 
+    // Same column order as the runs screen: the plan's own page drops only
+    // the Plan column, which would repeat the page title in every row.
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent?.trim() ?? "");
+    expect(headers).toEqual([
+      "Name",
+      "Status",
+      "% complete",
+      "Assignees",
+      "Start date",
+      "Due date",
+    ]);
+
+    // A status bar + percentage per run (no more Open/Completed chip).
     expect(
-      within(table).getByRole("link", { name: "Release 2.4 smoke" })
-    ).toHaveAttribute("href", "/runs/run-1?project=p-1");
-    expect(within(table).getByText("Open")).toBeInTheDocument();
-    expect(within(table).getByText("Completed")).toBeInTheDocument();
+      within(table).getByRole("img", { name: /Release 2.4 smoke:/ })
+    ).toBeInTheDocument();
+    expect(within(table).getByText("40%")).toBeInTheDocument();
+    expect(within(table).getByText("100%")).toBeInTheDocument();
+
+    // Assignee ids are a count, as on the runs list.
+    expect(within(table).getByText("2 assignees")).toBeInTheDocument();
+
+    // Dates are YYYY-MM-DD rendered without a day shift.
+    expect(within(table).getByText("1 Nov 2026")).toBeInTheDocument();
+    expect(within(table).getByText("10 Nov 2026")).toBeInTheDocument();
+  });
+
+  it("opens a run from its name", async () => {
+    mockApi();
+    await renderPage();
+
+    const table = await screen.findByRole("table", { name: "Plan runs" });
+    await within(table).findByText("Release 2.4 smoke");
+    fireEvent.click(
+      within(table).getByRole("button", { name: "Open run Release 2.4 smoke" })
+    );
+    expect(mockPush).toHaveBeenCalledWith("/runs/run-1?project=p-1");
   });
 
   it("says so when the plan has no runs", async () => {

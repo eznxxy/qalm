@@ -14,71 +14,7 @@
   line-height: 16px;
 }
 
-/* The name cell opens the run (card 3.2 owns the destination screen). */
-.run-title-link {
-  background: none;
-  border: none;
-  height: auto;
-  padding: 0;
-  color: var(--accent);
-  font: inherit;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-
-.run-title-link:hover:not(:disabled) {
-  background: none;
-  border: none;
-  color: var(--accent-strong);
-  text-decoration: underline;
-}
-
-/* Column widths are a fixed layout, not an auto one: with `table-layout: auto`
- * the table hands every spare pixel to the widest columns, so a short run name
- * ends up floating in a half-empty cell. Fixed widths pin the Name column to a
- * share of the table and let a long name wrap inside its cell. The shares must
- * total 100% and leave each non-text column room for its header and its widest
- * fixed-shape value (a status bar, or `Oct 28, 2026`). */
-.runs-page .dt-table {
-  table-layout: fixed;
-}
-
-.runs-page .run-col-name {
-  width: 22%;
-}
-
-.runs-page .run-col-plan {
-  width: 12%;
-}
-
-.runs-page .run-col-status {
-  width: 16%;
-}
-
-.runs-page .run-col-percent {
-  width: 12%;
-}
-
-.runs-page .run-col-assignees {
-  width: 11%;
-}
-
-.runs-page .run-col-start {
-  width: 13%;
-}
-
-.runs-page .run-col-due {
-  width: 14%;
-}
-
-/* A date is one token — "28 Oct" / "2026" on two lines reads as two values.
- * The fixed widths above leave room for the longest locale form at the
- * narrowest supported layout, so nowrap never has to clip. */
-.runs-page .run-col-start,
-.runs-page .run-col-due {
-  white-space: nowrap;
-}
+/* Table styling lives with the columns in components/runs/runTable.css. */
 
 /* ---- New run dialog ---- */
 
