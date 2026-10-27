@@ -262,13 +262,11 @@ function AppShellInner({ children }: { children: ReactNode }) {
     // A detail URL (a run or a plan) belongs to the project in its path, not
     // the `?project=` scope: the detail page rewrites the query back to the
     // entity's project, so rewriting it here would be a silent no-op (QA card
-    // 3.18). Switch to the collection of the project the user picked instead.
-    const detail = /^\/(runs|plans)\/[^/]+$/.exec(pathname);
-    if (detail) {
-      const collection = `/${detail[1]}`;
-      router.push(
-        id ? `${collection}?project=${encodeURIComponent(id)}` : collection
-      );
+    // 3.18). Switch to the picked project's collection instead. Plans have no
+    // list route of their own — the runs screen carries the Plan column and
+    // the create dialog — so both detail screens land on /runs (QA 4.2).
+    if (/^\/(runs|plans)\/[^/]+$/.test(pathname)) {
+      router.push(id ? `/runs?project=${encodeURIComponent(id)}` : "/runs");
       return;
     }
     const params = new URLSearchParams(searchParams.toString());

@@ -372,7 +372,8 @@ describe("project switcher", () => {
     expect(mockRouterState.replace).not.toHaveBeenCalled();
   });
 
-  it("leaves a plan detail for the new project's plans list (card 3.18)", async () => {
+  it("leaves a plan detail for the runs list, where plans live (card 3.18)", async () => {
+    // Plans have no list route of their own; /plans?project=… 404s (QA 4.2).
     mockRouterState.pathname = "/plans/pl-9";
     mockRouterState.search = "project=p-1";
     await renderShell();
@@ -382,7 +383,7 @@ describe("project switcher", () => {
     });
 
     await waitFor(() =>
-      expect(mockRouterState.push).toHaveBeenCalledWith("/plans?project=p-2")
+      expect(mockRouterState.push).toHaveBeenCalledWith("/runs?project=p-2")
     );
   });
 
