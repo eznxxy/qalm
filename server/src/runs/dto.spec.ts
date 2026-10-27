@@ -77,6 +77,14 @@ describe('runs DTOs', () => {
       expect(await fieldsOf(CreateRunDto, validCreate({ plan_id: 'nope' }))).toContain('plan_id');
     });
 
+    it('accepts a milestone_id UUID or null, rejecting anything else', async () => {
+      expect(await issuesFor(CreateRunDto, validCreate({ milestone_id: UUID }))).toEqual([]);
+      expect(await issuesFor(CreateRunDto, validCreate({ milestone_id: null }))).toEqual([]);
+      expect(await fieldsOf(CreateRunDto, validCreate({ milestone_id: 'nope' }))).toContain(
+        'milestone_id',
+      );
+    });
+
     it('accepts a YYYY-MM-DD due_date or null, rejecting other shapes', async () => {
       expect(await issuesFor(CreateRunDto, validCreate({ due_date: '2026-11-14' }))).toEqual([]);
       expect(await issuesFor(CreateRunDto, validCreate({ due_date: null }))).toEqual([]);
@@ -158,9 +166,10 @@ describe('runs DTOs', () => {
       expect(dto.name).toBe('Final');
     });
 
-    it('accepts null for description, plan_id, start_date and due_date (clears/detaches)', async () => {
+    it('accepts null for description, plan_id, milestone_id, start_date and due_date (clears/detaches)', async () => {
       expect(await issuesFor(UpdateRunDto, { description: null })).toEqual([]);
       expect(await issuesFor(UpdateRunDto, { plan_id: null })).toEqual([]);
+      expect(await issuesFor(UpdateRunDto, { milestone_id: null })).toEqual([]);
       expect(await issuesFor(UpdateRunDto, { start_date: null })).toEqual([]);
       expect(await issuesFor(UpdateRunDto, { due_date: null })).toEqual([]);
     });
@@ -182,6 +191,14 @@ describe('runs DTOs', () => {
       expect(await query({ plan_id: UUID })).toEqual([]);
       expect(await query({ plan_id: 'none' })).toEqual([]);
       expect(await fieldsOf(ListRunsQuery, { plan_id: 'not-a-uuid' })).toContain('plan_id');
+    });
+
+    it('accepts milestone_id as a UUID or the literal none, rejecting other values', async () => {
+      expect(await query({ milestone_id: UUID })).toEqual([]);
+      expect(await query({ milestone_id: 'none' })).toEqual([]);
+      expect(await fieldsOf(ListRunsQuery, { milestone_id: 'not-a-uuid' })).toContain(
+        'milestone_id',
+      );
     });
 
     it('only accepts open or completed for status', async () => {

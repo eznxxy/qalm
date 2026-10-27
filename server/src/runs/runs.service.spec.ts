@@ -9,6 +9,7 @@ import { countsForStatuses } from './run-counts';
 import { RunsService } from './runs.service';
 import {
   CaseSnapshotRow,
+  MilestoneRef,
   PlanRef,
   ProjectRef,
   RunItemDetailRow,
@@ -81,6 +82,7 @@ interface FakeCase {
 class FakeStore {
   projects: ProjectRef[] = [];
   plans: Array<PlanRef & { deleted: boolean }> = [];
+  milestones: Array<MilestoneRef & { name: string; deleted: boolean }> = [];
   suites: FakeSuite[] = [];
   users: UserRef[] = [];
   cases: FakeCase[] = [];
@@ -102,6 +104,11 @@ class FakeStore {
       { id: 'pl-2', project_id: 'p-1', deleted: false },
       { id: 'pl-gone', project_id: 'p-1', deleted: true },
       { id: 'pl-other', project_id: 'p-2', deleted: false },
+    ];
+    this.milestones = [
+      { id: 'ms-1', project_id: 'p-1', name: 'Release 2.4', deleted: false },
+      { id: 'ms-gone', project_id: 'p-1', name: 'Deleted release', deleted: true },
+      { id: 'ms-other', project_id: 'p-2', name: 'Other release', deleted: false },
     ];
     this.suites = [
       { id: 's-root', project_id: 'p-1', parent_id: null },
@@ -159,6 +166,11 @@ class FakeStore {
   async findPlan(planId: string): Promise<PlanRef | null> {
     const plan = this.plans.find((row) => row.id === planId && !row.deleted);
     return plan ? { id: plan.id, project_id: plan.project_id } : null;
+  }
+
+  async findMilestone(milestoneId: string): Promise<MilestoneRef | null> {
+    const milestone = this.milestones.find((row) => row.id === milestoneId && !row.deleted);
+    return milestone ? { id: milestone.id, project_id: milestone.project_id } : null;
   }
 
   async findAssignee(id: string): Promise<UserRef | null> {
@@ -237,6 +249,7 @@ class FakeStore {
   async insertRun(row: {
     project_id: string;
     plan_id: string | null;
+    milestone_id: string | null;
     name: string;
     description: string | null;
     start_date: string | null;
@@ -248,6 +261,7 @@ class FakeStore {
       id: `run-${this.nextId++}`,
       project_id: row.project_id,
       plan_id: row.plan_id,
+      milestone_id: row.milestone_id,
       name: row.name,
       description: row.description,
       start_date: row.start_date,
@@ -270,6 +284,7 @@ class FakeStore {
     if (fields.name !== undefined) row.name = fields.name;
     if (fields.description !== undefined) row.description = fields.description;
     if (fields.plan_id !== undefined) row.plan_id = fields.plan_id;
+    if (fields.milestone_id !== undefined) row.milestone_id = fields.milestone_id;
     if (fields.start_date !== undefined) row.start_date = fields.start_date;
     if (fields.due_date !== undefined) row.due_date = fields.due_date;
     row.updated_by = fields.updated_by;
@@ -326,6 +341,14 @@ class FakeStore {
     if (run.project_id !== filter.projectId || run.deleted_at !== null) return false;
     if (filter.planId === 'none' && run.plan_id !== null) return false;
     if (filter.planId !== null && filter.planId !== 'none' && run.plan_id !== filter.planId) {
+      return false;
+    }
+    if (filter.milestoneId === 'none' && run.milestone_id !== null) return false;
+    if (
+      filter.milestoneId !== null &&
+      filter.milestoneId !== 'none' &&
+      run.milestone_id !== filter.milestoneId
+    ) {
       return false;
     }
     if (filter.status === 'open' && run.completed_at !== null) return false;
@@ -609,6 +632,15 @@ class FakeStore {
 
   // --- fixtures -----------------------------------------------------------
 
+  /** Mirrors the `LEFT JOIN milestones ms … AND ms.deleted_at IS NULL` name. */
+  private milestoneName(milestoneId: string | null): string | null {
+    if (milestoneId === null) return null;
+    const row = this.milestones.find(
+      (milestone) => milestone.id === milestoneId && !milestone.deleted,
+    );
+    return row?.name ?? null;
+  }
+
   private runWithCounts(run: RunRow): RunWithCountsRow {
     const statuses = this.items
       .filter((item) => item.run_id === run.id)
@@ -630,6 +662,7 @@ class FakeStore {
     ];
     return {
       ...run,
+      milestone_name: this.milestoneName(run.milestone_id),
       total: counts.total,
       passed: counts.passed,
       failed: counts.failed,
@@ -645,6 +678,7 @@ class FakeStore {
   addRun(overrides: {
     projectId?: string;
     planId?: string | null;
+    milestoneId?: string | null;
     name?: string;
     description?: string | null;
     startDate?: string | null;
@@ -658,6 +692,7 @@ class FakeStore {
       id: `run-${this.nextId++}`,
       project_id: overrides.projectId ?? 'p-1',
       plan_id: overrides.planId ?? null,
+      milestone_id: overrides.milestoneId ?? null,
       name: overrides.name ?? 'Run',
       description: overrides.description ?? null,
       start_date: overrides.startDate ?? null,
@@ -852,6 +887,19 @@ describe('RunsService (unit, in-memory runs)', () => {
       expect(byName.data.map((row) => row.name).sort()).toEqual(['Release full', 'Release smoke']);
     });
 
+    it('filters by milestone id and the none sentinel, naming the milestone', async () => {
+      store.addRun({ name: 'In 2.4', milestoneId: 'ms-1' });
+      store.addRun({ name: 'Loose', milestoneId: null });
+
+      const inMilestone = await service.list(AS('admin'), 'p-1', { milestone_id: 'ms-1' });
+      expect(inMilestone.data.map((row) => [row.name, row.milestone_name])).toEqual([
+        ['In 2.4', 'Release 2.4'],
+      ]);
+
+      const noMilestone = await service.list(AS('admin'), 'p-1', { milestone_id: 'none' });
+      expect(noMilestone.data.map((row) => row.name)).toEqual(['Loose']);
+    });
+
     it('treats LIKE wildcards in the query as literal text', async () => {
       store.addRun({ name: '100% coverage' });
       store.addRun({ name: '1000 coverage' });
@@ -972,6 +1020,24 @@ describe('RunsService (unit, in-memory runs)', () => {
         name: 'Good',
         plan_id: 'pl-1',
       })).resolves.toMatchObject({ plan_id: 'pl-1' });
+    });
+
+    it('links a milestone and 400s one that is unknown, deleted or foreign', async () => {
+      const linked = await service.create(AS('lead'), 'p-1', {
+        name: 'Milestoned',
+        milestone_id: 'ms-1',
+      });
+      expect(linked).toMatchObject({ milestone_id: 'ms-1', milestone_name: 'Release 2.4' });
+
+      await expectCode(
+        service.create(AS('admin'), 'p-1', { name: 'Gone', milestone_id: 'ms-gone' }),
+        'VALIDATION_ERROR',
+      );
+      await expectCode(
+        service.create(AS('admin'), 'p-1', { name: 'Foreign', milestone_id: 'ms-other' }),
+        'VALIDATION_ERROR',
+      );
+      expect(store.runs.map((run) => run.name)).toEqual(['Milestoned']);
     });
 
     it('409s every write in an archived project', async () => {
@@ -1116,6 +1182,21 @@ describe('RunsService (unit, in-memory runs)', () => {
       await expectCode(service.update(AS('admin'), run.id, {}), 'VALIDATION_ERROR');
       await expectCode(
         service.update(AS('admin'), run.id, { plan_id: 'pl-other' }),
+        'VALIDATION_ERROR',
+      );
+    });
+
+    it('moves a run between milestones and detaches it with an explicit null', async () => {
+      const run = store.addRun({ name: 'Milestoned', milestoneId: 'ms-1' });
+
+      const moved = await service.update(AS('lead'), run.id, { milestone_id: 'ms-1' });
+      expect(moved).toMatchObject({ milestone_id: 'ms-1', milestone_name: 'Release 2.4' });
+
+      const detached = await service.update(AS('lead'), run.id, { milestone_id: null });
+      expect(detached).toMatchObject({ milestone_id: null, milestone_name: null });
+
+      await expectCode(
+        service.update(AS('admin'), run.id, { milestone_id: 'ms-other' }),
         'VALIDATION_ERROR',
       );
     });

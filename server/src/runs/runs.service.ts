@@ -93,6 +93,12 @@ export class RunsService {
           : query.plan_id === 'none'
             ? 'none'
             : query.plan_id,
+      milestoneId:
+        query.milestone_id === undefined
+          ? null
+          : query.milestone_id === 'none'
+            ? 'none'
+            : query.milestone_id,
       status: query.status ?? null,
       query: query.query ?? null,
     };
@@ -120,6 +126,7 @@ export class RunsService {
     if (duplicate !== null) throw runNameConflict();
     return this.store.transaction(async (client) => {
       const planId = await this.resolvePlan(projectId, dto.plan_id, client);
+      const milestoneId = await this.resolveMilestone(projectId, dto.milestone_id, client);
       const startDate = dto.start_date ?? null;
       const dueDate = dto.due_date ?? null;
       assertDateOrder(startDate, dueDate);
@@ -134,6 +141,7 @@ export class RunsService {
         {
           project_id: projectId,
           plan_id: planId ?? null,
+          milestone_id: milestoneId ?? null,
           name: dto.name,
           description: blankToNull(dto.description),
           start_date: startDate,
@@ -177,6 +185,11 @@ export class RunsService {
         if (duplicate !== null) throw runNameConflict();
       }
       const planId = await this.resolvePlan(row.project_id, dto.plan_id, client);
+      const milestoneId = await this.resolveMilestone(
+        row.project_id,
+        dto.milestone_id,
+        client,
+      );
       const startDate = dto.start_date === undefined ? row.start_date : dto.start_date;
       const dueDate = dto.due_date === undefined ? row.due_date : dto.due_date;
       assertDateOrder(startDate, dueDate);
@@ -187,6 +200,7 @@ export class RunsService {
           description:
             dto.description === undefined ? undefined : blankToNull(dto.description),
           plan_id: planId,
+          milestone_id: milestoneId,
           start_date: dto.start_date,
           due_date: dto.due_date,
           updated_by: caller.id,
@@ -455,6 +469,25 @@ export class RunsService {
     return plan.id;
   }
 
+  /**
+   * Resolves a milestone reference: must be a live milestone in the same
+   * project (docs/api-runs.md § Validation). An explicit value here *moves* the
+   * run; only the bulk attach refuses an already-attached run.
+   */
+  private async resolveMilestone(
+    projectId: string,
+    milestoneId: string | null | undefined,
+    q: Queryable,
+  ): Promise<string | null | undefined> {
+    if (milestoneId === undefined) return undefined;
+    if (milestoneId === null) return null;
+    const milestone = await this.store.findMilestone(milestoneId, q);
+    if (!milestone || milestone.project_id !== projectId) {
+      throw validationError('milestone_id', 'must be a milestone in this project');
+    }
+    return milestone.id;
+  }
+
   private async materializeSelection(
     projectId: string,
     selection: RunSelectionDto | undefined,
@@ -572,12 +605,13 @@ export class RunsService {
       dto.name !== undefined ||
       dto.description !== undefined ||
       dto.plan_id !== undefined ||
+      dto.milestone_id !== undefined ||
       dto.start_date !== undefined ||
       dto.due_date !== undefined
     ) {
       return;
     }
-    const fields = ['name', 'description', 'plan_id', 'start_date', 'due_date'];
+    const fields = ['name', 'description', 'plan_id', 'milestone_id', 'start_date', 'due_date'];
     throw new ApiError(
       'VALIDATION_ERROR',
       'Provide at least one field to update.',

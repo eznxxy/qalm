@@ -290,6 +290,7 @@ class FakeStore {
       id: `run-${this.nextId++}`,
       project_id: overrides.projectId ?? 'p-1',
       plan_id: null,
+      milestone_id: null,
       name: 'Run',
       description: null,
       start_date: null,

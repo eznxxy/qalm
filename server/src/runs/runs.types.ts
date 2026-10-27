@@ -29,6 +29,9 @@ export interface RunDto {
   id: string;
   project_id: string;
   plan_id: string | null;
+  milestone_id: string | null;
+  /** The milestone's current name (joined); `null` together with the id. */
+  milestone_name: string | null;
   name: string;
   description: string | null;
   status: 'open' | 'completed';
@@ -98,6 +101,8 @@ export function toRunDto(row: RunWithCountsRow): RunDto {
     id: row.id,
     project_id: row.project_id,
     plan_id: row.plan_id,
+    milestone_id: row.milestone_id,
+    milestone_name: row.milestone_name,
     name: row.name,
     description: row.description,
     status: row.completed_at === null ? 'open' : 'completed',

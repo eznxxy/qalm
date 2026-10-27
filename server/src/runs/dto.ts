@@ -239,6 +239,11 @@ export class CreateRunDto {
   @IsUUID()
   plan_id?: string | null;
 
+  /** A live milestone in the same project; omitted or null = none. */
+  @IsOptional()
+  @IsUUID()
+  milestone_id?: string | null;
+
   @IsOptional()
   @IsDateOnly()
   due_date?: string | null;
@@ -273,6 +278,11 @@ export class UpdateRunDto {
   @IsUUID()
   plan_id?: string | null;
 
+  /** Explicit null detaches the run from its milestone; another id moves it. */
+  @IsOptional()
+  @IsUUID()
+  milestone_id?: string | null;
+
   /** Explicit null clears the due date. */
   @IsOptional()
   @IsDateOnly()
@@ -290,6 +300,11 @@ export class ListRunsQuery {
   @IsOptional()
   @IsUuidOrNone()
   plan_id?: string;
+
+  /** UUID restricts to one milestone; `none` selects runs with no milestone. */
+  @IsOptional()
+  @IsUuidOrNone()
+  milestone_id?: string;
 
   @IsOptional()
   @IsIn(['open', 'completed'])
