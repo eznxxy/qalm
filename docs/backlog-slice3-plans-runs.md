@@ -337,10 +337,10 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   full pie with per-status shares.
 - **Card.** `.rd-summary` is a row of cards — `display: flex`, `align-items:
   stretch`, 12px gap — and every child carries the chrome (`--surface`, 1px
-  `--border`, 10px radius, 16/24px padding). The row hugs its content rather
-  than spanning the page (a full-width card left the legend swimming in white
-  space). 565 × 224px for the pie, 320 × 224px for the headline, identical at
-  1600px and 1024px wide.
+  `--border`, 10px radius, 16/24px padding). The row is 768 + 544px at 1600px
+  and 584 + 328px at 1024px: both cards flex-grow from `36rem` / `20rem` bases
+  so the pair spans the content width. The first cut hugged its content and left
+  the right half of the header empty — that is the dead space this fills.
 - **Headline on its own card** (third review pass): the passed share as a big
   number — 40px/44px `--ink-900` — with "passed" at 18px under it, then a muted
   13px footer "1 / 3 untested (33%).", matching the reviewer's reference, where
@@ -349,10 +349,18 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   exported from `ui/index.ts`); `sharePercent` and `statusTotal` moved into
   `StatusPie.tsx` as exports so both cards round identically. The block is
   `white-space: nowrap` with a 20rem min-width and centred text, so it keeps a
-  steady 320px as results land. A run with no items reads "0% passed" and
+  steady width as results land. A run with no items reads "0% passed" and
   "0 / 0 untested (0%)." The overall "done" figure the first cut put in the
   donut hole is not lost — it is `percent_complete` on the run resource and
   `% complete` on the runs list.
+- **Filling the dead space** (fourth review pass): the two cards sat at their
+  content width and left the right half of the header blank. Both now flex-grow
+  from `36rem` (`StatusPie`) and `20rem` (`StatusSummary`) bases, so the pair
+  spans the row — 768 + 544px at 1600px, 584 + 328px at 1024px — and the pie and
+  legend stay a centred group inside their card instead of being pushed to
+  opposite edges. Below ~900px of content the row wraps and the headline drops
+  under the pie. The flex bases are load-bearing: at `34rem` the 1024px card
+  fell 2px short of pie + legend and silently stacked them.
 - **Hover contrast on the result status buttons.** First pass (brand tint +
   darker border/label) was still too quiet on the real screen — the reviewer's
   screenshot showed the hovered button almost identical to its neighbours.

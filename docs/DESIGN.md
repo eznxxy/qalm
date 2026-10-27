@@ -230,8 +230,13 @@ assignee, due date. Filter by Open / Completed.
   number a reviewer asks for first without doing arithmetic on the wedges. Both
   shares are `round(count / total × 100)`, the legend's rounding, so the two
   cards can never disagree; a run with no items reads "0% passed" and
-  "0 / 0 untested (0%)." The row wraps when it has to, so the headline drops
-  under the pie rather than squeezing it.
+  "0 / 0 untested (0%)."
+- **The pair fills the row.** Both cards flex-grow (`36rem` / `20rem` flex
+  bases) so they span the content width instead of leaving the right half of the
+  header empty; the pie card takes the larger share because it holds more. The
+  pie and legend stay a centred group inside their card rather than being pushed
+  to opposite edges. Below ~900px of content width the row wraps and the
+  headline drops under the pie.
 - **Add result** form: status (segmented buttons with shortcuts P, F, B, R, S),
   comment (markdown), elapsed time, defect link, attachments (drag and drop).
   Hovering or focusing a status button previews that status — its tint as the
