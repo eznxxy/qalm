@@ -384,20 +384,24 @@ describe("run detail", () => {
     const summary = await screen.findByRole("group", {
       name: "Release 2.4 smoke results by status",
     });
-    // Completion lives in the middle of the donut (2 passed + 1 failed of 4).
-    expect(within(summary).getByText("75%")).toBeInTheDocument();
+    // The numbers live in the legend now: count on top, share below.
+    expect(within(summary).getByText("2 Passed")).toBeInTheDocument();
+    expect(within(summary).getByText("50% set to Passed")).toBeInTheDocument();
+    expect(within(summary).getByText("1 Failed")).toBeInTheDocument();
+    expect(within(summary).getByText("25% set to Failed")).toBeInTheDocument();
+    expect(within(summary).getByText("1 Untested")).toBeInTheDocument();
     // All six statuses are listed, zeros included.
-    for (const status of [
-      "Passed",
-      "Retest",
-      "Blocked",
-      "Failed",
-      "Skipped",
-      "Untested",
-    ]) {
-      expect(within(summary).getByText(status)).toBeInTheDocument();
-    }
-    expect(within(summary).getAllByText("0")).toHaveLength(3);
+    const titles = Array.from(
+      summary.querySelectorAll(".stp-legend-title")
+    ).map((el) => el.textContent);
+    expect(titles).toEqual([
+      "2 Passed",
+      "0 Retest",
+      "0 Blocked",
+      "1 Failed",
+      "0 Skipped",
+      "1 Untested",
+    ]);
     // The old progress bar is gone from this screen.
     expect(summary.querySelector(".stb-root")).toBeNull();
   });

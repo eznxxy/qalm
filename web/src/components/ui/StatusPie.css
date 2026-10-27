@@ -1,10 +1,11 @@
 /*
  * StatusPie — stylesheet for web/src/components/ui/StatusPie.tsx.
  *
- * Colours are var() references into web/src/styles/tokens.css (status solids,
- * §2.2 — tints stay reserved for badge backgrounds). The ring is drawn with
- * stroke-dasharray on a circumference-100 circle, so fractions map 1:1 to
- * percent (see RADIUS in the component).
+ * A full pie on the left, a two-column legend on the right (review feedback,
+ * matching the reviewer's reference): dot, then a count + status line over a
+ * muted "n% set to <status>" line. Colours are var() references into
+ * web/src/styles/tokens.css (status solids, §2.2 — tints stay reserved for
+ * badge backgrounds).
  */
 
 .stp-root {
@@ -14,108 +15,68 @@
   flex-wrap: wrap;
 }
 
-.stp-figure {
-  position: relative;
-  flex: 0 0 auto;
-  width: 132px;
-  height: 132px;
-}
-
 .stp-chart {
   display: block;
-  width: 100%;
-  height: 100%;
-  /* Start the first slice at 12 o'clock, not 3 o'clock. */
-  transform: rotate(-90deg);
+  flex: 0 0 auto;
+  width: 190px;
+  height: 190px;
 }
 
-/* Track: what is left of the ring when every status is zero. */
+/* Backing disc — visible only where no status has a wedge. */
 .stp-track {
-  fill: none;
-  stroke: var(--canvas);
-  stroke-width: 6;
+  fill: var(--canvas);
 }
 
 .stp-slice {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 6;
-  stroke-linecap: butt;
+  fill: currentColor;
 }
 
-/* Centre label: the one number the header leads with. */
-.stp-centre {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  pointer-events: none;
-}
-
-.stp-percent {
-  color: var(--ink-900);
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 30px;
-}
-
-.stp-percent-label {
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 16px;
-}
-
+/* Every legend row keeps its status colour, zeros included, so the dot stays
+ * the colour key rather than a presence indicator. */
 .stp-legend {
   list-style: none;
   margin: 0;
   padding: 0;
-  /* Two columns of three beside the donut — a count stays next to its label. */
+  /* Six statuses: three rows, filled down each column. */
   display: grid;
-  grid-template-columns: repeat(2, minmax(6.5rem, 1fr));
-  gap: var(--space-2) var(--space-6);
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  gap: var(--space-4) var(--space-6);
 }
 
 .stp-legend-row {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.stp-legend-row.is-zero {
-  color: var(--text-muted);
+  align-items: flex-start;
+  gap: var(--space-3);
 }
 
 .stp-dot {
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
   background: currentColor;
 }
 
-.stp-legend-row.is-zero .stp-dot {
-  /* A zero status keeps its slot but not its emphasis. */
-  opacity: 0.35;
+.stp-legend-text {
+  display: flex;
+  flex-direction: column;
 }
 
-.stp-legend-label {
-  color: inherit;
-}
-
-.stp-legend-count {
-  margin-left: auto;
+.stp-legend-title {
   color: var(--ink-900);
-  font-weight: 500;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.stp-legend-row.is-zero .stp-legend-count {
+.stp-legend-sub {
   color: var(--text-muted);
-  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------ solid per status */

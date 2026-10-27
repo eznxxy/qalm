@@ -1,16 +1,16 @@
 /**
  * StatusPie — rendering + a11y unit tests (card 3.7, review feedback).
  *
- * Spec: the run detail header shows a pie/donut of the run's statuses with a
- * legend covering **all six** statuses (zeros included), the fixed §5 order,
- * and completion in the middle (`done` = total − untested).
+ * Spec: a full pie (no hole, no centre number) with a two-column legend that
+ * carries the numbers — "1 Passed" over "33% set to Passed" — every status
+ * listed, zeros included, in the fixed §5 order.
  */
 
 import { render, screen } from "@testing-library/react";
 import { STATUS_ORDER, type StatusBarValue } from "../StatusBar";
-import { percentComplete, StatusPie } from "../StatusPie";
+import { StatusPie } from "../StatusPie";
 
-/** Slice classes in DOM order, e.g. ["stp-passed", "stp-untested"]. */
+/** Wedge classes in DOM order, e.g. ["stp-passed", "stp-untested"]. */
 function sliceClasses(container: HTMLElement): string[] {
   return Array.from(container.querySelectorAll(".stp-slice")).map((el) => {
     const classes = Array.from(el.classList).filter((c) => c !== "stp-slice");
@@ -19,15 +19,16 @@ function sliceClasses(container: HTMLElement): string[] {
   });
 }
 
+/** [title, subtitle] per legend row, e.g. ["1 Passed", "33% set to Passed"]. */
 function legendRows(container: HTMLElement): [string, string][] {
   return Array.from(container.querySelectorAll(".stp-legend-row")).map((row) => [
-    row.querySelector(".stp-legend-label")?.textContent ?? "",
-    row.querySelector(".stp-legend-count")?.textContent ?? "",
+    row.querySelector(".stp-legend-title")?.textContent ?? "",
+    row.querySelector(".stp-legend-sub")?.textContent ?? "",
   ]);
 }
 
 describe("StatusPie", () => {
-  it("renders one slice per nonzero status in the fixed §5 order", () => {
+  it("renders one wedge per nonzero status in the fixed §5 order", () => {
     const counts: StatusBarValue = {
       untested: 2,
       failed: 1,
@@ -41,46 +42,59 @@ describe("StatusPie", () => {
     ]);
   });
 
-  it("lists every status in the legend, zeros included", () => {
-    const counts: StatusBarValue = { passed: 1, untested: 2 };
-    const { container } = render(<StatusPie counts={counts} />);
+  it("carries the numbers in the legend: count in the title, share below", () => {
+    const { container } = render(<StatusPie counts={{ passed: 1, untested: 2 }} />);
     expect(legendRows(container)).toEqual([
-      ["Passed", "1"],
-      ["Retest", "0"],
-      ["Blocked", "0"],
-      ["Failed", "0"],
-      ["Skipped", "0"],
-      ["Untested", "2"],
+      ["1 Passed", "33% set to Passed"],
+      ["0 Retest", "0% set to Retest"],
+      ["0 Blocked", "0% set to Blocked"],
+      ["0 Failed", "0% set to Failed"],
+      ["0 Skipped", "0% set to Skipped"],
+      ["2 Untested", "67% set to Untested"],
     ]);
-    expect(legendRows(container).map(([label]) => label)).toEqual(
+    expect(legendRows(container).map(([title]) => title.split(" ")[1])).toEqual(
       STATUS_ORDER.map((status) => label(status))
     );
   });
 
-  it("greys the zero rows so the eye lands on the statuses that exist", () => {
+  it("keeps the status dot on a zero row — the dot is the colour key", () => {
     const { container } = render(
       <StatusPie counts={{ passed: 1, untested: 2 }} />
     );
-    const zero = container.querySelectorAll(".stp-legend-row.is-zero");
-    expect(zero).toHaveLength(4);
-  });
-
-  it("puts completion in the middle: done = total − untested", () => {
-    const { container } = render(
-      <StatusPie counts={{ passed: 1, untested: 2 }} />
+    const dots = Array.from(container.querySelectorAll(".stp-dot")).map((el) =>
+      Array.from(el.classList).find((c) => c !== "stp-dot")
     );
-    expect(container.querySelector(".stp-percent")?.textContent).toBe("33%");
-    // 3 of 4 done rounds to 75, matching the run resource's percent_complete.
-    expect(percentComplete({ passed: 2, failed: 1, untested: 1 })).toBe(75);
-    expect(percentComplete({ untested: 2 })).toBe(0);
-    expect(percentComplete({ passed: 2 })).toBe(100);
-    expect(percentComplete({})).toBe(0);
+    // Four zeros still render their own colour, so every row is identifiable.
+    expect(dots).toEqual([
+      "stp-passed",
+      "stp-retest",
+      "stp-blocked",
+      "stp-failed",
+      "stp-skipped",
+      "stp-untested",
+    ]);
   });
 
-  it("draws a full ring when one status owns the run", () => {
+  it("draws wedges from the centre, starting at 12 o'clock", () => {
+    const { container } = render(
+      <StatusPie counts={{ passed: 1, failed: 1 }} />
+    );
+    const [first, second] = Array.from(container.querySelectorAll(".stp-slice"));
+    // Half the circle: straight down from 12 o'clock to 6 o'clock, no large arc.
+    expect(first.getAttribute("d")).toBe(
+      "M 21 21 L 21.000 1.000 A 20 20 0 0 1 21.000 41.000 Z"
+    );
+    expect(second.getAttribute("d")).toBe(
+      "M 21 21 L 21.000 41.000 A 20 20 0 0 1 21.000 1.000 Z"
+    );
+  });
+
+  it("draws a full circle when one status owns the run", () => {
     const { container } = render(<StatusPie counts={{ passed: 5 }} />);
-    const slice = container.querySelector(".stp-slice");
-    expect(slice?.getAttribute("stroke-dasharray")).toBe("100 0");
+    const slice = container.querySelector(".stp-slice") as SVGElement;
+    expect(slice.tagName.toLowerCase()).toBe("circle");
+    expect(slice.getAttribute("class")).toContain("stp-passed");
+    expect(container.querySelector("path")).toBeNull();
   });
 
   it("names the group after the run and stays decorative for the SVG", () => {
@@ -94,14 +108,17 @@ describe("StatusPie", () => {
       "true"
     );
     // The legend is the accessible view of the numbers.
-    expect(screen.getByText("Untested")).toBeInTheDocument();
+    expect(screen.getByText("1 Untested")).toBeInTheDocument();
+    expect(screen.getByText("33% set to Untested")).toBeInTheDocument();
   });
 
-  it("renders an empty ring for a run with no items", () => {
+  it("leaves an empty disc for a run with no items", () => {
     const { container } = render(<StatusPie counts={{}} />);
     expect(container.querySelectorAll(".stp-slice")).toHaveLength(0);
     expect(container.querySelector(".stp-track")).toBeInTheDocument();
-    expect(container.querySelector(".stp-percent")?.textContent).toBe("0%");
+    expect(legendRows(container).map(([, sub]) => sub)).toEqual(
+      STATUS_ORDER.map((status) => `0% set to ${label(status)}`)
+    );
   });
 });
 

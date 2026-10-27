@@ -1,22 +1,21 @@
 "use client";
 
 /**
- * StatusPie — the pie/donut rollup used on the run detail header (review
- * feedback, card 3.7). Same data as StatusBar, different shape: the reader gets
- * one slice per status plus a legend that lists **all six** statuses with their
- * counts, so a run with zeros still shows the full vocabulary of outcomes.
+ * StatusPie — the rollup on the run detail header (review feedback, card 3.7;
+ * layout reworked to the reviewer's reference).
  *
- * - Slice order is FIXED (STATUS_ORDER: Passed, Retest, Blocked, Failed,
+ * - A **full pie**: one wedge per status, no hole, no number in the middle.
+ * - The legend carries the numbers instead: two columns of three, each row a
+ *   count + status ("110 Passed") over a muted share ("46% set to Passed"), so
+ *   the reader gets both the absolute and the relative size in one glance.
+ * - Wedge order is FIXED (STATUS_ORDER: Passed, Retest, Blocked, Failed,
  *   Skipped, Untested) — never sorted by size; position is memory.
- * - Slices use the status SOLIDS (--passed …) from tokens.css; tints stay
+ * - Wedges use the status SOLIDS (--passed …) from tokens.css; tints stay
  *   reserved for badge backgrounds (§2.2).
- * - The centre states completion ("33% done"), matching the run headline it
- *   replaced. `done` = items with any result = total − untested, the same rule
- *   as `percent_complete` on the run resource (docs/api-runs.md § Resource).
- * - The legend is real text, so the counts are readable and selectable; the SVG
- *   itself is decorative (`aria-hidden`) and the group carries a name.
- * - Zero-count statuses render no slice (an empty arc would read as data) but
- *   do keep their legend row, greyed.
+ * - Zero-count statuses render no wedge (an empty arc would read as data) but
+ *   keep their legend row with "0" and "0%", exactly like the reference.
+ * - The SVG is decorative (`aria-hidden`); the group is named "<run> results
+ *   by status" and the legend, being real text, is the accessible view.
  */
 
 import type { ReactElement } from "react";
@@ -32,40 +31,51 @@ export interface StatusPieProps {
   label?: string;
 }
 
-/** Circumference of the r=15.9155 circle in a 42×42 viewBox is exactly 100. */
-const RADIUS = 15.9155;
+/** The pie is drawn in a 42×42 box with a 20 unit radius. */
 const VIEWBOX = 42;
+const RADIUS = 20;
+const CENTRE = VIEWBOX / 2;
 
-/** `done` ÷ total as a whole percent; 0 for a run with no items. */
-export function percentComplete(counts: StatusBarValue): number {
-  const total = STATUS_ORDER.reduce((sum, s) => sum + (counts[s] ?? 0), 0);
+/** A point on the circle; 0° is 12 o'clock, angles run clockwise. */
+function pointAt(fraction: number): string {
+  const radians = (fraction * 360 - 90) * (Math.PI / 180);
+  const x = CENTRE + RADIUS * Math.cos(radians);
+  const y = CENTRE + RADIUS * Math.sin(radians);
+  return `${x.toFixed(3)} ${y.toFixed(3)}`;
+}
+
+/** Centre → start → arc → close: one wedge of the full pie. */
+function wedgePath(start: number, end: number): string {
+  const largeArc = end - start > 0.5 ? 1 : 0;
+  return `M ${CENTRE} ${CENTRE} L ${pointAt(start)} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${pointAt(end)} Z`;
+}
+
+/** count ÷ total as a whole percent; 0 for a run with no items. */
+function sharePercent(count: number, total: number): number {
   if (total === 0) return 0;
-  const done = total - (counts.untested ?? 0);
-  return Math.round((done / total) * 100);
+  return Math.round((count / total) * 100);
 }
 
 export function StatusPie({ counts, label }: StatusPieProps): ReactElement {
   const total = STATUS_ORDER.reduce((sum, s) => sum + (counts[s] ?? 0), 0);
-  const percent = percentComplete(counts);
 
-  // Walk the ring once: each nonzero status takes dash = its share of 100.
-  // Offsets are prefix sums, so the ring closes without mutating anything
-  // during render (react-hooks/immutability).
+  // Wedge angles are prefix sums of the counts, so they cannot drift away from
+  // the whole (and nothing is reassigned during render —
+  // react-hooks/immutability).
   const present = STATUS_ORDER.map((status) => ({
     status,
     count: counts[status] ?? 0,
-  }))
-    .filter((entry) => entry.count > 0)
-    .map((entry) => ({
-      status: entry.status,
-      share: total === 0 ? 0 : (entry.count / total) * 100,
-    }));
-  const slices = present.map((slice, index) => ({
-    ...slice,
-    offset: present
+  })).filter((entry) => entry.count > 0);
+  const wedges = present.map((entry, index) => {
+    const before = present
       .slice(0, index)
-      .reduce((sum, earlier) => sum + earlier.share, 0),
-  }));
+      .reduce((sum, earlier) => sum + earlier.count, 0);
+    return {
+      status: entry.status,
+      start: before / total,
+      end: (before + entry.count) / total,
+    };
+  });
 
   return (
     <div
@@ -73,53 +83,50 @@ export function StatusPie({ counts, label }: StatusPieProps): ReactElement {
       role="group"
       aria-label={label ? `${label} results by status` : "Results by status"}
     >
-      <div className="stp-figure">
-        <svg
-          className="stp-chart"
-          viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
-          aria-hidden="true"
-          focusable="false"
-        >
-          <circle
-            className="stp-track"
-            cx={VIEWBOX / 2}
-            cy={VIEWBOX / 2}
-            r={RADIUS}
-          />
-          {slices.map(({ status, share, offset: start }) => (
+      <svg
+        className="stp-chart"
+        viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
+        aria-hidden="true"
+        focusable="false"
+      >
+        {/* Backing disc: what is left when every status is zero. */}
+        <circle className="stp-track" cx={CENTRE} cy={CENTRE} r={RADIUS} />
+        {wedges.map(({ status, start, end }) =>
+          // A lone status owns the whole circle, where an arc would collapse.
+          end - start > 0.9999 ? (
             <circle
               key={status}
               className={`stp-slice stp-${status}`}
-              cx={VIEWBOX / 2}
-              cy={VIEWBOX / 2}
+              cx={CENTRE}
+              cy={CENTRE}
               r={RADIUS}
-              // The dash length is the share; the gap keeps the ring honest
-              // when a single status owns 100%.
-              strokeDasharray={`${share} ${100 - share}`}
-              strokeDashoffset={-start}
             />
-          ))}
-        </svg>
-        <span className="stp-centre">
-          <span className="stp-percent t-nums">{percent}%</span>
-          <span className="stp-percent-label">done</span>
-        </span>
-      </div>
+          ) : (
+            <path
+              key={status}
+              className={`stp-slice stp-${status}`}
+              d={wedgePath(start, end)}
+            />
+          )
+        )}
+      </svg>
 
       <ul className="stp-legend">
         {STATUS_ORDER.map((status) => {
           const count = counts[status] ?? 0;
+          const share = sharePercent(count, total);
+          const name = STATUS_LABELS[status];
           return (
-            <li
-              key={status}
-              className={count === 0 ? "stp-legend-row is-zero" : "stp-legend-row"}
-            >
-              <span
-                className={`stp-dot stp-${status}`}
-                aria-hidden="true"
-              />
-              <span className="stp-legend-label">{STATUS_LABELS[status]}</span>
-              <span className="stp-legend-count t-nums">{count}</span>
+            <li className="stp-legend-row" key={status}>
+              <span className={`stp-dot stp-${status}`} aria-hidden="true" />
+              <span className="stp-legend-text">
+                <span className="stp-legend-title">
+                  {count} {name}
+                </span>
+                <span className="stp-legend-sub">
+                  {share}% set to {name}
+                </span>
+              </span>
             </li>
           );
         })}
