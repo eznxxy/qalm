@@ -11,7 +11,8 @@
  *
  * Colours are the §2.2 status solids only; every status is also named in the
  * legend and in the table, so nothing depends on colour. The plot is a single
- * `role="img"` summary; per-day detail is the table's job (§8).
+ * `role="img"` summary; per-day detail is the table's job (§8) and the native
+ * tooltip on hover.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -63,21 +64,28 @@ interface Point {
 }
 
 const WIDTH = 680;
-const HEIGHT = 260;
-const MARGIN = { top: 12, right: 44, bottom: 34, left: 34 };
+const HEIGHT = 250;
+const MARGIN = { top: 16, right: 48, bottom: 32, left: 38 };
 const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 const BASE_Y = MARGIN.top + PLOT_HEIGHT;
 
-/** A count axis whose top tick is a round number and leaves headroom. */
-function niceMax(value: number): number {
-  if (value <= 4) return 4;
-  const rough = value / 3;
+/**
+ * A count axis with integer ticks and at most five gridlines, always anchored
+ * at 0. An empty window keeps a quiet 0–4 frame so the plot is never a bare
+ * line.
+ */
+function niceScale(maxValue: number): { max: number; ticks: number[] } {
+  if (maxValue <= 4) return { max: 4, ticks: [0, 2, 4] };
+  const rough = maxValue / 4;
   const magnitude = 10 ** Math.floor(Math.log10(rough));
   const norm = rough / magnitude;
   const step =
     (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * magnitude;
-  return Math.ceil(value / step) * step;
+  const max = Math.ceil(maxValue / step) * step;
+  const ticks: number[] = [];
+  for (let value = 0; value <= max + 1e-9; value += step) ticks.push(value);
+  return { max, ticks };
 }
 
 /** Indices that get an x-axis label: at most 7, always first and last. */
@@ -102,6 +110,26 @@ function rateY(rate: number): number {
   return MARGIN.top + PLOT_HEIGHT * (1 - rate / 100);
 }
 
+/** A column's top segment gets rounded shoulders; the stack stays crisp. */
+function roundedTopRect(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+): string {
+  const r = Math.max(0, Math.min(radius, width / 2, height));
+  return [
+    `M ${x} ${y + r}`,
+    `Q ${x} ${y} ${x + r} ${y}`,
+    `H ${x + width - r}`,
+    `Q ${x + width} ${y} ${x + width} ${y + r}`,
+    `V ${y + height}`,
+    `H ${x}`,
+    "Z",
+  ].join(" ");
+}
+
 function segmentPoints(buckets: TrendBucket[], days: number): Point[][] {
   const segments: Point[][] = [];
   let current: Point[] = [];
@@ -118,8 +146,7 @@ function segmentPoints(buckets: TrendBucket[], days: number): Point[][] {
 }
 
 function chartSummary(trend: ProjectTrend, days: TrendWindow): string {
-  const windowCopy =
-    days === 1 ? "today" : `in the last ${days} days`;
+  const windowCopy = days === 1 ? "today" : `in the last ${days} days`;
   const totals = trend.totals;
   const rate =
     totals.pass_rate === null
@@ -151,13 +178,14 @@ function TrendChart({
 }) {
   const buckets = trend.buckets;
   const maxCount = buckets.reduce((max, bucket) => Math.max(max, bucket.total), 0);
-  const yMax = niceMax(maxCount);
-  const yTicks = [0, yMax / 2, yMax];
+  const { max: yMax, ticks: yTicks } = niceScale(maxCount);
   const slot = PLOT_WIDTH / days;
-  const barWidth = Math.min(48, Math.max(4, slot * 0.6));
+  const maxBar = days === 1 ? 88 : 46;
+  const barWidth = Math.max(5, Math.min(maxBar, slot * 0.56));
+  const radius = barWidth >= 34 ? 4 : barWidth >= 12 ? 3 : 2;
   const labels = labelIndices(days);
   const segments = segmentPoints(buckets, days);
-  const pointCount = segments.reduce((sum, segment) => sum + segment.length, 0);
+  const yFor = (value: number) => BASE_Y - (value / yMax) * PLOT_HEIGHT;
 
   return (
     <div className="ov-trend-plot">
@@ -169,7 +197,7 @@ function TrendChart({
       >
         {/* horizontal grid + left count axis */}
         {yTicks.map((tick) => {
-          const y = BASE_Y - (tick / yMax) * PLOT_HEIGHT;
+          const y = yFor(tick);
           return (
             <g key={`grid-${tick}`}>
               <line
@@ -179,34 +207,41 @@ function TrendChart({
                 y2={y}
                 className="ov-trend-grid"
               />
-              <text x={MARGIN.left - 6} y={y + 4} textAnchor="end" className="ov-trend-axis">
+              <text
+                x={MARGIN.left - 8}
+                y={y + 4}
+                textAnchor="end"
+                className="ov-trend-axis"
+              >
                 {Math.round(tick)}
               </text>
             </g>
           );
         })}
 
-        {/* right pass-rate axis */}
+        {/* right pass-rate axis: labels only, no grid, so the two scales read
+            as separate */}
         {[0, 50, 100].map((rate) => (
-          <text
-            key={`rate-${rate}`}
-            x={WIDTH - MARGIN.right + 6}
-            y={rateY(rate) + 4}
-            textAnchor="start"
-            className="ov-trend-axis"
-          >
-            {rate}%
-          </text>
+          <g key={`rate-${rate}`}>
+            <line
+              x1={WIDTH - MARGIN.right}
+              x2={WIDTH - MARGIN.right + 4}
+              y1={rateY(rate)}
+              y2={rateY(rate)}
+              className="ov-trend-axis-tick"
+            />
+            <text
+              x={WIDTH - MARGIN.right + 8}
+              y={rateY(rate) + 4}
+              textAnchor="start"
+              className="ov-trend-axis"
+            >
+              {rate}%
+            </text>
+          </g>
         ))}
 
-        {/* axes */}
-        <line
-          x1={MARGIN.left}
-          x2={MARGIN.left}
-          y1={MARGIN.top}
-          y2={BASE_Y}
-          className="ov-trend-axis-line"
-        />
+        {/* baseline */}
         <line
           x1={MARGIN.left}
           x2={WIDTH - MARGIN.right}
@@ -215,56 +250,92 @@ function TrendChart({
           className="ov-trend-axis-line"
         />
 
-        {/* stacked daily columns */}
+        {/* stacked daily columns; the whole day slot is the hover target */}
         {buckets.map((bucket, index) => {
           const x = bucketX(index, days) - barWidth / 2;
           let stackY = BASE_Y;
+          const stack = TREND_STATUS_ORDER.map((status) => ({
+            status,
+            count: bucket.status_counts[status],
+          }))
+            .filter((segment) => segment.count > 0)
+            .map((segment, segmentIndex, all) => {
+              const height = (segment.count / yMax) * PLOT_HEIGHT;
+              const y = stackY - height;
+              stackY = y;
+              return {
+                status: segment.status,
+                y,
+                height,
+                top: segmentIndex === all.length - 1,
+              };
+            });
+
           return (
-            <g key={bucket.date}>
+            <g key={bucket.date} className="ov-trend-col">
               <title>{bucketTitle(bucket)}</title>
-              {TREND_STATUS_ORDER.map((status) => {
-                const count = bucket.status_counts[status];
-                if (count === 0) return null;
-                const height = (count / yMax) * PLOT_HEIGHT;
-                const y = stackY - height;
-                stackY = y;
-                return (
-                  <rect
-                    key={status}
-                    x={x}
-                    y={y}
-                    width={barWidth}
-                    height={height}
-                    fill={STATUS_FILLS[status]}
+              <rect
+                className="ov-trend-col-bg"
+                x={MARGIN.left + slot * index}
+                y={MARGIN.top}
+                width={slot}
+                height={PLOT_HEIGHT}
+              />
+              {stack.map((segment) =>
+                segment.top ? (
+                  <path
+                    key={segment.status}
+                    d={roundedTopRect(
+                      x,
+                      segment.y,
+                      barWidth,
+                      segment.height,
+                      radius
+                    )}
+                    fill={STATUS_FILLS[segment.status]}
                   />
-                );
-              })}
+                ) : (
+                  <rect
+                    key={segment.status}
+                    x={x}
+                    y={segment.y}
+                    width={barWidth}
+                    height={segment.height}
+                    fill={STATUS_FILLS[segment.status]}
+                  />
+                )
+              )}
             </g>
           );
         })}
 
-        {/* pass-rate line, broken on days with no verdicts */}
+        {/* pass-rate line, broken on days with no verdicts; a surface halo
+            keeps it legible where it crosses a column */}
         {segments.map((segment, index) =>
           segment.length > 1 ? (
-            <polyline
-              key={`line-${index}`}
-              points={segment.map((point) => `${point.x},${point.y}`).join(" ")}
-              className="ov-trend-line"
-            />
+            <g key={`line-${index}`}>
+              <polyline
+                points={segment.map((point) => `${point.x},${point.y}`).join(" ")}
+                className="ov-trend-line-halo"
+              />
+              <polyline
+                points={segment.map((point) => `${point.x},${point.y}`).join(" ")}
+                className="ov-trend-line"
+              />
+            </g>
           ) : null
         )}
-        {pointCount > 0 &&
-          segments.map((segment, index) =>
-            segment.map((point, pointIndex) => (
-              <circle
-                key={`point-${index}-${pointIndex}`}
-                cx={point.x}
-                cy={point.y}
-                r={2.6}
-                className="ov-trend-point"
-              />
-            ))
-          )}
+        {segments.map((segment, index) =>
+          segment.map((point, pointIndex) => (
+            <circle
+              key={`point-${index}-${pointIndex}`}
+              cx={point.x}
+              cy={point.y}
+              r={days > 14 ? 2.25 : 3}
+              className="ov-trend-point"
+            />
+          ))
+        )}
 
         {/* x-axis dates (at most 7 labels) */}
         {buckets.map((bucket, index) =>
@@ -272,7 +343,7 @@ function TrendChart({
             <text
               key={`label-${bucket.date}`}
               x={bucketX(index, days)}
-              y={HEIGHT - 12}
+              y={HEIGHT - 10}
               textAnchor="middle"
               className="ov-trend-axis"
             >
@@ -426,6 +497,19 @@ export function ResultsTrend({ projectId, days, onDaysChange }: ResultsTrendProp
 
       {!loading && !error && data && (
         <>
+          {data.totals.total > 0 && (
+            <div className="ov-trend-summary">
+              <span className="ov-trend-rate">
+                {formatPassRate(data.totals.pass_rate)}
+              </span>
+              <span className="ov-trend-rate-label">pass rate</span>
+              <span className="ov-trend-total">
+                {data.totals.total}{" "}
+                {data.totals.total === 1 ? "result" : "results"}
+              </span>
+            </div>
+          )}
+
           <div className="ov-trend-body">
             {tableView ? (
               <TrendTable trend={data} days={days} />

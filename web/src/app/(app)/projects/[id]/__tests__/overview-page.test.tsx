@@ -435,6 +435,27 @@ describe("overview: trend chart and table", () => {
     );
   });
 
+  it("headlines the window pass rate and result count above the plot", async () => {
+    mockApi();
+    await renderPage();
+
+    expect(await screen.findByText("71.4%")).toBeInTheDocument();
+    expect(screen.getByText("pass rate")).toBeInTheDocument();
+    expect(screen.getByText("7 results")).toBeInTheDocument();
+  });
+
+  it("omits the headline for an empty window instead of showing a bare dash", async () => {
+    mockRouterState.search = "days=30";
+    mockApi({ trend: makeTrend(30, true) });
+    await renderPage();
+
+    expect(
+      await screen.findByText("No results recorded in the last 30 days.")
+    ).toBeInTheDocument();
+    expect(document.querySelector(".ov-trend-summary")).toBeNull();
+    expect(screen.queryByText("0 results")).toBeNull();
+  });
+
   it("names every status in the legend, plus the pass-rate line", async () => {
     mockApi();
     await renderPage();

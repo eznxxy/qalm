@@ -59,6 +59,36 @@
   outline-offset: -2px;
 }
 
+/* ---------- headline stat ---------- */
+
+.ov-trend-summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0 0 var(--space-4);
+}
+
+.ov-trend-rate {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-trend-rate-label {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.ov-trend-total {
+  margin-left: auto;
+  color: var(--ink-500);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- plot ---------- */
 
 .ov-trend-body {
@@ -79,6 +109,7 @@
 .ov-trend-grid {
   stroke: var(--line);
   stroke-width: 1;
+  stroke-dasharray: 2 5;
 }
 
 .ov-trend-axis-line {
@@ -86,9 +117,34 @@
   stroke-width: 1;
 }
 
+.ov-trend-axis-tick {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
 .ov-trend-axis {
   fill: var(--ink-500);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The whole day slot is a hover target; the tooltip is the bucket <title>. */
+.ov-trend-col-bg {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.ov-trend-col:hover .ov-trend-col-bg {
+  fill: var(--canvas);
+}
+
+/* A surface halo under the ink line keeps it readable over a column. */
+.ov-trend-line-halo {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
 .ov-trend-line {
@@ -100,9 +156,9 @@
 }
 
 .ov-trend-point {
-  fill: var(--ink-900);
-  stroke: var(--surface);
-  stroke-width: 1.5;
+  fill: var(--surface);
+  stroke: var(--ink-900);
+  stroke-width: 2;
 }
 
 .ov-trend-empty {
@@ -111,11 +167,24 @@
   right: 15%;
   top: 42%;
   transform: translateY(-50%);
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Sit the copy on the card surface so gridlines do not run through it. */
+.ov-trend-empty p,
+.ov-trend-empty a {
+  position: relative;
+  width: fit-content;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface);
 }
 
 .ov-trend-empty p {
-  margin: 0 0 var(--space-2);
+  margin: 0;
   color: var(--ink-700);
 }
 
@@ -149,8 +218,8 @@
 
 .ov-legend-swatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 2px;
 }
 
