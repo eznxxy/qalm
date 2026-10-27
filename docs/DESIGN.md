@@ -279,6 +279,15 @@ assignee, due date. Filter by Open / Completed.
   — the styling moved onto the label and the focus ring is drawn on it with
   `:focus-within`, so the picker keeps its accessible name and its keyboard
   path.
+- **The Section filter offers only the suites this run has items from.** The
+  bar above the table narrows the items, so a suite with no items in the run
+  can only ever filter down to nothing; listing all ten project suites invited
+  dead ends. The options come from the new `Run.suite_ids` (the distinct
+  non-null `case_suite_id` snapshots among the run's items), ordered by the
+  suite tree rather than by the aggregate, and each keeps its real tree depth so
+  the `— ` indentation still says where it sits. A `?suite=` already in the URL
+  for a suite the run no longer touches stays selectable as "Selected section"
+  — otherwise a shared link would silently reset to "All sections".
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
 - Failed results require a comment. Show the reason inline, not in a toast.

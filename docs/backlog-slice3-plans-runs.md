@@ -443,11 +443,35 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
   select's label rather than a line resting on it. Measured in the browser:
   416px wide, padding 24, select inset 25px each side (24 + 1px border), 12px
   hint → label, 8px label → select, 8px select → caveat.
-- Verified: web `tsc`/`eslint` clean, jest **571** (40 suites) including seven
+- **The Section filter lists only the suites the run has items from** (tenth
+  review pass: "set the value of section its only what suites that attach when
+  create a run"). The dropdown offered every suite in the project, so on `Run
+  October` — whose three items all sit in `Auth › Login` — nine of the ten
+  options could only filter down to zero rows. Options now come from a new
+  `Run.suite_ids` aggregate: the distinct non-null `case_suite_id` snapshots
+  among the run's items, added to `docs/api-runs.md` beside `assignee_ids`, to
+  `RunAggRow` and both `json_agg` subqueries in `runSelect()` (one grouped
+  aggregate per page, never a query per row) and to `RunDto` through a
+  `toIdList` that now serves both id lists. The web side filters the suite tree
+  with `suitesInRun()` (`web/src/lib/suites.ts`): tree order, not the
+  aggregate's unspecified order, and each entry keeps its real `depth` so the
+  `— ` indentation still says where the suite sits. A `?suite=` for a suite the
+  run no longer touches stays selectable as "Selected section" instead of
+  silently resetting to "All sections".
+- Verified: web `tsc`/`eslint` clean, jest **580** (41 suites) including seven
   new `StatusPie` tests, four drawer attachment tests (staged image viewer +
   revoke, uploaded PDF `iframe` after a fetch, icon-only removal, the actions as
-  buttons) and the run-detail pie test. Live as Tester on `Run October` — header
-  group reads "Run October results by status", centre `33% done`, legend
+  buttons), the run-detail pie test, seven `suitesInRun` tests and two page
+  tests for the Section filter (only run suites offered; a stale `?suite=` stays
+  selectable). Server `tsc`/`eslint` clean, jest **448** (27 suites) with
+  `suite_ids` asserted on list, detail and an empty run, and the runs e2e
+  **39** tests including "a run created from a suite selection reports the four
+  suites it touched, deduplicated". Live on `Run October` as the reviewer's
+  session: the Section control now reads `All sections` + `— Login` (was ten
+  options) and selecting Login keeps the same three items (`C38`–`C40`) with
+  `?suite=1a813596…` in the URL.
+  Earlier, the header group
+  read "Run October results by status", centre `33% done`, legend
   `Passed 1 · Retest 0 · Blocked 0 · Failed 0 · Skipped 0 · Untested 2`.
   **Verification note:** the reviewer's Admin session showed the first hover pass
   was too quiet, so the second pass was checked in the browser against the app's
