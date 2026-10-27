@@ -176,11 +176,27 @@
 
 /* ---------- assign dialog ---------- */
 
+/* The shared `.dialog` frame is 16px of padding (globals.css) because most
+ * dialogs are dense forms that want the height. This one is two lines of copy
+ * and a single control, so the frame can breathe: 24px all round, which puts
+ * the same 24px between the select and the card edge as the fields have
+ * between each other. */
+.assign-dialog {
+  padding: var(--space-6);
+}
+
 .assign-dialog .field-hint {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 16px;
+}
+
+/* The hint above the field has no bottom margin (it is description copy, not a
+ * label), so the field needs its own separation or "Assignee" sits on the
+ * sentence. */
+.assign-dialog .field {
+  margin-top: var(--space-4);
 }
 
 .assign-dialog select {
