@@ -16,9 +16,9 @@ describe('resolveReportFilters', () => {
   });
 
   it('never passes the literal none into a uuid field', () => {
-    const filter = resolveReportFilters({ plan_id: 'none', milestone_id: 'none' });
-    expect(filter.planId).toBeNull();
-    expect(filter.milestoneId).toBeNull();
+    expect(resolveReportFilters({ plan_id: 'none', milestone_id: 'none' })).toEqual({
+      planId: null, planNone: true, milestoneId: null, milestoneNone: true, status: null,
+    });
   });
 });
 
