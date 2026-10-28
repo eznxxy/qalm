@@ -17,6 +17,36 @@ export interface TrendRow {
   skipped: number;
 }
 
+/** One run's current progress plus its activity in the window. */
+export interface ProgressRunRow {
+  id: string;
+  name: string;
+  plan_id: string | null;
+  plan_name: string | null;
+  milestone_id: string | null;
+  milestone_name: string | null;
+  /** `YYYY-MM-DD` (selected `::text`), never a Date. */
+  start_date: string | null;
+  due_date: string | null;
+  completed: boolean;
+  total: number;
+  passed: number;
+  failed: number;
+  blocked: number;
+  retest: number;
+  skipped: number;
+  untested: number;
+  results_in_window: number;
+  /** `max(created_at)` across all time; `null` when the run has no result. */
+  last_result_at: Date | null;
+}
+
+/** The `progress.items` rollup over every matching run, not just the page. */
+export interface ProgressItemsRow {
+  total: number;
+  with_results: number;
+}
+
 /**
  * Every result recorded in the window, bucketed by UTC day, docs/
  * api-project-overview.md § What is counted.
