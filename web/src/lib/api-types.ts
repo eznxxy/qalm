@@ -875,3 +875,67 @@ export interface ProjectTrend {
   buckets: TrendBucket[];
   totals: TrendTotals;
 }
+
+// ---- reports summary (docs/api-reports.md) ----
+
+/** The resolved filters echoed by the summary; `none` is meaningful. */
+export interface ReportFilters {
+  plan_id: string | null;
+  milestone_id: string | null;
+  status: RunStatus | null;
+}
+
+/** One run's current state plus its activity in the window. */
+export interface ProgressRun {
+  id: string;
+  name: string;
+  status: RunStatus;
+  plan_id: string | null;
+  plan_name: string | null;
+  milestone_id: string | null;
+  milestone_name: string | null;
+  /** Plain `YYYY-MM-DD`, or null. */
+  start_date: string | null;
+  due_date: string | null;
+  counts: RunCounts;
+  /** `passed / (passed + failed + blocked + retest)`, one decimal; null when 0. */
+  pass_rate: number | null;
+  /** Result rows recorded for this run inside the window. */
+  results_in_window: number;
+  /** ISO instant of the newest result across all time, or null. */
+  last_result_at: string | null;
+}
+
+export interface ProgressItems {
+  total: number;
+  with_results: number;
+  untested: number;
+  percent_complete: number;
+}
+
+export interface ReportProgress {
+  data: ProgressRun[];
+  meta: PaginationMeta;
+  items: ProgressItems;
+}
+
+/** GET /projects/:projectId/reports/summary */
+export interface ReportSummary {
+  project_id: string;
+  from: string;
+  to: string;
+  days: number;
+  filters: ReportFilters;
+  /** The trend body without the echoed window — the window lives at the top. */
+  trend: { buckets: TrendBucket[]; totals: TrendTotals };
+  progress: ReportProgress;
+}
+
+export interface ReportSummaryQuery {
+  days?: number;
+  plan_id?: string;
+  milestone_id?: string;
+  status?: RunStatus;
+  page?: number;
+  limit?: number;
+}

@@ -37,6 +37,8 @@ import {
   ProjectTrend,
   RefreshResult,
   ReorderSuitesInput,
+  ReportSummary,
+  ReportSummaryQuery,
   Result,
   ResultAttachment,
   ResultListQuery,
@@ -170,6 +172,22 @@ export const api = {
     client.apiFetch<ProjectTrend>(
       `/projects/${encodeURIComponent(projectId)}/reports/trend`,
       { query: { days } }
+    ),
+
+  /** Reports tab: filtered trend plus the project's run progress in one read. */
+  getReportSummary: (projectId: string, query: ReportSummaryQuery = {}) =>
+    client.apiFetch<ReportSummary>(
+      `/projects/${encodeURIComponent(projectId)}/reports/summary`,
+      {
+        query: {
+          days: query.days,
+          plan_id: query.plan_id,
+          milestone_id: query.milestone_id,
+          status: query.status,
+          page: query.page,
+          limit: query.limit,
+        },
+      }
     ),
 
   // ---- suites (docs/api-suites.md) ----
