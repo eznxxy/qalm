@@ -3,6 +3,7 @@ import {
   formatAbsoluteDate,
   formatDateOnly,
   formatDateTime,
+  formatDaysLeft,
   formatFullTimestamp,
   formatRelativeTime,
   RELATIVE_WINDOW_MS,
@@ -149,5 +150,39 @@ describe("formatDateOnly", () => {
   it("returns the raw string for a rollover date (2026-02-30)", () => {
     expect(formatDateOnly("2026-02-30", { locale: LOCALE })).toBe("2026-02-30");
     expect(formatDateOnly("2026-13-01", { locale: LOCALE })).toBe("2026-13-01");
+  });
+});
+
+describe("formatDaysLeft", () => {
+  // The countdown compares calendar days in the user's zone, so the clock is
+  // built from local parts: 25 Oct 2026 is that day in every timezone.
+  const TODAY = new Date(2026, 9, 25, 12, 0, 0);
+
+  it.each([
+    ["2026-10-25", "Due today"],
+    ["2026-10-26", "1 day left"],
+    ["2026-11-06", "12 days left"],
+    ["2026-10-24", "1 day late"],
+    ["2026-10-22", "3 days late"],
+  ])("%s reads %j", (due, expected) => {
+    expect(formatDaysLeft(due, { now: TODAY })).toBe(expected);
+  });
+
+  it("counts calendar days, not elapsed hours", () => {
+    // 23:59 on the due date is still "Due today" even though it is under an
+    // hour away from midnight.
+    const lateEvening = new Date(2026, 9, 25, 23, 59);
+    expect(formatDaysLeft("2026-10-25", { now: lateEvening })).toBe("Due today");
+    expect(formatDaysLeft("2026-10-26", { now: lateEvening })).toBe(
+      "1 day left"
+    );
+  });
+
+  it("returns null for a missing or malformed date", () => {
+    expect(formatDaysLeft(null, { now: TODAY })).toBeNull();
+    expect(formatDaysLeft(undefined, { now: TODAY })).toBeNull();
+    expect(formatDaysLeft("", { now: TODAY })).toBeNull();
+    expect(formatDaysLeft("26/10/2026", { now: TODAY })).toBeNull();
+    expect(formatDaysLeft("2026-02-30", { now: TODAY })).toBeNull();
   });
 });

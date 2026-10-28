@@ -28,6 +28,7 @@ const SHORTCUT_SECTIONS: ReadonlyArray<{
     entries: [
       { keys: ["g", "c"], description: "Go to Test cases" },
       { keys: ["g", "r"], description: "Go to Test runs" },
+      { keys: ["g", "m"], description: "Go to Milestones" },
     ],
   },
   {

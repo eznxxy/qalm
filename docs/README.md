@@ -28,5 +28,20 @@ exists and is approved (see `/AGENTS.md`).
   close/reopen, and the case drawer's Linked runs feed. Ten decisions (Q1–Q10)
   are recorded in the PRD.
 
+## Slice 4 (milestones) — status: contracts approved (Arif, 2026-10-27)
+- `PRD-milestones.md` / `api-milestones.md` — project-scoped, dated checkpoints
+  over runs (one milestone per run), with a derived status and a rollup over the
+  milestone's runs, editable attach/detach, and no plan-level milestone. The run
+  link is additive in `api-runs.md`; `api-plans.md` records that an embedded run
+  does not take one.
+
+## Slice 5 (project overview) — status: proposed, awaiting approval
+- `PRD-project-overview.md` / `api-project-overview.md` — the project page gains
+  a tab strip (Overview / Milestones / Test runs / Test cases live, Reports
+  disabled), a results trend over a 1/7/14/30-day window backed by the new
+  `GET /projects/:projectId/reports/trend`, a Milestones card and a Test Runs
+  card, and moves the description into Overview. One new read-only endpoint and
+  one index; no existing resource changes.
+
 ## Later slices (no docs yet)
-Milestones → dashboards/reports → CSV import/export.
+Dashboards/reports → CSV import/export.

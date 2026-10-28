@@ -1,0 +1,137 @@
+/*
+ * Milestones table (DESIGN §4.5) — the project's milestones list. Tokens only;
+ * scoped under .milestone-table so it never leaks into other tables.
+ */
+
+/* The name cell opens the milestone. */
+.ms-title-link {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ms-title-link:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+/* Fixed layout for the same reason as the runs table: spare pixels must not all
+ * land in the name column. The shares total 100% and leave the action pair and
+ * the dates room for their fixed shapes. */
+.milestone-table .dt-table {
+  table-layout: fixed;
+}
+
+.milestone-table .ms-col-name {
+  width: 24%;
+}
+
+.milestone-table .ms-col-runs {
+  width: 7%;
+}
+
+.milestone-table .ms-col-status {
+  width: 11%;
+}
+
+.milestone-table .ms-col-percent {
+  width: 20%;
+}
+
+.milestone-table .ms-col-due {
+  width: 12%;
+}
+
+.milestone-table .ms-col-days {
+  width: 12%;
+}
+
+.milestone-table .ms-col-actions {
+  width: 14%;
+}
+
+.milestone-table .ms-col-due {
+  white-space: nowrap;
+}
+
+/* Derived status (docs/api-milestones.md): a badge, not a control. */
+.ms-status {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-badge);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.ms-status-open {
+  background: var(--brand-tint);
+  color: var(--ink-700);
+}
+
+.ms-status-completed {
+  background: var(--canvas);
+  color: var(--ink-700);
+}
+
+.ms-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ms-progress > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ms-progress-value {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-days-late {
+  color: var(--danger);
+}
+
+.ms-row-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+/* Row actions are text buttons: the row already carries the name link. */
+.ms-action {
+  background: none;
+  border: none;
+  height: auto;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ms-action:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.ms-action-danger {
+  color: var(--danger);
+}
+
+.ms-action-danger:hover:not(:disabled) {
+  color: var(--danger);
+}

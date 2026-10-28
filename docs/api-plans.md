@@ -54,10 +54,11 @@ total * 100)`, and is `0` when `total = 0`.
 | `runs[].description` | optional, ≤ 1,000 chars |
 | `runs[].start_date`, `runs[].due_date` | optional `YYYY-MM-DD`; `start_date` may not be after `due_date` |
 | `runs[].plan_id` | not accepted — every run inherits the new plan's id |
+| `runs[].milestone_id` | not accepted — a milestone is attached after creation (`docs/api-milestones.md`); `PATCH /runs/:id` or `POST /milestones/:id/runs` |
 
 Run fields follow `docs/api-runs.md`; the embedded run has no
-`selection`/`case_ids`. Runs created this way start empty (`0` items) — cases
-are added afterwards from the run screen.
+`selection`/`case_ids` and no `milestone_id`. Runs created this way start empty
+(`0` items) — cases are added afterwards from the run screen.
 
 ## Endpoints
 

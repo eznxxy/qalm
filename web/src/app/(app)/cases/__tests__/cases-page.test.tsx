@@ -175,6 +175,8 @@ const RUNS: Run[] = [
     id: "r-1",
     project_id: "p-1",
     plan_id: null,
+    milestone_id: null,
+    milestone_name: null,
     name: "Run October",
     description: null,
     status: "open",

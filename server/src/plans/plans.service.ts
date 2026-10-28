@@ -145,6 +145,7 @@ export class PlansService {
             {
               project_id: projectId,
               plan_id: row.id,
+              milestone_id: null,
               name: run.name,
               description: blankToNull(run.description),
               start_date: startDate,

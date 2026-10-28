@@ -98,6 +98,8 @@ function makeRun(overrides: Partial<Run> = {}): Run {
     id: "run-1",
     project_id: "p-1",
     plan_id: "pl-1",
+    milestone_id: null,
+    milestone_name: null,
     name: "Release 2.4 smoke",
     description: null,
     status: "open",
@@ -274,6 +276,7 @@ describe("plan detail", () => {
       .map((cell) => cell.textContent?.trim() ?? "");
     expect(headers).toEqual([
       "Name",
+      "Milestone",
       "Status",
       "% complete",
       "Assignees",

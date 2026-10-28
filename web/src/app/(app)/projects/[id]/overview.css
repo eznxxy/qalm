@@ -1,0 +1,54 @@
+/*
+ * Project overview layout (docs/DESIGN.md §4.8). 12 columns, 16px gutters:
+ * trend 8, milestones 4, runs 12; one column below 1024px in DOM order
+ * (description → trend → milestones → runs). The card components own their
+ * own internals and their grid spans.
+ */
+
+.ov-project-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.ov-project-header h1 {
+  overflow-wrap: anywhere;
+}
+
+.ov-header-actions {
+  flex: 0 0 auto;
+}
+
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.ov-description {
+  grid-column: 1 / -1;
+}
+
+.ov-description h2 {
+  margin-top: 0;
+}
+
+.ov-description p {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1024px) {
+  .ov-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ov-description,
+  .ov-trend-card,
+  .ov-ms-card,
+  .ov-runs-card {
+    grid-column: 1 / -1;
+  }
+}

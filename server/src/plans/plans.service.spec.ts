@@ -38,6 +38,7 @@ interface FakeRun {
   id: string;
   project_id: string;
   plan_id: string | null;
+  milestone_id: string | null;
   name: string;
   description: string | null;
   start_date: string | null;
@@ -123,6 +124,7 @@ class FakeStore {
       id: `run-seed-${this.nextRunId++}`,
       project_id: overrides.project_id ?? 'p-1',
       plan_id: overrides.plan_id ?? null,
+      milestone_id: overrides.milestone_id ?? null,
       name: overrides.name ?? 'Run',
       description: overrides.description ?? null,
       start_date: overrides.start_date ?? null,
@@ -265,6 +267,7 @@ class FakeStore {
   async insertRun(row: {
     project_id: string;
     plan_id: string | null;
+    milestone_id: string | null;
     name: string;
     description: string | null;
     start_date: string | null;
@@ -409,6 +412,7 @@ class FakeRunsStore {
   async insertRun(row: {
     project_id: string;
     plan_id: string | null;
+    milestone_id: string | null;
     name: string;
     description: string | null;
     start_date: string | null;
@@ -547,6 +551,7 @@ describe('PlansService (unit, in-memory plans)', () => {
           id: 'run-1',
           project_id: 'p-1',
           plan_id: plan.id,
+          milestone_id: null,
           name: 'Smoke',
           description: null,
           start_date: '2026-11-01',

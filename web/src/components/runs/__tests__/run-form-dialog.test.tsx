@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import React from "react";
 import type {
   CaseListItem,
+  Milestone,
   Plan,
   RunSelection,
   SuiteNode,
@@ -73,6 +74,32 @@ const PLANS: Plan[] = [
   },
 ];
 
+const MILESTONES: Milestone[] = [
+  {
+    id: "m-1",
+    project_id: "p-1",
+    name: "2.4 release",
+    description: null,
+    due_date: "2026-11-14",
+    status: "open",
+    run_count: 0,
+    counts: {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      blocked: 0,
+      retest: 0,
+      skipped: 0,
+      untested: 0,
+      percent_complete: 0,
+    },
+    created_by: "u-1",
+    updated_by: "u-1",
+    created_at: "2026-10-20T12:00:00Z",
+    updated_at: "2026-10-20T12:00:00Z",
+  },
+];
+
 const CASE: CaseListItem = {
   id: "c-1",
   project_id: "p-1",
@@ -92,7 +119,15 @@ const CASE: CaseListItem = {
 };
 
 async function renderDialog(
-  onSubmit: (values: RunFormValues, selection: RunSelection | undefined) => void
+  onSubmit: (values: RunFormValues, selection: RunSelection | undefined) => void,
+  {
+    milestones = [],
+    serverFieldErrors,
+  }: {
+    /** The project's milestones for the optional Milestone select. */
+    milestones?: Milestone[];
+    serverFieldErrors?: { milestone_id?: string };
+  } = {}
 ): Promise<ReturnType<typeof render>> {
   const { RunFormDialog } = await import("@/components/runs/RunFormDialog");
   return render(
@@ -100,6 +135,8 @@ async function renderDialog(
       projectId="p-1"
       suites={SUITES}
       plans={PLANS}
+      milestones={milestones}
+      serverFieldErrors={serverFieldErrors}
       onSubmit={onSubmit}
       onCancel={jest.fn()}
     />
@@ -171,11 +208,43 @@ describe("RunFormDialog", () => {
         name: "Checkout smoke",
         description: "",
         planId: "",
+        milestoneId: "",
         startDate: "",
         dueDate: "",
       },
       undefined
     );
+  });
+
+  it("offers the project's milestones and hands the chosen one back", async () => {
+    const onSubmit = jest.fn();
+    await renderDialog(onSubmit, { milestones: MILESTONES });
+
+    const select = screen.getByLabelText("Milestone");
+    expect(select).toHaveValue("");
+    expect(within(select).getByRole("option", { name: "No milestone" })).toBeInTheDocument();
+    expect(
+      within(select).getByRole("option", { name: "2.4 release" })
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Checkout smoke" },
+    });
+    fireEvent.change(select, { target: { value: "m-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create run" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Checkout smoke", milestoneId: "m-1" }),
+      undefined
+    );
+  });
+
+  it("reports a rejected milestone on its own field", async () => {
+    await renderDialog(jest.fn(), {
+      serverFieldErrors: { milestone_id: "Milestone not found." },
+    });
+
+    expect(screen.getByText("Milestone not found.")).toBeInTheDocument();
   });
 
   it("hands back the start and due dates as plain YYYY-MM-DD values", async () => {

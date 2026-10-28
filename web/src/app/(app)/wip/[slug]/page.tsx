@@ -17,7 +17,6 @@ import { useParams } from "next/navigation";
 
 const SECTION_TITLES: Record<string, string> = {
   overview: "Overview",
-  milestones: "Milestones",
   reports: "Reports",
 };
 

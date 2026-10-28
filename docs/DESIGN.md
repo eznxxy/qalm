@@ -199,8 +199,14 @@ cases."
 
 ### 4.3 Test runs list
 
-Columns: name, plan, status bar (the memorable element), % complete,
-assignee, start date, due date. Filter by Open / Completed.
+Columns: name, plan, milestone, status bar (the memorable element),
+% complete, assignee, start date, due date. Filter by Open / Completed.
+
+- **The Milestone column** sits between Plan and Status, as originally drawn,
+  and shows the milestone's name as a link or `—`. It comes from the run's own
+  `milestone_id`/`milestone_name`, so the column needs no second fetch. The plan
+  detail's Runs table shows it too (that table only drops the Plan column); the
+  milestone detail's table drops Milestone instead (§4.5).
 
 - **The toolbar creates both things, and a plan is created with its runs.** A
   plan with no runs is an empty folder, so "New plan" opens one dialog that
@@ -324,6 +330,13 @@ assignee, start date, due date. Filter by Open / Completed.
   — otherwise a shared link would silently reset to "All sections".
 - After saving a result, move focus to the next untested row ("Save and next",
   `Ctrl+Enter`).
+- **Assign is per item.** The items table has a selection column for Admin/Lead
+  on an open run; ticking rows scopes the dialog to those items ("2 selected
+  items") and sends their ids, while an empty selection keeps the whole-run
+  default ("All 6 items"). The selection belongs to the current result set — a
+  different filter, sort or page starts with nothing ticked, and it is consumed
+  by the assign — so a bulk action never reaches an item the reviewer cannot
+  see. Roles that cannot assign see no checkboxes.
 - Failed results require a comment. Show the reason inline, not in a toast.
 
 ### 4.5 Plans, milestones
@@ -333,7 +346,35 @@ own screen shows the plan's fields, the aggregate rollup, the Edit/Delete pair
 (Admin/Lead, read-only when archived) and a table of its runs — the runs list's
 columns minus Plan, sorted by the server.
 
-Milestone: name, due date, progress bar, linked runs, days left.
+Milestone: a project-scoped, dated checkpoint over runs (`docs/PRD-milestones.md`).
+Its list is the "what is coming up" screen: Name, Runs, Status, `% complete`
+with the status bar, Due date, Days left, Actions — sorted by due date by
+default, undated last, with a name search and an Open/Completed filter. The
+screen's primary action is **New milestone**; the dialog collects name,
+description and due date, and a milestone is allowed to have no runs yet.
+
+- **Detail** — the milestone's fields, its rollup (status bar, exact per-status
+  counts, `% complete`), due date and days left, the Edit/Delete pair
+  (Admin/Lead, read-only when the project is archived) and its runs in the runs
+  table: the Plan column included, the Milestone column dropped because every
+  row would repeat the page title. A row opens the run.
+- **Add runs** lists live runs of the project that have **no** milestone, each
+  with its status and progress; attaching is per row and a save attaches the
+  ticked ones. **Remove from milestone** on a run detaches it and keeps it —
+  the confirm says so. A run can be in one milestone, and a run already in
+  another is not offered.
+- **Completion is derived, not a button**: a milestone reads **Completed** when
+  it has at least one run and every run is completed, and returns to **Open**
+  when a run is reopened or an open run is attached. There is no Close
+  milestone action.
+- **Days left** is the countdown to `due_date`: "12 days left", "Due today",
+  "3 days late"; no due date means no countdown. It is computed in the web from
+  the plain calendar date (§9), never by the API.
+- **Deleting a milestone detaches its runs** and deletes nothing; the confirm
+  names that ("Its 3 runs will be kept, without a milestone.").
+- A milestone is never chosen on a plan. The run's own form carries the optional
+  Milestone field, the run detail names it with a link, and the runs table shows
+  it (see §4.3).
 
 ### 4.6 Reports and dashboard
 
@@ -354,6 +395,105 @@ state the insight source ("Pass rate, last 30 days"), not decoration.
 Left sub-nav: Project, Members and roles, Case fields (phase 2), Integrations
 (phase 2). Roles: Admin, Lead, Tester, Viewer. Hide or disable controls the
 role cannot use, and explain why on hover ("Viewers can't edit cases").
+
+### 4.8 Project overview
+
+The project page is the project's overview. Title, key, status badge and the
+Edit/Archive buttons stay in the header (unchanged from slice 1); directly
+below them, a tab strip; below that, the Overview tab's content.
+
+```
+┌ Projects › Checkout                    [Edit] [Archive] ┐
+│ Checkout  [Archived]      Key: CHK                      │
+│ Overview │ Milestones │ Test runs │ Test cases │ Reports│
+├────────────────────────────────────┬────────────────────┤
+│ Results recorded, last 14 days     │ Milestones         │
+│  ▁▂▅▃▆▂▁  ▲ 81.6%  [1d│7d│14d│30d]│ Release 2.4        │
+│  ● Passed ● Failed ● Blocked       │ 14 Nov · 12 days   │
+│  ● Retest ● Skipped      [as table]│ ▓▓▓▓▓▓░░░ 71%      │
+│                                    │ Release 2.5        │
+├────────────────────────────────────┴────────────────────┤
+│ Test runs                                  View all →    │
+│ Release 2.4 smoke · 31 of 50 · 74% · 14 Nov              │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Tab strip.** Underline tabs (§5): 2px `--brand` underline on the active tab,
+`aria-current="page"`, real links. `Overview` → `/projects/:id`;
+`Milestones` → `/milestones?project=:id`; `Test runs` → `/runs?project=:id`;
+`Test cases` → `/cases?project=:id`. `Reports` is rendered as a disabled tab
+(`aria-disabled="true"`, no `href`, explanation on hover/focus: "Reports arrive
+in a later slice"). No Todo tab. The active tab follows the route, never local
+state.
+
+**Grid.** 12 columns, 16px gutters (§4.6): trend card 8, Milestones card 4,
+Test Runs card 12. One column below 1024px, in that order.
+
+**Results trend card.** Title names the insight and its source, generated from
+the resolved window: "Results recorded, last 14 days", "… last 7 days", "… last
+30 days", and "… today" for 1 day. Two series on one plot: stacked daily columns
+of recorded results by status (left axis, counts) and the daily pass rate as a
+line (right axis, 0–100%). Status colours are the only colours used (§2.2) and
+the legend spells out every status in text. Days with no results draw no column
+and **break** the pass-rate line — never a point at 0%. A day with no verdicts
+labels `—`, not `0%`. The window footer states "UTC days" so the buckets are
+unambiguous.
+
+- **Range selector**: a segmented control in the card header, `1d · 7d · 14d ·
+  30d`, 14 default, selected option marked with `aria-pressed` and a filled
+  background (not colour alone). It is a labelled group ("Trend window"), the
+  four buttons are 32px touch targets, and the choice lives in the URL
+  (`/projects/:id?days=30`) so refresh and sharing keep it; an unsupported value
+  falls back to 14 silently. Changing it refetches only this card.
+- **Loading on change**: keep the previous plot, mark the card `aria-busy="true"`
+  and announce "Updating…" politely; never flash the skeleton after the first
+  load. On failure, show the card error + Retry with the chosen range still
+  selected.
+- Hover/focus a day: tooltip with date, per-status counts, total and pass rate.
+  Keyboard: the plot is a single `role="img"` with an `aria-label` summarising
+  the window, total and pass rate; the day detail is reachable through the table
+  view, which is the accessible path.
+- **View as table** toggle (§4.6), a real button with `aria-expanded`: Date,
+  Passed, Failed, Blocked, Retest, Skipped, Total, Pass rate — one row per
+  selected day, `—` for a null rate. Toggling does not refetch.
+- One day selected: a single stacked column and a single pass-rate **point**, no
+  line; one table row.
+- Empty window: keep the axes and legend, put "No results recorded in the last
+  14 days." (or "… today.") in the plot area with a link to Test runs. Never an
+  empty frame alone.
+
+**Milestones card.** Up to 5, sorted by due date ascending with undated last
+(the milestones screen's default), each with name, due date, days left (or
+"No due date"), the 8px status bar and `% complete`. Rows link to the milestone.
+Header: for Admin/Lead on an active project, a "New milestone" button that opens
+`MilestoneFormDialog` in create mode in place (no navigation; Cancel closes, a
+save closes and refreshes both cards), then the "View all milestones" link →
+`/milestones?project=:id`. Empty: "No milestones yet. Create one to track a
+release."; the button lives in the header, and Tester/Viewer get the read-only
+reason instead.
+
+**Test Runs card.** Up to 5 live runs, newest first, each with name, plan (or
+`—`), milestone (or `—`), status badge, `31 of 50`, the status bar, `74%
+complete` and due date. Rows link to the run. Header: for Admin/Lead on an
+active project, a "New run" button that opens `RunFormDialog` in create mode in
+place, then the "View all runs" link → `/runs?project=:id`. The dialog loads the
+project's plans, milestones and suites when it opens (a loading shell with
+Cancel), because those pickers need them before the form can mount. Empty: "No
+runs yet. Create a run to start recording results."; the button lives in the
+header, and Tester/Viewer get the read-only reason instead. No "By" column: the
+run resource carries no author name and `GET /users` is Admin-only (see PRD
+decision 8).
+
+**Description.** The slice-1 Description panel moves into the Overview tab,
+above the trend card: description or "No description.", then created / last
+updated. It is no longer a card above the tabs, and the stale "arrive in later
+slices" line is removed.
+
+**States.** Each card loads and fails independently: its own skeleton
+(chart = axis skeleton, cards = row skeletons), its own error with Retry that
+refetches only that card. The header and tab strip render as soon as the project
+loads. The archived-project banner and the project-level 404/403 states are
+unchanged.
 
 ---
 
@@ -402,9 +542,9 @@ Do not add a UI library without Daedalus's approval.
   expands (120 ms), toast appears. No page-load animations, no hover animations
   on rows or cards.
 - Respect `prefers-reduced-motion`: replace motion with instant changes.
-- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`
-  go to cases, runs, `n` new, `Ctrl+Enter` save, `P F B R S` set status
-  in a result form, `j`/`k` move between rows, `Esc` close.
+- Shortcuts (show in a `?` help dialog): `/` search, `g` then `c`/`r`/`m`
+  go to cases, runs, milestones, `n` new, `Ctrl+Enter` save, `P F B R S` set
+  status in a result form, `j`/`k` move between rows, `Esc` close.
 
 ---
 

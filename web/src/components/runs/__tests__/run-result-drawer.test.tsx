@@ -56,6 +56,7 @@ function result(overrides: Partial<Result> = {}): Result {
     defect_url: null,
     attachments: [],
     created_by: "u-1",
+    created_by_name: "Tess Tester",
     created_at: "2026-10-25T09:00:00Z",
     ...overrides,
   };
@@ -203,6 +204,21 @@ describe("RunResultDrawer", () => {
       await screen.findByText(/This item isn't assigned to you/)
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save result" })).toBeNull();
+  });
+
+  it("names the person who recorded each result, keeping the id in the tooltip", async () => {
+    // Card 3.16: history used to read "by bf6f8166…".
+    mockApi.listItemResults.mockResolvedValue({
+      data: [result({ created_by: "bf6f8166-1111-2222-3333-444455556666" })],
+      meta: { page: 1, limit: 25, total: 1, total_pages: 1 },
+    });
+    await renderDrawer();
+
+    const actor = await screen.findByTitle(
+      "bf6f8166-1111-2222-3333-444455556666"
+    );
+    expect(actor).toHaveTextContent("Tess Tester");
+    expect(screen.queryByText("bf6f8166…")).toBeNull();
   });
 
   it("shows the kept-result actions as compact buttons, not links", async () => {
@@ -434,5 +450,20 @@ describe("RunResultDrawer", () => {
 
     expect(await screen.findByText("This run is completed.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save result" })).toBeNull();
+  });
+
+  it("offers no edit affordance on a completed run", async () => {
+    // Card 3.15: the latest result is editable by its author, but the run is
+    // closed — clicking Edit would only swap the heading and leave the
+    // read-only sentence. The button (and Add attachment) stay hidden.
+    await renderDrawer({
+      canRecord: false,
+      recordHint: "This run is completed.",
+      role: "admin",
+    });
+
+    expect(await screen.findByText("This run is completed.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit result" })).toBeNull();
+    expect(screen.queryByText("Add attachment")).toBeNull();
   });
 });

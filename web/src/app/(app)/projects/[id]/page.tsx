@@ -1,26 +1,45 @@
 "use client";
 
 /**
- * Project detail — placeholder screen hosting suites/runs in later slices.
- * Shows the project per docs/api-projects.md § Resource; Admin gets an inline
- * edit form. 403/404 render as readable states: a non-admin opening an
- * archived project receives the contract's 404 and sees "Project not found",
- * never a crash.
+ * Project overview (docs/DESIGN.md §4.8, docs/PRD-project-overview.md).
+ *
+ * The project header (title, key, status badge, Edit/Archive) is unchanged from
+ * slice 1; the tab strip below it reaches the project's other screens, and the
+ * Overview tab holds the description plus three independently-loaded cards: the
+ * results trend over a 1/7/14/30-day window, the nearest milestones and the
+ * newest runs.
+ *
+ * The window lives in the URL (`?days=30`) so reloads and shared links keep it;
+ * only the trend card refetches when it changes. 403/404 render as readable
+ * states: a non-admin opening an archived project receives the contract's 404
+ * and sees "Project not found", never a crash.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Project } from "@/lib/api-types";
 import { api } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
 import { useSession } from "@/lib/session";
-import { canArchiveProject, canEditProject, canRestoreProject } from "@/lib/project-permissions";
+import {
+  canArchiveProject,
+  canEditProject,
+  canRestoreProject,
+} from "@/lib/project-permissions";
+import { canWriteMilestones } from "@/lib/milestone-permissions";
+import { canWriteRuns } from "@/lib/run-permissions";
 import { EditProjectForm } from "@/components/project-forms";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { StatusBadge } from "@/components/ui";
 import { projectActionError } from "@/components/project-action-error";
 import { describeTimestamp } from "@/lib/dates";
+import { parseTrendDays, type TrendWindow } from "@/lib/trend-window";
+import { ProjectTabs } from "@/components/projects/ProjectTabs";
+import { ResultsTrend } from "@/components/projects/ResultsTrend";
+import { MilestonesCard } from "@/components/projects/MilestonesCard";
+import { RunsCard } from "@/components/projects/RunsCard";
+import "./overview.css";
 
 type LoadState =
   | { kind: "loading" }
@@ -32,14 +51,44 @@ type LoadState =
 export default function ProjectDetailPage() {
   const { user } = useSession();
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
   const id = typeof params?.id === "string" ? params.id : "";
+  const days = useMemo(
+    () => parseTrendDays(new URLSearchParams(searchKey).get("days")),
+    [searchKey]
+  );
 
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [editing, setEditing] = useState(searchParams.get("edit") === "1");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<"archive" | "restore" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"archive" | "restore" | null>(
+    null
+  );
   const [busy, setBusy] = useState(false);
+  /**
+   * Creating a milestone or a run happens in the card that owns the button, but
+   * a new run changes a milestone's counts, so both cards refresh together.
+   * The card calls `onChanged`; the page bumps this token for both.
+   */
+  const [cardsVersion, setCardsVersion] = useState(0);
+  const onCardsChanged = useCallback(() => {
+    setCardsVersion((version) => version + 1);
+  }, []);
+
+  // The same route serves every project, so a scope switch only changes the
+  // param. Edit mode, an action error and an open archive/restore dialog belong
+  // to the project that was on screen; carry none of them over, and re-read
+  // `?edit=1` for the new URL. Adjust during render (React docs pattern) — the
+  // shell's switcher does the same for `?project=`.
+  const [renderedId, setRenderedId] = useState(id);
+  if (renderedId !== id) {
+    setRenderedId(id);
+    setEditing(searchParams.get("edit") === "1");
+    setActionError(null);
+    setConfirmAction(null);
+  }
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -79,6 +128,18 @@ export default function ProjectDetailPage() {
       active = false;
     };
   }, [id, load]);
+
+  const onDaysChange = useCallback(
+    (next: TrendWindow) => {
+      const nextParams = new URLSearchParams(searchKey);
+      nextParams.set("days", String(next));
+      router.replace(
+        `/projects/${encodeURIComponent(id)}?${nextParams.toString()}`,
+        { scroll: false }
+      );
+    },
+    [id, router, searchKey]
+  );
 
   async function runAction(kind: "archive" | "restore") {
     if (state.kind !== "loaded") return;
@@ -165,6 +226,11 @@ export default function ProjectDetailPage() {
   const canEdit = user ? canEditProject(user.role) : false;
   const canArchive = user ? canArchiveProject(user.role) : false;
   const canRestore = user ? canRestoreProject(user.role) : false;
+  const activeProject = project.status === "active";
+  const canCreateMilestone =
+    activeProject && Boolean(user) && canWriteMilestones(user!.role);
+  const canCreateRun =
+    activeProject && Boolean(user) && canWriteRuns(user!.role);
 
   return (
     <div className="page">
@@ -174,24 +240,49 @@ export default function ProjectDetailPage() {
       {editing && canEdit ? (
         <EditProjectForm
           project={project}
-          onSaved={(updated) => {
-            setState({ kind: "loaded", project: updated });
+          onSaved={(saved) => {
+            setState({ kind: "loaded", project: saved });
             setEditing(false);
           }}
           onCancel={() => setEditing(false)}
         />
       ) : (
         <>
-          <div className="project-header">
-            <h1>
-              {project.name}{" "}
-              {project.status === "archived" && (
-                <StatusBadge status="skipped">Archived</StatusBadge>
+          <div className="project-header ov-project-header">
+            <div>
+              <h1>
+                {project.name}{" "}
+                {project.status === "archived" && (
+                  <StatusBadge status="skipped">Archived</StatusBadge>
+                )}
+              </h1>
+              <p className="project-key-line">
+                Key: <code>{project.key}</code>
+              </p>
+            </div>
+            <div className="button-row ov-header-actions">
+              {canEdit && (
+                <button type="button" onClick={() => setEditing(true)}>
+                  Edit
+                </button>
               )}
-            </h1>
-            <p className="project-key-line">
-              Key: <code>{project.key}</code>
-            </p>
+              {canArchive && activeProject && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction("archive")}
+                >
+                  Archive
+                </button>
+              )}
+              {canRestore && project.status === "archived" && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction("restore")}
+                >
+                  Restore
+                </button>
+              )}
+            </div>
           </div>
 
           {actionError && (
@@ -200,68 +291,67 @@ export default function ProjectDetailPage() {
             </p>
           )}
 
-          <div className="panel">
-            <h2>Description</h2>
-            {project.description ? (
-              <p>{project.description}</p>
-            ) : (
-              <p className="muted">No description.</p>
-            )}
-            <p className="muted project-meta">
-              Created{" "}
-              <time dateTime={project.created_at} title={created.title}>
-                {created.label}
-              </time>{" "}
-              · Last updated{" "}
-              <time dateTime={project.updated_at} title={updated.title}>
-                {updated.label}
-              </time>
-            </p>
-            <p className="muted">
-              Test runs and reports for this project arrive in later slices.
-            </p>
-          </div>
+          <ProjectTabs projectId={project.id} />
 
-          <div className="button-row">
-            <Link
-              href={`/cases?project=${encodeURIComponent(project.id)}`}
-              className="button-link"
-            >
-              Test cases
-            </Link>
-            {canEdit && (
-              <button type="button" onClick={() => setEditing(true)}>
-                Edit
-              </button>
-            )}
-            {canArchive && project.status === "active" && (
-              <button type="button" onClick={() => setConfirmAction("archive")}>
-                Archive
-              </button>
-            )}
-            {canRestore && project.status === "archived" && (
-              <button type="button" onClick={() => setConfirmAction("restore")}>
-                Restore
-              </button>
-            )}
+          <div className="ov-grid">
+            <section className="panel ov-description">
+              <h2>Description</h2>
+              {project.description ? (
+                <p>{project.description}</p>
+              ) : (
+                <p className="muted">No description.</p>
+              )}
+              <p className="muted project-meta">
+                Created{" "}
+                <time dateTime={project.created_at} title={created.title}>
+                  {created.label}
+                </time>{" "}
+                · Last updated{" "}
+                <time dateTime={project.updated_at} title={updated.title}>
+                  {updated.label}
+                </time>
+              </p>
+            </section>
+
+            <ResultsTrend
+              projectId={project.id}
+              days={days}
+              onDaysChange={onDaysChange}
+            />
+
+            <MilestonesCard
+              projectId={project.id}
+              canCreate={canCreateMilestone}
+              refreshToken={cardsVersion}
+              onChanged={onCardsChanged}
+            />
+
+            <RunsCard
+              projectId={project.id}
+              canCreate={canCreateRun}
+              refreshToken={cardsVersion}
+              onChanged={onCardsChanged}
+            />
           </div>
         </>
       )}
 
       {confirmAction && (
         <ConfirmDialog
-          title={confirmAction === "archive" ? "Archive project?" : "Restore project?"}
+          title={
+            confirmAction === "archive" ? "Archive project?" : "Restore project?"
+          }
           body={
             confirmAction === "archive" ? (
               <p>
-                <strong>{project.name}</strong> will be archived and disappear from
-                the list for everyone except Admins. Existing data is kept; an Admin
-                can restore it later.
+                <strong>{project.name}</strong> will be archived and disappear
+                from the list for everyone except Admins. Existing data is kept;
+                an Admin can restore it later.
               </p>
             ) : (
               <p>
-                <strong>{project.name}</strong> will be restored to the active list
-                for all roles.
+                <strong>{project.name}</strong> will be restored to the active
+                list for all roles.
               </p>
             )
           }
@@ -275,4 +365,3 @@ export default function ProjectDetailPage() {
     </div>
   );
 }
-

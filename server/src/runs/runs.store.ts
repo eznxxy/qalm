@@ -39,6 +39,7 @@ export interface RunRow {
   id: string;
   project_id: string;
   plan_id: string | null;
+  milestone_id: string | null;
   name: string;
   description: string | null;
   start_date: string | null;
@@ -66,7 +67,14 @@ export interface RunAggRow {
   suite_ids: string[] | null;
 }
 
-export type RunWithCountsRow = RunRow & RunAggRow;
+/**
+ * A run plus its rollup and its milestone's current name. The name is joined in
+ * `runSelect()`, so an INSERT/UPDATE's `RETURNING` row (plain `RunRow`) never
+ * has it and every read path does.
+ */
+export interface RunWithCountsRow extends RunRow, RunAggRow {
+  milestone_name: string | null;
+}
 
 export interface RunItemRow {
   id: string;
@@ -119,6 +127,12 @@ export interface PlanRef {
   project_id: string;
 }
 
+/** Minimal live-milestone lookup for the run link (docs/api-milestones.md). */
+export interface MilestoneRef {
+  id: string;
+  project_id: string;
+}
+
 export interface UserRef {
   id: string;
   role: string;
@@ -147,6 +161,8 @@ export interface RunListFilter {
   projectId: string;
   /** `null` = any plan; the literal `'none'` = runs with no plan; else a plan id. */
   planId: string | null;
+  /** `null` = any milestone; `'none'` = runs with no milestone; else an id. */
+  milestoneId: string | null;
   status: 'open' | 'completed' | null;
   query: string | null;
 }
@@ -166,6 +182,7 @@ export interface RunUpdateFields {
   name?: string;
   description?: string | null;
   plan_id?: string | null;
+  milestone_id?: string | null;
   start_date?: string | null;
   due_date?: string | null;
   updated_by: string;
@@ -195,6 +212,15 @@ export interface ResultRow {
   defect_url: string | null;
   created_by: string;
   created_at: Date;
+}
+
+/**
+ * A result plus its author's display name — what the Result resource returns
+ * (docs/api-runs.md, QA card 3.16). The name is joined, never stored, so it
+ * follows a later rename.
+ */
+export interface ResultRowWithAuthor extends ResultRow {
+  created_by_name: string;
 }
 
 /**
@@ -256,6 +282,7 @@ const RUN_FIELDS = [
   'id',
   'project_id',
   'plan_id',
+  'milestone_id',
   'name',
   'description',
   'start_date',
@@ -370,6 +397,18 @@ function resultColumns(alias: string): string {
   return RESULT_FIELDS.map((field) => `${alias}.${field}`).join(', ');
 }
 
+/**
+ * The Result resource's columns: the row plus its author's name (card 3.16).
+ * Pairs with `RESULT_AUTHOR_JOIN`.
+ */
+function resultColumnsWithAuthor(alias: string): string {
+  return `${resultColumns(alias)}, u.name AS created_by_name`;
+}
+
+function RESULT_AUTHOR_JOIN(alias: string): string {
+  return `JOIN users u ON u.id = ${alias}.created_by`;
+}
+
 const ATTACHMENT_FIELDS = [
   'id',
   'result_id',
@@ -460,6 +499,18 @@ export class RunsStore {
     const result = await q.query<PlanRef>(
       'SELECT id, project_id FROM plans WHERE id = $1 AND deleted_at IS NULL',
       [planId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /** A live milestone's project, for the same-project link rule. */
+  async findMilestone(
+    milestoneId: string,
+    q: Queryable = this.db,
+  ): Promise<MilestoneRef | null> {
+    const result = await q.query<MilestoneRef>(
+      'SELECT id, project_id FROM milestones WHERE id = $1 AND deleted_at IS NULL',
+      [milestoneId],
     );
     return result.rows[0] ?? null;
   }
@@ -602,6 +653,43 @@ export class RunsStore {
     );
   }
 
+  /**
+   * Writes the milestone link for a batch of already-validated runs (one
+   * statement, like `attachToPlan`). `null` detaches; the caller has already
+   * checked project, liveness and, for bulk attach, that none is taken.
+   */
+  async setMilestone(
+    ids: string[],
+    milestoneId: string | null,
+    actorId: string,
+    client: Queryable,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await client.query(
+      `UPDATE runs SET milestone_id = $2, updated_by = $3, updated_at = now()
+       WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
+      [ids, milestoneId, actorId],
+    );
+  }
+
+  /**
+   * Detaches every run of a milestone (`milestone_id = null`) — deleting a
+   * milestone never deletes its runs. Soft-deleted runs are detached too, so a
+   * restore never resurrects a dangling reference.
+   */
+  async detachMilestoneRuns(
+    milestoneId: string,
+    actorId: string,
+    client: Queryable,
+  ): Promise<number> {
+    const result = await client.query(
+      `UPDATE runs SET milestone_id = null, updated_by = $2, updated_at = now()
+       WHERE milestone_id = $1`,
+      [milestoneId, actorId],
+    );
+    return result.rowCount ?? 0;
+  }
+
   /** One run with its counts and assignees (detail + post-write responses). */
   async findWithCounts(id: string, q: Queryable = this.db): Promise<RunWithCountsRow | null> {
     const result = await q.query<RunWithCountsRow>(
@@ -638,6 +726,7 @@ export class RunsStore {
     row: {
       project_id: string;
       plan_id: string | null;
+      milestone_id: string | null;
       name: string;
       description: string | null;
       start_date: string | null;
@@ -648,12 +737,13 @@ export class RunsStore {
   ): Promise<RunRow> {
     try {
       const result = await q.query<RunRow>(
-        `INSERT INTO runs (project_id, plan_id, name, description, start_date, due_date, created_by, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+        `INSERT INTO runs (project_id, plan_id, milestone_id, name, description, start_date, due_date, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
          RETURNING ${runColumns()}`,
         [
           row.project_id,
           row.plan_id,
+          row.milestone_id,
           row.name,
           row.description,
           row.start_date,
@@ -685,6 +775,7 @@ export class RunsStore {
     if (fields.name !== undefined) assign('name', fields.name);
     if (fields.description !== undefined) assign('description', fields.description);
     if (fields.plan_id !== undefined) assign('plan_id', fields.plan_id);
+    if (fields.milestone_id !== undefined) assign('milestone_id', fields.milestone_id);
     if (fields.start_date !== undefined) assign('start_date', fields.start_date);
     if (fields.due_date !== undefined) assign('due_date', fields.due_date);
     assign('updated_by', fields.updated_by);
@@ -745,6 +836,7 @@ export class RunsStore {
    */
   private runSelect(): string {
     return `SELECT ${runColumns('r')},
+        ms.name AS milestone_name,
         COALESCE(agg.total, 0)::int AS total,
         COALESCE(agg.passed, 0)::int AS passed,
         COALESCE(agg.failed, 0)::int AS failed,
@@ -759,6 +851,7 @@ export class RunsStore {
            FROM run_items si
           WHERE si.run_id = r.id AND si.case_suite_id IS NOT NULL) AS suite_ids
       FROM runs r
+      LEFT JOIN milestones ms ON ms.id = r.milestone_id AND ms.deleted_at IS NULL
       LEFT JOIN (
         SELECT i.run_id,
                count(*) AS total,
@@ -785,6 +878,11 @@ export class RunsStore {
       where.push('r.plan_id IS NULL');
     } else if (filter.planId !== null) {
       where.push(`r.plan_id = ${push(filter.planId)}`);
+    }
+    if (filter.milestoneId === 'none') {
+      where.push('r.milestone_id IS NULL');
+    } else if (filter.milestoneId !== null) {
+      where.push(`r.milestone_id = ${push(filter.milestoneId)}`);
     }
     if (filter.status === 'open') where.push('r.completed_at IS NULL');
     if (filter.status === 'completed') where.push('r.completed_at IS NOT NULL');
@@ -1168,11 +1266,18 @@ export class RunsStore {
       created_by: string;
     },
     q: Queryable = this.db,
-  ): Promise<ResultRow> {
-    const result = await q.query<ResultRow>(
-      `INSERT INTO results (run_item_id, status, comment, elapsed_minutes, defect_url, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING ${resultColumns('results')}`,
+  ): Promise<ResultRowWithAuthor> {
+    // A CTE so the inserted row and its author's name come back in one
+    // round-trip: RETURNING cannot join (docs/api-runs.md § Resource: Result).
+    const result = await q.query<ResultRowWithAuthor>(
+      `WITH inserted AS (
+         INSERT INTO results (run_item_id, status, comment, elapsed_minutes, defect_url, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING ${RESULT_FIELDS.join(', ')}
+       )
+       SELECT ${resultColumnsWithAuthor('inserted')}
+       FROM inserted
+       ${RESULT_AUTHOR_JOIN('inserted')}`,
       [
         row.run_item_id,
         row.status,
@@ -1228,10 +1333,11 @@ export class RunsStore {
     limit: number,
     offset: number,
     q: Queryable = this.db,
-  ): Promise<ResultRow[]> {
-    const result = await q.query<ResultRow>(
-      `SELECT ${resultColumns('res')}
+  ): Promise<ResultRowWithAuthor[]> {
+    const result = await q.query<ResultRowWithAuthor>(
+      `SELECT ${resultColumnsWithAuthor('res')}
        FROM results res
+       ${RESULT_AUTHOR_JOIN('res')}
        WHERE res.run_item_id = $1
        ORDER BY res.created_at DESC, res.id DESC
        LIMIT $2 OFFSET $3`,
@@ -1265,9 +1371,15 @@ export class RunsStore {
     return result.rows[0] ?? null;
   }
 
-  async findResultById(id: string, q: Queryable = this.db): Promise<ResultRow | null> {
-    const result = await q.query<ResultRow>(
-      `SELECT ${resultColumns('res')} FROM results res WHERE res.id = $1`,
+  async findResultById(
+    id: string,
+    q: Queryable = this.db,
+  ): Promise<ResultRowWithAuthor | null> {
+    const result = await q.query<ResultRowWithAuthor>(
+      `SELECT ${resultColumnsWithAuthor('res')}
+       FROM results res
+       ${RESULT_AUTHOR_JOIN('res')}
+       WHERE res.id = $1`,
       [id],
     );
     return result.rows[0] ?? null;

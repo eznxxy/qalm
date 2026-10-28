@@ -208,7 +208,7 @@ describe("sidebar navigation", () => {
       ["Overview", "/wip/overview"],
       ["Test cases", "/cases"],
       ["Test runs", "/runs"],
-      ["Milestones", "/wip/milestones"],
+      ["Milestones", "/milestones"],
       ["Reports", "/wip/reports"],
       ["Settings", "/settings"],
     ] as const) {
@@ -352,6 +352,109 @@ describe("project switcher", () => {
       expect(mockRouterState.replace).toHaveBeenCalledWith("/projects?project=p-2", {
         scroll: false,
       })
+    );
+  });
+
+  it("leaves a run detail for the new project's runs list (card 3.18)", async () => {
+    // The detail page owns ?project= and would rewrite it back; replacing the
+    // query here used to do nothing at all. A real navigation is the fix.
+    mockRouterState.pathname = "/runs/r-1";
+    mockRouterState.search = "project=p-1";
+    await renderShell();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/runs?project=p-2")
+    );
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+
+  it("leaves a plan detail for the runs list, where plans live (card 3.18)", async () => {
+    // Plans have no list route of their own; /plans?project=… 404s (QA 4.2).
+    mockRouterState.pathname = "/plans/pl-9";
+    mockRouterState.search = "project=p-1";
+    await renderShell();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/runs?project=p-2")
+    );
+  });
+
+  it("leaves a milestone detail for the new project's milestones list", async () => {
+    // A milestone detail belongs to the milestone's project, not ?project=;
+    // rewriting the query left the screen on the old project.
+    mockRouterState.pathname = "/milestones/m-1";
+    mockRouterState.search = "project=p-1";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/milestones?project=p-2")
+    );
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+
+  it("scopes from the project detail path, not the first project in the list", async () => {
+    // /projects/<id> names its project in the path; the detail page reads
+    // params.id and ignores ?project=. Falling back to projects[0] labelled
+    // the wrong project and scoped the sidebar to it.
+    mockRouterState.pathname = "/projects/p-2";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    const switcher = screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement;
+    await waitFor(() => expect(switcher.value).toBe("p-2"));
+    expect(screen.getByRole("link", { name: "Test cases" })).toHaveAttribute(
+      "href",
+      "/cases?project=p-2"
+    );
+  });
+
+  it("switches project on the project detail by rewriting the path (bug)", async () => {
+    // Regression: the switcher only replaced ?project=, but the detail page
+    // renders params.id — the URL and the switcher changed, the content did not.
+    mockRouterState.pathname = "/projects/p-1";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/projects/p-2", {
+        scroll: false,
+      })
+    );
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps the trend window but drops ?edit= on a project switch", async () => {
+    mockRouterState.pathname = "/projects/p-1";
+    mockRouterState.search = "days=30&edit=1&project=p-1";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith(
+        "/projects/p-2?days=30",
+        { scroll: false }
+      )
     );
   });
 
@@ -516,17 +619,17 @@ describe("not-built-yet placeholder (/wip/[slug])", () => {
 
   it("renders the §6 one-sentence empty state, no fake screens", async () => {
     const { default: NotBuiltPage } = await import("@/app/(app)/wip/[slug]/page");
-    mockRouterState.slug = "milestones";
+    mockRouterState.slug = "reports";
     render(<NotBuiltPage />);
 
-    expect(screen.getByRole("heading", { name: "Milestones" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reports" })).toBeInTheDocument();
     expect(screen.getByText("This screen is not built yet.")).toBeInTheDocument();
   });
 
-  it("has no entry for sections that shipped (cases, runs, plans)", async () => {
+  it("has no entry for sections that shipped (cases, runs, plans, milestones)", async () => {
     // Those routes are real now; /wip/<them> must not masquerade as a screen.
     const { default: NotBuiltPage } = await import("@/app/(app)/wip/[slug]/page");
-    for (const slug of ["cases", "runs", "plans", "settings"]) {
+    for (const slug of ["cases", "runs", "plans", "milestones", "settings"]) {
       mockRouterState.slug = slug;
       const { unmount } = render(<NotBuiltPage />);
       expect(

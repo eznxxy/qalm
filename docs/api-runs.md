@@ -11,6 +11,8 @@ Cases referenced here are defined in `docs/api-cases.md`.
   "id": "018f3b22-5c4d-7e6f-8a91-6b7c8d9e0f12",
   "project_id": "018f1c31-9d4e-7b2a-8c1f-2a3b4c5d6e7f",
   "plan_id": "018f3a10-4b2c-7d3e-8f40-5a6b7c8d9e0f",
+  "milestone_id": "018f4c40-8d5f-7a80-9c13-8d9e0f123456",
+  "milestone_name": "Release 2.4",
   "name": "Release 2.4 smoke",
   "description": "Smoke pass over Payments and Accounts.",
   "status": "open",
@@ -50,6 +52,14 @@ Cases referenced here are defined in `docs/api-cases.md`.
 - `start_date` and `due_date` are plain calendar dates (`YYYY-MM-DD`), never
   instants, so they cannot shift with a timezone. Both are optional and
   independent of each other except for the ordering rule below.
+- `milestone_id` is the milestone this run works towards (`null` = none; one
+  milestone per run), and `milestone_name` is its current name, resolved by a
+  join like a result's `created_by_name`, so a renamed milestone needs no client
+  cache. Both are `null` together. A milestone's own status and rollup are in
+  `docs/api-milestones.md`; deleting a milestone clears this column and never
+  deletes the run.
+- A run's `due_date` and its milestone's `due_date` are unrelated: there is no
+  cross-field rule (PRD-milestones decision 8).
 
 ### Validation
 | Field | Rules |
@@ -57,6 +67,7 @@ Cases referenced here are defined in `docs/api-cases.md`.
 | `name` | required, trimmed 1–120 chars; **unique per project, case-insensitive**, among live runs — a soft-deleted run frees its name (enforced on create and rename) |
 | `description` | optional, ≤ 1,000 chars; `null` clears |
 | `plan_id` | optional UUID of a plan in the same project; `null` detaches |
+| `milestone_id` | optional UUID of a **live milestone in the same project**; `null` detaches, a different id moves the run. An unknown, deleted or other-project milestone is `400` on `milestone_id` |
 | `due_date` | optional `YYYY-MM-DD`; `null` clears |
 | `start_date` | optional `YYYY-MM-DD`; `null` clears; when both dates are set, `start_date` must be **on or before** `due_date` (`400` otherwise) |
 | `selection` | create-only; `{ "case_ids"?: [uuid], "suite_ids"?: [uuid], "include_descendants"?: bool (default true) }`. Omit for an empty run. `suite_ids` holds 1–20 distinct suites of the project; every listed suite's subtree is unioned with `case_ids`. Always plural: there is no singular `suite_id` alias |
@@ -120,9 +131,18 @@ A run may hold at most **2,000 items**; exceeding it is `400`.
     }
   ],
   "created_by": "018f1c2e-7b3a-7a10-9c2d-3f4a5b6c7d8e",
+  "created_by_name": "Tess Tester",
   "created_at": "2026-10-26T12:30:00Z"
 }
 ```
+
+- `created_by_name` is the author's current display name, resolved by a join on
+  `users` (added 2026-10-27, QA card 3.16). It is read-only, is not part of any
+  request body, and follows a later rename — the result records who wrote it,
+  not a frozen label. `created_by` stays the stable id (the edit and attachment
+  rules compare against it); clients show the name and keep the id for audit.
+  `updated_by`/`updated_by_name` are not exposed: results are append-only and
+  only the latest one's metadata is editable.
 
 ### Validation
 | Field | Rules |
@@ -140,6 +160,7 @@ Paginated list for the runs screen (§4.3).
 | Query param | Rules |
 |---|---|
 | `plan_id` | optional UUID; restrict to one plan. `plan_id=none` selects runs with no plan |
+| `milestone_id` | optional UUID; restrict to one milestone. `milestone_id=none` selects runs with no milestone |
 | `status` | optional: `open │ completed` |
 | `query` | optional, case-insensitive substring on `name` |
 | `sort` | optional: `created_at` (default), `updated_at`, `start_date`, `due_date`, `name`; prefix `-` for descending. Null `start_date`/`due_date` sort last in both directions |
@@ -155,6 +176,7 @@ Paginated list for the runs screen (§4.3).
   "name": "Release 2.4 smoke",
   "description": "Smoke pass over Payments and Accounts.",
   "plan_id": "018f3a10-4b2c-7d3e-8f40-5a6b7c8d9e0f",
+  "milestone_id": "018f4c40-8d5f-7a80-9c13-8d9e0f123456",
   "start_date": "2026-11-01",
   "due_date": "2026-11-14",
   "selection": {
@@ -177,7 +199,8 @@ Paginated list for the runs screen (§4.3).
 - `201` → `{ "data": { ...run } }` with `counts.total` = items created.
 - `400` `VALIDATION_ERROR` — bad fields, more than 20 `suite_ids`, an unknown
   suite (`selection.suite_ids`, or `selection.suite_ids[i]` when the bad id can
-  be named), `start_date` after `due_date`, or more than 2,000 items.
+  be named), `start_date` after `due_date`, an unknown/deleted/other-project
+  `milestone_id`, or more than 2,000 items.
 - `409` `CONFLICT` — the project is archived, or a live run in the project
   already has this name (case-insensitive; details name the field `name`).
 - `404` — project or referenced case/suite unknown; `403` — non-writer.
@@ -189,14 +212,19 @@ Paginated list for the runs screen (§4.3).
 
 ### `PATCH /api/v1/runs/:id` — Admin, Lead
 ```json
-// request — any non-empty subset (move a run between plans)
-{ "name": "Release 2.4 smoke (final)", "plan_id": null }
+// request — any non-empty subset (move a run between plans or milestones)
+{ "name": "Release 2.4 smoke (final)", "plan_id": null, "milestone_id": null }
 ```
 - `200` → `{ "data": { ...run } }`
 - `400` `VALIDATION_ERROR` — including a `start_date` that would land after the
-  run's (existing or new) `due_date`; `404`; `409` — project archived, or the
+  run's (existing or new) `due_date`, or a `milestone_id` that is unknown,
+  deleted or in another project; `404`; `409` — project archived, or the
   new `name` is already used by another live run in the project (renaming a run
   to a different case of its own name is allowed); `403`.
+- Moving a run with `milestone_id` is an explicit act and is allowed even when
+  the run is in another milestone; the bulk attach
+  (`POST /milestones/:id/runs`) is stricter and refuses an already-attached run
+  (see `docs/api-milestones.md`).
 
 ### `POST /api/v1/runs/:id/close` — Admin, Lead
 Sets `completed_at`/`completed_by`. Items may be left untested (the status bar
@@ -429,6 +457,14 @@ Backs the case drawer's **Linked runs** tab (§4.2). Newest run first.
      `storage_key text not null unique`, `created_by uuid not null fk → users`,
      `created_at timestamptz`. Index `(result_id)`.
      Check: `size_bytes between 1 and 10485760`.
+- **Milestone link** (slice 4, `docs/api-milestones.md`): `runs.milestone_id
+  uuid null fk → milestones(id)`, added by the milestones migration (nullable,
+  no backfill) with a partial index on `(milestone_id) where deleted_at is
+  null`. `milestone_name` comes from one `left join milestones` in
+  `runSelect()` — never a per-row query; the list's `milestone_id` filter is
+  `runs.milestone_id = $1` or `is null` for `none`. Same-project validation is
+  in the service (no composite FK, like `plan_id`). Deleting a milestone clears
+  this column in its own transaction; deleting a run is unchanged.
 - **Latest result per item** is never stored on `run_items`: derive it with a
   `lateral join` to `results` ordered by `(created_at desc, id desc) limit 1`.
   Counts, the item list's `status`, and the run/plan rollups all use that.

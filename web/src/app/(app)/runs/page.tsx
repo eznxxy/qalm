@@ -36,6 +36,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   RUN_STATUSES,
   RUN_STATUS_LABELS,
+  type Milestone,
   type Plan,
   type Project,
   type Run,
@@ -224,6 +225,28 @@ export default function RunsPage() {
     };
   }, [projectId, plansRetry]);
 
+  // ---- milestones (the New run dialog's milestone select) ----
+  // Non-essential: a failed load hides the select instead of failing the page.
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    let active = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!active) return;
+      try {
+        const result = await api.listMilestones(projectId, { limit: 100 });
+        if (active) setMilestones(result.data);
+      } catch (err) {
+        if (isSessionDead(err)) return;
+        if (active) setMilestones([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+
   // ---- suites (the New run dialog's suite picker) ----
   const [suites, setSuites] = useState<SuiteNode[]>([]);
   useEffect(() => {
@@ -335,9 +358,44 @@ export default function RunsPage() {
     start_date?: string;
     due_date?: string;
     plan_id?: string;
+    milestone_id?: string;
     selection?: string;
   }>({});
   const [createFormError, setCreateFormError] = useState<string | null>(null);
+
+  /**
+   * Open the New run dialog with a clean slate. The server's field errors
+   * belong to the attempt that produced them, so re-opening the dialog — after
+   * Cancel, or after switching project — must not mark an empty Name
+   * "already in use" from the previous attempt (QA card 3.14). The dialog
+   * itself is mounted only while `creating`, so its own state resets on close.
+   */
+  function openRunDialog(): void {
+    setCreateFieldErrors({});
+    setCreateFormError(null);
+    setCreating(true);
+  }
+
+  // The project overview's empty card links here with `&new=1`. Consume it
+  // once (writers only), then strip it from the URL so a reload does not reopen
+  // the dialog. A Tester/Viewer typing it by hand simply gets the list.
+  const createFromUrlHandled = useRef(false);
+  useEffect(() => {
+    if (createFromUrlHandled.current) return;
+    if (searchParams.get("new") !== "1") return;
+    if (!projectId || !canWrite) return;
+    createFromUrlHandled.current = true;
+    const params = new URLSearchParams(searchKey);
+    params.delete("new");
+    const qs = params.toString();
+    router.replace(qs ? `/runs?${qs}` : "/runs", { scroll: false });
+    void (async () => {
+      await Promise.resolve();
+      setCreateFieldErrors({});
+      setCreateFormError(null);
+      setCreating(true);
+    })();
+  }, [projectId, canWrite, searchParams, searchKey, router]);
 
   async function submitRun(
     values: RunFormValues,
@@ -352,6 +410,7 @@ export default function RunsPage() {
         name: values.name,
         ...(values.description ? { description: values.description } : {}),
         ...(values.planId ? { plan_id: values.planId } : {}),
+        ...(values.milestoneId ? { milestone_id: values.milestoneId } : {}),
         ...(values.startDate ? { start_date: values.startDate } : {}),
         ...(values.dueDate ? { due_date: values.dueDate } : {}),
         ...(selection ? { selection } : {}),
@@ -377,6 +436,7 @@ export default function RunsPage() {
           field === "start_date" ||
           field === "due_date" ||
           field === "plan_id" ||
+          field === "milestone_id" ||
           field === "selection"
         ) {
           fieldErrors[field] = detail.issue;
@@ -520,7 +580,10 @@ export default function RunsPage() {
     onOpenRun: (run) => router.push(`/runs/${run.id}?project=${projectId}`),
     onOpenPlan: (planId) =>
       router.push(`/plans/${planId}?project=${projectId}`),
+    onOpenMilestone: (milestoneId) =>
+      router.push(`/milestones/${milestoneId}?project=${projectId}`),
     planNames,
+    showMilestone: true,
     sortable: true,
   });
 
@@ -619,7 +682,7 @@ export default function RunsPage() {
         <button
           type="button"
           className="primary"
-          onClick={() => setCreating(true)}
+          onClick={openRunDialog}
         >
           New run
         </button>
@@ -676,7 +739,7 @@ export default function RunsPage() {
             <button
               type="button"
               className="primary"
-              onClick={() => setCreating(true)}
+              onClick={openRunDialog}
             >
               New run
             </button>
@@ -743,6 +806,7 @@ export default function RunsPage() {
           projectId={projectId}
           suites={suites}
           plans={plans}
+          milestones={milestones}
           busy={createBusy}
           serverFieldErrors={createFieldErrors}
           formError={createFormError}

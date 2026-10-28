@@ -1,6 +1,7 @@
 /*
- * Test runs list (DESIGN §4.3) + the New run dialog. Tokens only; the dialog
- * styles are scoped under .run-dialog so they never leak into other screens.
+ * Test runs list (DESIGN §4.3). Tokens only. The New run dialog's styles live
+ * with the component in components/runs/run-dialog.css, because the project
+ * overview mounts that dialog too.
  */
 
 .runs-heading h1 {
@@ -23,117 +24,4 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-/* ---- New run dialog ---- */
-
-.run-dialog .field-hint {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.run-dialog textarea,
-.run-dialog .combobox,
-.run-dialog input[type="search"] {
-  width: 100%;
-}
-
-.run-dialog-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0 var(--space-4);
-}
-
-.run-dialog-row .field {
-  min-width: 0;
-}
-
-.run-case-results {
-  list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-raised);
-  max-height: 12rem;
-  overflow: auto;
-}
-
-.run-case-results li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.run-case-add {
-  background: none;
-  border: none;
-  height: auto;
-  padding: var(--space-1) var(--space-2);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.run-case-add:hover:not(:disabled) {
-  background: var(--canvas);
-  border: none;
-}
-
-.run-case-chips,
-.run-suite-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: 0;
-}
-
-.run-case-chips li,
-.run-suite-chips li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  max-width: 100%;
-  padding: 2px var(--space-1) 2px var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-badge);
-  background: var(--brand-tint);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.run-case-chips li > span,
-.run-suite-chips li > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.run-case-remove {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-badge);
-  background: transparent;
-  color: inherit;
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.run-case-remove:hover:not(:disabled) {
-  background: var(--canvas);
-  border: none;
 }

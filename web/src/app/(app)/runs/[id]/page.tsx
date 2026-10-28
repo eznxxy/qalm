@@ -26,6 +26,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -89,6 +90,8 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 /** Stable empty array so the not-ready render does not retrigger memos. */
 const EMPTY_ROWS: RunItem[] = [];
+/** Stable empty selection, same reason. */
+const EMPTY_SELECTION: ReadonlySet<string> = new Set<string>();
 
 type ProjectState =
   | { kind: "loading" }
@@ -359,6 +362,44 @@ export default function RunDetailPage() {
   const rows = itemsState.kind === "ready" ? itemsState.rows : EMPTY_ROWS;
   const meta = itemsState.kind === "ready" ? itemsState.meta : null;
 
+  /**
+   * Assign is per item (PRD decision 2), so the table carries a scoped
+   * selection. Selection is keyed to the current result set: a different
+   * filter, sort or page starts with nothing selected, and the old ids are
+   * never carried silently into a bulk assign (QA card 3.17). It is derived,
+   * not cleared in an effect, mirroring the cases screen.
+   */
+  const itemsKey = [
+    url.statuses.join(","),
+    url.assignee,
+    url.suite,
+    url.query,
+    url.sort,
+    url.page,
+  ].join("|");
+  const [selection, setSelection] = useState<{
+    key: string;
+    ids: ReadonlySet<string>;
+  }>({ key: "", ids: EMPTY_SELECTION });
+  const selectedIds = selection.key === itemsKey ? selection.ids : EMPTY_SELECTION;
+  const setSelectedIds = useCallback(
+    (ids: ReadonlySet<string>) => setSelection({ key: itemsKey, ids }),
+    [itemsKey]
+  );
+  const clearSelection = useCallback(
+    () => setSelection({ key: "", ids: EMPTY_SELECTION }),
+    []
+  );
+
+  // Cache Components hides this route with <Activity> instead of unmounting
+  // it, so a selection left behind would greet the user on their return. Drop
+  // it as the page is hidden (the documented Activity pattern, card 3.12).
+  useLayoutEffect(() => {
+    return () => {
+      setSelection({ key: "", ids: EMPTY_SELECTION });
+    };
+  }, []);
+
   const pushParams = useCallback(
     (patch: RunDetailUrlPatch) => {
       const next = patchRunDetailParams(
@@ -439,8 +480,14 @@ export default function RunDetailPage() {
     setAssignBusy(true);
     setAssignError(null);
     try {
-      await api.assignRunItems(runId, { assignee_id: assigneeId });
+      // No selection = the whole run (the documented default); otherwise only
+      // the rows the Lead ticked (card 3.17).
+      await api.assignRunItems(runId, {
+        assignee_id: assigneeId,
+        item_ids: selectedIds.size > 0 ? Array.from(selectedIds) : undefined,
+      });
       setAssignOpen(false);
+      clearSelection();
       setDataRetry((n) => n + 1);
     } catch (err) {
       if (isSessionDead(err)) {
@@ -705,8 +752,18 @@ export default function RunDetailPage() {
     emptyBody = "A Lead or Admin adds cases to a run.";
   }
 
-  const subtitleParts = [project.name];
+  const subtitleParts: ReactNode[] = [project.name];
   if (planName) subtitleParts.push(planName);
+  if (run.milestone_id && run.milestone_name) {
+    subtitleParts.push(
+      <Link
+        key="milestone"
+        href={`/milestones/${run.milestone_id}?project=${projectId}`}
+      >
+        {run.milestone_name}
+      </Link>
+    );
+  }
   if (run.start_date) subtitleParts.push(`Starts ${formatDateOnly(run.start_date)}`);
   if (run.due_date) subtitleParts.push(`Due ${formatDateOnly(run.due_date)}`);
 
@@ -763,7 +820,14 @@ export default function RunDetailPage() {
         </div>
       </div>
 
-      <p className="rd-subtitle">{subtitleParts.join(" · ")}</p>
+      <p className="rd-subtitle">
+        {subtitleParts.map((part, index) => (
+          <span key={index}>
+            {index > 0 && " · "}
+            {part}
+          </span>
+        ))}
+      </p>
       {readOnlyReason && <p className="rd-readonly">{readOnlyReason}</p>}
 
       <div className="rd-summary">
@@ -855,6 +919,9 @@ export default function RunDetailPage() {
         getRowId={(row) => row.id}
         caption={`Items in ${run.name}`}
         ariaLabel="Run items"
+        selectable={canManage}
+        selectedIds={selectedIds}
+        onSelectedIdsChange={setSelectedIds}
         loading={itemsState.kind === "loading"}
         error={itemsState.kind === "error" ? itemsState.message : null}
         onRetry={() => setDataRetry((n) => n + 1)}
@@ -906,9 +973,15 @@ export default function RunDetailPage() {
 
       {assignOpen && (
         <AssignItemsDialog
-          scopeLabel={`All ${run.counts.total} item${
-            run.counts.total === 1 ? "" : "s"
-          }`}
+          scopeLabel={
+            selectedIds.size > 0
+              ? `${selectedIds.size} selected item${
+                  selectedIds.size === 1 ? "" : "s"
+                }`
+              : `All ${run.counts.total} item${
+                  run.counts.total === 1 ? "" : "s"
+                }`
+          }
           options={assigneeOptions}
           limited={!isAdmin}
           busy={assignBusy}

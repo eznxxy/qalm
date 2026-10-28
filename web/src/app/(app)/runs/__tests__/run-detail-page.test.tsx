@@ -125,6 +125,8 @@ function run(overrides: Partial<Run> = {}): Run {
     id: "r-1",
     project_id: "p-1",
     plan_id: "pl-1",
+    milestone_id: null,
+    milestone_name: null,
     name: "Release 2.4 smoke",
     description: "Smoke pass.",
     status: "open",
@@ -203,6 +205,7 @@ function result(overrides: Partial<Result> = {}): Result {
     defect_url: null,
     attachments: [],
     created_by: "u-1",
+    created_by_name: "Tess Tester",
     created_at: "2026-10-25T09:00:00Z",
     ...overrides,
   };
@@ -210,6 +213,7 @@ function result(overrides: Partial<Result> = {}): Result {
 
 let fetchMock: jest.Mock;
 let closeCalled: boolean;
+let assignBodies: { assignee_id: string | null; item_ids?: string[] }[];
 
 interface ApiOptions {
   role?: Role;
@@ -265,6 +269,17 @@ function mockApi({
             data: items,
             meta: { page: 1, limit: 25, total: items.length, total_pages: 1 },
           })
+        );
+      }
+      if (/\/runs\/[\w-]+\/assign$/.test(target) && method === "POST") {
+        assignBodies.push(
+          JSON.parse(String(init?.body)) as {
+            assignee_id: string | null;
+            item_ids?: string[];
+          }
+        );
+        return Promise.resolve(
+          jsonResponse(200, { data: { assigned: items.length } })
         );
       }
       if (/\/runs\/[\w-]+\/close$/.test(target) && method === "POST") {
@@ -352,6 +367,7 @@ beforeEach(() => {
   mockRouterState.replace = jest.fn();
   mockRouterState.push = jest.fn();
   closeCalled = false;
+  assignBodies = [];
 });
 
 describe("run detail", () => {
@@ -364,11 +380,9 @@ describe("run detail", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
     // Subtitle stitches project · plan · start date · due date.
-    expect(
-      screen.getByText(
-        "Payments · Release 2.4 · Starts 1 Nov 2026 · Due 14 Nov 2026"
-      )
-    ).toBeInTheDocument();
+    expect(document.querySelector("p.rd-subtitle")?.textContent).toBe(
+      "Payments · Release 2.4 · Starts 1 Nov 2026 · Due 14 Nov 2026"
+    );
 
     const table = await screen.findByRole("table", { name: "Run items" });
     expect(
@@ -388,7 +402,9 @@ describe("run detail", () => {
     await renderPage();
 
     await screen.findByRole("heading", { level: 1, name: "Release 2.4 smoke" });
-    expect(screen.getByText("Payments · Release 2.4")).toBeInTheDocument();
+    expect(document.querySelector("p.rd-subtitle")?.textContent).toBe(
+      "Payments · Release 2.4"
+    );
   });
 
   it("rolls the run up as a pie with every status in the legend", async () => {
@@ -507,6 +523,8 @@ describe("run detail", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close run" })).toBeNull();
     expect(screen.getByRole("button", { name: "Assign" })).toBeDisabled();
+    // No selection column for a role that cannot assign (card 3.17).
+    expect(screen.queryByRole("checkbox", { name: /Select row/ })).toBeNull();
   });
 
   it("closes the run and flips the header to Completed", async () => {
@@ -541,5 +559,56 @@ describe("run detail", () => {
     expect(
       await screen.findByRole("heading", { name: "Run not found" })
     ).toBeInTheDocument();
+  });
+
+  it("assigns only the ticked items (card 3.17)", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("table", { name: "Run items" });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 1" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select row 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Assign items" });
+    expect(
+      within(dialog).getByText(/^2 selected items\./)
+    ).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText("Assignee"), {
+      target: { value: "u-1" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(assignBodies).toHaveLength(1));
+    expect(assignBodies[0]).toEqual({
+      assignee_id: "u-1",
+      item_ids: ["i-1", "i-2"],
+    });
+
+    // The selection was consumed by the action: the next Assign is whole-run.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("checkbox", { name: "Select row 1" })
+      ).not.toBeChecked()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+    expect(
+      await screen.findByText(/^All 4 items\./)
+    ).toBeInTheDocument();
+  });
+
+  it("assigns the whole run when nothing is ticked (card 3.17)", async () => {
+    mockApi();
+    await renderPage();
+    await screen.findByRole("table", { name: "Run items" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign items" });
+    expect(within(dialog).getByText(/^All 4 items\./)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(assignBodies).toHaveLength(1));
+    // No `item_ids` key at all: the contract reads that as "every item".
+    expect(assignBodies[0]).toEqual({ assignee_id: null });
   });
 });

@@ -1,11 +1,12 @@
 # Qalm — Slice 3 Backlog: Test Plans & Runs
 
-Status: **APPROVED for planning** (Arif signed off all ten proposals,
-2026-10-26). Phase 1 contracts are **approved**: `docs/PRD-plans-runs.md`,
-`docs/api-runs.md`, `docs/api-plans.md`. Phase 2 backend: card 2.1 (runs &
-items) and card 2.2 (results & attachments) are **DONE 2026-10-26**; card 2.3
-(plans, rollups & linked runs) is next, and Phase 3 frontend can start against
-the frozen contract (phases overlap, as in slice 2).
+Status: **slice complete and merged** (`55ccd70`, 2026-10-27). Phase 1
+contracts are approved (`docs/PRD-plans-runs.md`, `docs/api-runs.md`,
+`docs/api-plans.md`); Phases 2–5 are done, with the QA pass (card 4.1)
+reporting 22 pass / 0 fail / 1 not-run, its five follow-ups (3.14–3.18)
+**DONE 2026-10-27** on `feature/slice3-qa-followups`, and the re-verification
+(card 4.2) reporting **7 pass / 0 fail / 0 not-run** after the one defect it
+found was fixed in `6c521fe`.
 Owner routing: Daedalus (contracts), Hephaestus (server), Iris (web), Argus
 (QA). Spec source: `docs/PRD-plans-runs.md` + `docs/api-runs.md` +
 `docs/api-plans.md` + `docs/DESIGN.md` §4.3/§4.4/§4.5 (and §5, §6, §8, §9).
@@ -806,19 +807,210 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 
 ## Phase 4 — QA (Argus)
 
-### Card 4.1 — E2E verification of plans & runs (medium) — PENDING
-- Bring up the stack; verify PRD acceptance criteria 1–14 as each role
-  (Admin/Lead/Tester/Viewer), UI end-to-end only (no DevTools, console, network
-  or API probing).
-- Cover: run creation selection, de-dup, status bar exactness, failed-comment
-  requirement, Tester-on-assigned-item, append-only results, Save-and-next +
-  shortcuts, close/reopen guard, item add/remove guard, attachment upload +
-  survives reload, plan rollup + detach-on-delete, Linked runs tab, §6 states.
-- Also recheck the review-feedback fixes end to end: an attach-only plan saves
-  without a new-run name (3.11), leaving Test cases for Test runs and coming
-  back starts with nothing selected (3.12), and a run created from two suites
-  (plus a nested one) holds each case exactly once (3.13).
-- Report + failure cards with repro steps if any.
+### Card 4.1 — E2E verification of plans & runs (medium) — DONE 2026-10-27
+- **Result: 22 PASS, 0 FAIL, 1 NOT RUN**, plus two partial rows (Lead role and
+  the Tester-on-someone-else's-item half of AC 5; error/retry and skeleton
+  states). Report and 57 screenshots: `shots/qa-4.1/REPORT.md`.
+- Build `master` @ `55ccd70`, UI end-to-end only (no DevTools, console, network,
+  API calls or `psql`); expectations taken from `/docs`, not from the source.
+  Run as a dedicated QA admin (`qa.argus@qalm.local`), with `tester@qalm.local`
+  and `viewer@qalm.local` for the read-only passes. `john@`/`johnlead@` were
+  never used and no password was reset.
+- All writes stayed in two throwaway projects (`QA Argus 2026-10-27`,
+  `QA Argus Empty 2026-10-27`); the owner's **Qalm** project was not touched.
+- What passed, in short: multi-suite creation with each case once (3.13), run
+  name uniqueness per project, exact counts and rollups, all five statuses,
+  Failed-without-comment blocked, append-only history, elapsed + defect link,
+  `P`/`S` + `Ctrl+Enter`, assign → assignee column/filter, close/reopen guard,
+  item remove guard and re-add, attachment survives reload and `.txt` rejected,
+  attach-only plan save without a new-run name (3.11), plan rollup,
+  detach-on-delete, Tester and Viewer guards, §6 empty/no-permission states,
+  and the 3.12 bulk-selection reset.
+- **Gaps, not failures.** (a) No Lead credential, so the Lead boundary is
+  unverified; (b) every item in the QA runs was assigned to the Tester or
+  unassigned, so "Tester on another user's item" was not exercised — the
+  unassigned-item block, which shares the guard, was; (c) checklist item 17
+  (attach a run to an *existing* plan) is **not a defect**: `api-plans.md`
+  makes attaching a create-time property on purpose; (d) error/retry and
+  skeleton states are unreachable without network manipulation.
+- **New findings, carded below:** 3.14 stale New-run validation across
+  projects, 3.15 "Edit result" on a completed run, 3.16 result history names
+  the actor, 3.17 assign items rather than the whole run, 3.18 project switcher
+  on a run URL.
+- Tool artifact: `.playwright-mcp/` at the repo root (page snapshots plus the
+  rejected `qa-bad.txt` upload) is safe to delete; no QA evidence lives there.
+
+### Card 4.2 — Re-verify the follow-ups + the two unrun role boundaries (medium) — DONE 2026-10-27
+- **Result: 7 PASS, 0 FAIL, 0 NOT RUN**, with four open findings below
+  (2 and 3 pre-existing, 4 and 5 contract-conformant) and no regression from
+  this slice. Report and 38 screenshots:
+  `shots/qa-4.2/REPORT.md`. Ran after Phase 5 landed, on
+  `feature/slice3-qa-followups` @ `fb7e282`, with the 3.18 recheck on
+  `6c521fe`; same method as 4.1 — UI end-to-end only, expectations from
+  `/docs`, a dedicated QA admin (`qa.argus@qalm.local`) plus `qa.lead@`,
+  `tester@` and `viewer@` for the role passes, all writes inside three new
+  throwaway projects, and `john@`/`johnlead@` never used.
+- **What passed, in short:** 3.14 (a rejected New run in project A, Cancel,
+  switch to B, reopen — empty Name, no stale "already in use"); 3.15 (no
+  "Edit result"/"Add attachment" on a closed run, both back after Reopen);
+  3.16 (`by Argus QA`, `by Tess Tester` — real display names, matching the
+  Users screen, not the uuids 4.1 saw); 3.17 (all items vs. 2
+  ticked items, selection cleared after the write, the same on a one-row Lead
+  variant, no checkbox column for Viewer or Tester); 3.18 (both detail screens
+  and a collection page, after the fix); the **Lead boundary** (no Users entry,
+  `/users` forbidden, can create project/suite/cases/run, record, close/reopen,
+  assign on a run that already has people) and the **Tester-on-someone-else's-
+  item** block that 4.1 could not exercise.
+- **One new defect, found and fixed inside the pass.** 3.18's plan branch
+  pushed `/plans?project=…`, a route that does not exist — the switcher landed
+  on the app's 404. `6c521fe` makes both detail routes push `/runs?project=…`
+  (plans are listed on the runs screen); rechecked on the running app, no 404.
+  The 3.18 card's fix line is superseded by this.
+- **Open findings, not fixed here.**
+  - **2 and 3 share one root: `GET /users` is Admin-only.** A Lead sees
+    truncated uuids (`06627ecb…`) in the Assignee column and the Assign dialog,
+    and on a run with no assignees the dropdown holds only "Unassign", so a
+    Lead cannot staff a new run without an Admin. Flagged in card 3.2 and
+    visible in the contract, not a slice-3 regression — closing it needs a
+    product decision on a non-Admin name list (a scoped `GET /users` that
+    returns id + name would serve both), then a contract change.
+  - **4 — a Lead cannot edit a project it created.** `PATCH /projects/:id` is
+    Admin-only in `api-projects.md` (decision 2026-10-07), so the UI is
+    conformant. Reopen only if that decision changes.
+  - **5 — Archive is offered to a Lead on projects it does not own.**
+    `POST /projects/:id/archive` is Admin+Lead in the contract, so this is
+    conformant too; whether a Lead should archive a project it did not create
+    is the same ownership question as 4. Not clicked, to avoid mutating data
+    outside the pass.
+- **Gaps.** The id-in-a-tooltip sub-item of 3.16 is unverified (no tooltip in
+  the accessibility tree, and DOM attributes are out of bounds); the
+  delete-project ownership boundary stays unverifiable because no Delete
+  control exists for Admin or Lead; error/retry and skeleton states still need
+  network manipulation; one browser (Chromium), mouse-driven, 1440×900.
+- **Data left behind:** the three 4.2 projects (`QAA42` `9d07536e-…`, `QAO42`
+  `29f68c99-…`, `QAL42` `826f6abe-…`) and the two 4.1 leftovers. All throwaway;
+  deleting them needs the owner's approval. `.playwright-mcp/` also still holds
+  the session's tool snapshots (untracked, not evidence).
+
+---
+
+## Phase 5 — QA follow-ups (from card 4.1) — DONE 2026-10-27
+
+None of these blocked an acceptance criterion, so they are separate cards rather
+than a QA failure round. Order is by user impact.
+
+### Card 3.14 — New run dialog shows the previous project's validation (small, web) — DONE 2026-10-27
+- **Reported by QA:** after a rejected New run in project A (duplicate name),
+  Cancel, switch to project B, open New run — the Name field is already
+  `[invalid]` with "already in use" under it while the field is empty. Typing a
+  fresh name and submitting works, so it is cosmetic but misleading.
+- **Cause, located.** `runs/page.tsx` owns `createFieldErrors` / `createFormError`
+  and only clears them inside `submitRun`; nothing clears them when the dialog
+  closes or when `projectId` changes, so the dialog re-opens onto the old
+  project's errors. The dialog itself is mounted only while `creating`, so its
+  own fields reset — the two error slots were the only survivors.
+- **Fix (web only, no contract change).** `openRunDialog()` clears both slots
+  before `setCreating(true)`, and both "New run" buttons (toolbar and the empty
+  state) call it. The card also asked for a clear "on project change": the
+  switcher sits behind the modal overlay, so the project cannot change while the
+  dialog is open — the next open is that path, and it is now clean.
+- Verified: web jest **600** (40 suites) — the 409 conflict test now cancels,
+  reopens and asserts no "already in use" text and no `aria-invalid` on the
+  empty Name; `tsc`/`eslint` clean. Nothing pushed.
+
+### Card 3.15 — "Edit result" on a completed run opens no editor (small, web) — DONE 2026-10-27
+- **Reported by QA:** on a Completed run the drawer shows the read-only
+  sentence; clicking "Edit result" only swaps the section title to "Edit result"
+  while the same "This run is completed. Reopen it to record results." stays.
+- **Cause.** `canEditLatest` only asked whether the viewer wrote the latest
+  result; the run-level gate (`canRecord` — open run, unarchived project, role
+  allowed) was not part of it, so the button outlived the close guard.
+- **Fix (web only).** `canEditLatest` now requires `canRecord` as well. The
+  editor heading, the "Add attachment" affordance and the staged-file UI all
+  follow that one flag, so the drawer offers no editor when there is nothing to
+  save into. Assumption: authorship stays the per-result rule — closing the run
+  freezes the result, reopening restores the author's editor.
+- Verified: web jest **600** (40 suites) — new test opens a completed run as the
+  result's author and asserts neither "Edit result" nor "Add attachment" is
+  offered; `tsc`/`eslint` clean. Nothing pushed.
+
+### Card 3.16 — Result history names the person, not a uuid fragment (medium, docs + server + web) — DONE 2026-10-27
+- **Reported by QA:** every history entry reads `by bf6f8166…`; a tester reading
+  history cannot tell who recorded the result.
+- **Cause.** `docs/api-runs.md` documented `created_by` as a bare uuid and the
+  drawer rendered `shortActorId(...)` from it — the contract never carried a
+  display name, and `GET /users` is Admin-only, so the web app cannot resolve it.
+- **Shipped.** Contract first: `created_by_name` on the Result resource
+  (read-only, joined from `users`, not part of any request body, follows a
+  later rename; `created_by` stays the stable id the write rules compare
+  against). Server: `ResultRowWithAuthor`, `resultColumnsWithAuthor()` and
+  `RESULT_AUTHOR_JOIN()`; `insertResult` inserts in a CTE and re-selects through
+  the join (`RETURNING` cannot see a joined table), `listResults` and
+  `findResultById` select through it, `toResultDto` takes the widened row. Web:
+  `Result.created_by_name`, the drawer shows the name with the id in `title`.
+  No schema change (the name is derived per read).
+- **Assumptions.** `updated_by_name` was suggested on the card and deliberately
+  left out: results are append-only, only the latest result's metadata is
+  editable, and no screen shows "last edited by" — adding it later stays
+  additive. Attachments keep only `created_by`; nothing displays an attachment
+  author. `docs/api-runs.md` records both omissions.
+- Verified: server `tsc`/`eslint` clean, jest **474** (28 suites), e2e **277**
+  (11 suites) with a new assertion pinning `"admin User"` on the create and the
+  history responses; web `tsc`/`eslint` clean, jest **600** (40 suites) with a
+  drawer test asserting the name renders and `bf6f8166…` does not. Nothing
+  pushed.
+
+### Card 3.17 — Assign items, not the whole run (medium, web) — DONE 2026-10-27
+- **Reported by QA:** the run header's Assign always says "All 6 items" and has
+  no per-item control, so a Lead cannot split a run's items between testers.
+- **Contract status.** `POST /runs/:id/assign` already takes optional
+  `item_ids` ("omit to assign every item"), and PRD decision 2 says assignment
+  is per run item — so this was a UI gap, not a contract gap.
+- **Shipped (web only).** A selection column (header + per-row checkboxes) on
+  the items table for Admin/Lead on an open run; ticking rows scopes the dialog
+  ("2 selected items") and sends those ids, an empty selection keeps "All N
+  items" and omits the field. The selection is keyed to the current result set
+  (filter/sort/page), is consumed by a successful assign, and is dropped by the
+  `<Activity>` cleanup so it cannot greet the user on return (the 3.12 pattern).
+  Roles that cannot assign get no checkboxes. `docs/DESIGN.md` §4.4 records the
+  rule.
+- **Assumptions.** The card allowed a per-row assignee control instead; the bulk
+  path was chosen because run detail is a review screen where "hand these to X"
+  is the common move, and a single item is still one tick plus Assign. Selection
+  is per page (25 rows), so assigning across pages takes one pass per page.
+- Verified: web jest **600** (40 suites) — page tests assert the two-item body,
+  the whole-run body with no `item_ids` key, the cleared selection afterwards,
+  and no checkbox column for a Viewer; `tsc`/`eslint` clean. Nothing pushed.
+
+### Card 3.18 — Project switcher silently no-ops on a run URL (small, web) — DONE 2026-10-27
+- **Reported by QA:** with `/runs/<id>?project=A` open, picking project B in the
+  header switcher leaves both the URL and the content on A (reproduced twice);
+  on `/runs` the same switch works. A run URL is project-scoped, so doing
+  nothing may be intended — doing it silently is not.
+- **Cause.** The switcher replaced `?project=` in place; the run detail page owns
+  that parameter and rewrites it back to the entity's project, so the change was
+  a no-op by construction, not a rendering bug.
+- **Fix (web only).** From a detail URL (`/runs/<id>`, `/plans/<id>`) the
+  switcher now pushes the picked project's runs list, `/runs?project=…`;
+  collection pages keep the cheap query replace. Assumption: navigating beats
+  explaining — the run in A is not readable in B, and a banner on a page whose
+  content cannot change would be noise. `/plans/<id>` was checked and had the
+  same behaviour, so both are covered. **Superseded:** the first cut pushed
+  `/plans?project=…` for the plan branch, a route that does not exist; QA 4.2
+  found the 404 and `6c521fe` made both branches target `/runs`.
+- Verified: web jest **600** (40 suites) — two new app-shell tests assert the
+  push to each collection and that `replace` is not called; `tsc`/`eslint` clean.
+  Nothing pushed.
+
+### Not carded
+- **`/settings` 404s** while the sidebar links to it. Pre-existing since slice 1
+  and outside this slice's screens; worth a line in the slice-1 or auth
+  backlog rather than a slice-3 card.
+- **`?sort=` alternates asc/desc on header click**, so "nulls last" cannot be
+  observed independently of direction. Documented behaviour, verified through
+  the URL — not a defect.
+- **Duplicate-name copy** is the bare "already in use" on the Name field. That
+  is the shape 3.9 asked for (field-level message, empty form-level slot).
 
 ---
 
@@ -828,9 +1020,10 @@ primitives: `StatusBar`, `StatusBadge`, `PriorityIcon`, `DataTable`, `Drawer`,
 |---|---|---|
 | 1 — contracts | 1 (docs) | done |
 | 2 — backend | 3 (2 large, 1 medium) | ~5–7h |
-| 3 — frontend | 4 (1 large, 2 medium, 1 small) | ~6–8h |
-| 4 — QA | 1 | ~1–1.5h |
-| **Total** | **9 cards** | **~12–17h agent time** |
+| 3 — frontend | 4 + 9 review-feedback cards (3.5–3.13) | ~6–8h, done |
+| 4 — QA | 2 (4.1, 4.2) | done (22 + 7 pass, 0 fail) |
+| 5 — QA follow-ups | 5 (3.14–3.18) | done (~3–5h) |
+| **Total** | **23 cards** | **~15–22h agent time** |
 
 Phases 2 and 3 overlap: Iris builds the runs list and plans screen against the
 frozen contract while Hephaestus finishes results/attachments. Card 3.2 (run
