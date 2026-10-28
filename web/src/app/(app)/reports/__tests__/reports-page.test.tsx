@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -134,6 +135,16 @@ function bucket(
     total,
     pass_rate: total === 0 ? null : Math.round((passed / total) * 1000) / 10,
   };
+}
+
+/** One bucket per UTC day, oldest first — a full `days`-long summary window. */
+function bucketsFor(days: number, end = "2026-10-28"): TrendBucket[] {
+  const endDate = new Date(`${end}T00:00:00Z`);
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(endDate);
+    date.setUTCDate(endDate.getUTCDate() - (days - 1 - index));
+    return bucket(date.toISOString().slice(0, 10), 2, 1, 0);
+  });
 }
 
 /** Mirrors the progress table's `run()` fixture (card 6.8). */
@@ -358,6 +369,22 @@ function lastReplaceUrl(): string {
   return String(calls[calls.length - 1]?.[0] ?? "");
 }
 
+/** A promise the test settles by hand — no timers, no timing assumptions. */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+/** Every bucket's `<title>` in the failures plot (one per bucket). */
+function chartTitles(): (string | null)[] {
+  return Array.from(document.querySelectorAll(".rep-svg title")).map(
+    (title) => title.textContent
+  );
+}
+
 function tile(name: string): HTMLElement {
   return screen.getByRole("group", { name });
 }
@@ -427,8 +454,93 @@ describe("reports screen", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("keeps the old window's scale and labels until the new summary lands", async () => {
+    mockApi({
+      summary: summary({
+        trend: { buckets: bucketsFor(30), totals: summary().trend.totals },
+      }),
+    });
+    const { view, tree } = await renderPage();
+
+    await screen.findByText("97.9%");
+    expect(
+      screen.getByRole("heading", { name: "Failures over time, last 30 days" })
+    ).toBeInTheDocument();
+    expect(
+      within(tile("Pass rate")).getByText("last 30 days")
+    ).toBeInTheDocument();
+    expect(
+      within(tile("Results recorded")).getByText("last 30 days")
+    ).toBeInTheDocument();
+    expect(chartTitles()).toHaveLength(30);
+
+    // Hold the next summary response so the rerender lands while the request
+    // is still in flight: the URL says 7d, the screen still holds 30d data.
+    const baseFetch = fetchMock.getMockImplementation();
+    if (!baseFetch) throw new Error("fetch mock is not installed");
+    const held = deferred<ReportSummary>();
+    let heldOnce = true;
+    fetchMock.mockImplementation((url: string, init?: unknown) => {
+      if (heldOnce && String(url).includes("/reports/summary")) {
+        heldOnce = false;
+        return held.promise.then((body) => jsonResponse(200, { data: body }));
+      }
+      return baseFetch(url, init);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
+    await waitFor(() =>
+      expect(mockRouterState.replace).toHaveBeenCalledWith(
+        "/reports?project=p-1&days=7",
+        { scroll: false }
+      )
+    );
+
+    moveTo(view, tree, "project=p-1&days=7");
+    await waitFor(() => expect(summaryCalls()).toHaveLength(2));
+
+    expect(
+      screen.getByRole("button", { name: "Last 7 days" })
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("heading", { name: "Failures over time, last 30 days" })
+    ).toBeInTheDocument();
+    expect(
+      within(tile("Pass rate")).getByText("last 30 days")
+    ).toBeInTheDocument();
+    expect(
+      within(tile("Results recorded")).getByText("last 30 days")
+    ).toBeInTheDocument();
+    expect(chartTitles()).toHaveLength(30);
+
+    await act(async () => {
+      held.resolve(
+        summary({
+          days: 7,
+          from: "2026-10-22",
+          trend: { buckets: bucketsFor(7), totals: summary().trend.totals },
+        })
+      );
+    });
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Failures over time, last 7 days",
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(tile("Pass rate")).getByText("last 7 days")
+    ).toBeInTheDocument();
+    expect(
+      within(tile("Results recorded")).getByText("last 7 days")
+    ).toBeInTheDocument();
+    expect(chartTitles()).toHaveLength(7);
+  });
+
   it("maps the plan, milestone and status filters to the API and shows Reset filters only when they are set", async () => {
     mockApi();
+    // A non-default window rides along so Reset can prove it keeps it.
+    mockRouterState.search = "project=p-1&days=7";
     const { view, tree } = await renderPage();
     await screen.findByText("97.9%");
 
@@ -438,10 +550,10 @@ describe("reports screen", () => {
     fireEvent.change(plan, { target: { value: "none" } });
 
     await waitFor(() =>
-      expect(lastReplaceUrl()).toBe("/reports?project=p-1&plan=none")
+      expect(lastReplaceUrl()).toBe("/reports?project=p-1&days=7&plan=none")
     );
 
-    moveTo(view, tree, "project=p-1&plan=none");
+    moveTo(view, tree, "project=p-1&days=7&plan=none");
     expect(
       screen.getByRole("button", { name: "Reset filters" })
     ).toBeInTheDocument();
@@ -450,17 +562,73 @@ describe("reports screen", () => {
       "No plan"
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
-    await waitFor(() => expect(lastReplaceUrl()).toBe("/reports?project=p-1"));
+    fireEvent.change(screen.getByRole("combobox", { name: "Milestone" }), {
+      target: { value: "none" },
+    });
+    await waitFor(() =>
+      expect(lastReplaceUrl()).toBe(
+        "/reports?project=p-1&days=7&plan=none&milestone=none"
+      )
+    );
 
-    moveTo(view, tree, "project=p-1");
+    moveTo(view, tree, "project=p-1&days=7&plan=none&milestone=none");
+    expect(
+      screen.getByRole("combobox", { name: "Milestone" })
+    ).toHaveDisplayValue("No milestone");
+    await waitFor(() =>
+      expect(lastSummaryUrl()).toContain("milestone_id=none")
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
+      target: { value: "completed" },
+    });
+    await waitFor(() =>
+      expect(lastReplaceUrl()).toBe(
+        "/reports?project=p-1&days=7&plan=none&milestone=none&status=completed"
+      )
+    );
+
+    moveTo(
+      view,
+      tree,
+      "project=p-1&days=7&plan=none&milestone=none&status=completed"
+    );
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveDisplayValue(
+      "Completed"
+    );
+    await waitFor(() => {
+      const url = lastSummaryUrl();
+      expect(url).toContain("plan_id=none");
+      expect(url).toContain("milestone_id=none");
+      expect(url).toContain("status=completed");
+      expect(url).toContain("days=7");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    await waitFor(() =>
+      expect(lastReplaceUrl()).toBe("/reports?project=p-1&days=7")
+    );
+
+    moveTo(view, tree, "project=p-1&days=7");
     expect(
       screen.queryByRole("button", { name: "Reset filters" })
     ).not.toBeInTheDocument();
-    await waitFor(() => expect(lastSummaryUrl()).not.toContain("plan_id"));
     expect(screen.getByRole("combobox", { name: "Plan" })).toHaveDisplayValue(
       "All plans"
     );
+    expect(
+      screen.getByRole("combobox", { name: "Milestone" })
+    ).toHaveDisplayValue("All milestones");
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveDisplayValue(
+      "All"
+    );
+    await waitFor(() => {
+      const url = lastSummaryUrl();
+      expect(url).not.toContain("plan_id");
+      expect(url).not.toContain("milestone_id");
+      expect(url).not.toContain("status=");
+      expect(url).toContain("days=7");
+    });
   });
 
   it("keeps the tiles honest for an empty project", async () => {

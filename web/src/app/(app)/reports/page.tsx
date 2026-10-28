@@ -41,7 +41,7 @@ const REPORT_ERROR =
   "Couldn't load this report. Check your connection and retry.";
 
 /** "today" / "last 30 days" — the window sub-line under both trend tiles. */
-function windowSubline(days: TrendWindow): string {
+function windowSubline(days: number): string {
   return days === 1 ? "today" : `last ${days} days`;
 }
 
@@ -425,6 +425,9 @@ export default function ReportsPage() {
         <ReportBodySkeleton />
       ) : (
         <>
+          {/* While a window/filter/page change is in flight the previous
+              summary stays on screen, so every label and every bar-scale
+              decision reads the summary — the URL only says what to fetch. */}
           <div className="rep-tiles" aria-busy={refreshing || undefined}>
             <div className="rep-tile" role="group" aria-label="Pass rate">
               <p className="rep-tile-label">Pass rate</p>
@@ -434,7 +437,7 @@ export default function ReportsPage() {
               <p className="rep-tile-sub">
                 {summary.trend.totals.pass_rate === null
                   ? "No verdicts in this window"
-                  : windowSubline(url.days)}
+                  : windowSubline(summary.days)}
               </p>
             </div>
 
@@ -445,14 +448,18 @@ export default function ReportsPage() {
             >
               <p className="rep-tile-label">Results recorded</p>
               <p className="rep-tile-value">{summary.trend.totals.total}</p>
-              <p className="rep-tile-sub">{windowSubline(url.days)}</p>
+              <p className="rep-tile-sub">{windowSubline(summary.days)}</p>
             </div>
 
             <div className="rep-tile" role="group" aria-label="Runs">
               <p className="rep-tile-label">Runs</p>
               <p className="rep-tile-value">{summary.progress.meta.total}</p>
               <p className="rep-tile-sub">
-                {filtersActive ? "matching filters" : "in this project"}
+                {summary.filters.plan_id ||
+                summary.filters.milestone_id ||
+                summary.filters.status
+                  ? "matching filters"
+                  : "in this project"}
               </p>
             </div>
 
@@ -475,14 +482,14 @@ export default function ReportsPage() {
           <FailuresChart
             projectId={projectId}
             buckets={summary.trend.buckets}
-            days={url.days}
+            days={summary.days}
             loading={refreshing}
           />
 
           <ProgressTable
             projectId={projectId}
             progress={summary.progress}
-            page={url.page}
+            page={summary.progress.meta.page}
             onPageChange={(page) => pushParams({ page })}
             filtered={filtersActive}
             onClearFilters={resetFilters}
