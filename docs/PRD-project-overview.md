@@ -113,11 +113,21 @@ state, so reloading `/projects/:id` always lands on Overview.
 3. **Milestones card** — up to 5 milestones sorted like the milestones screen
    (due date ascending, undated last), each with name, due date, days left
    ("12 days left", "Due today", "3 days late", "No due date"), the status bar
-   and `% complete`. Header link: "View all milestones".
+   and `% complete`. Header: a **"New milestone"** button for Admin/Lead on an
+   active project, then the "View all milestones" link.
 4. **Test Runs card** — up to 5 live runs, newest first, each with name, plan
    name (or `—`), milestone name (or `—`), status badge, progress
    (`31 of 50`, status bar, `74% complete`) and due date. Rows open the run.
-   Header link: "View all runs".
+   Header: a **"New run"** button for Admin/Lead on an active project, then the
+   "View all runs" link.
+
+Both header buttons open the create dialog the matching list screen already
+uses (`MilestoneFormDialog` / `RunFormDialog`) without leaving the overview:
+the URL does not change, Cancel closes the dialog, and a successful save closes
+it and refreshes **both** cards (a new run changes a milestone's counts). A
+rejected save keeps the dialog open and shows the API's field errors inline.
+Switching project closes an open dialog — it belongs to the project that was on
+screen.
 
 Layout: 12-column grid, 16px gutters (§4.6). Chart 8 columns, Milestones 4;
 Test Runs full width. One column below 1024px, in the order above.
@@ -126,8 +136,8 @@ Test Runs full width. One column below 1024px, in the order above.
 | Situation | What renders |
 |---|---|
 | Project has no results in the window | Chart keeps its axes and legend; the plot area says "No results recorded in the last 14 days." (the copy follows the selected range, and reads "No results recorded today." for 1 day) with a link to Test runs. Table view shows one zero row per selected day with `—` pass rate. |
-| Project has no milestones | "No milestones yet. Create one to track a release." — a "New milestone" link for Admin/Lead, a plain read-only sentence for Tester/Viewer. |
-| Project has no runs | "No runs yet. Create a run to start recording results." — a "New run" link for Admin/Lead, a plain read-only sentence for Tester/Viewer. |
+| Project has no milestones | "No milestones yet. Create one to track a release." — writers open the dialog from the card header's "New milestone" button; Tester/Viewer see a plain read-only sentence instead. |
+| Project has no runs | "No runs yet. Create a run to start recording results." — writers open the dialog from the card header's "New run" button; Tester/Viewer see a plain read-only sentence instead. |
 | Loading | Row-shaped skeletons in each panel (chart: axis skeleton, not a spinner); the project header renders as soon as the project loads, the cards load independently. |
 | One card fails | That card alone shows "Couldn't load the trend. Check your connection and retry." with Retry; the other cards and the tab strip stay usable. |
 | Project 404 / 403 | The existing project-level states ("Project not found" / "Forbidden") are unchanged. |
@@ -142,7 +152,7 @@ Read-only addition; no endpoint in this slice writes.
 |---|---|---|---|---|
 | Open the project overview and its cards | ✔ | ✔ | ✔ | ✔ |
 | See the Description / Milestones / Test runs / Test cases tabs | ✔ | ✔ | ✔ | ✔ |
-| See "New milestone" / "New run" shortcuts in the empty states | ✔ | ✔ | – | – |
+| See "New milestone" / "New run" buttons in the card headers | ✔ | ✔ | – | – |
 | Edit / Archive / Restore (unchanged, header buttons) | ✔ | Archive only | – | – |
 | See the Reports tab enabled | – | – | – | – |
 
@@ -196,13 +206,14 @@ milestones"), matching §4.7's rule.
 12. The Milestones card lists at most 5 milestones, due date ascending with
    undated last, each showing name, due date, days left or "No due date",
    status bar and `% complete`; "View all milestones" opens
-   `/milestones?project=:id`. With no milestones the §6 empty state renders and
-   only writers get "New milestone".
+   `/milestones?project=:id`. With no milestones the §6 empty state renders.
+   Admin/Lead on an active project also get a "New milestone" button in the
+   header.
 13. The Test Runs card lists at most 5 live runs, newest first, each showing
     name, plan (or `—`), milestone (or `—`), status badge, `x of y`, status bar,
     `% complete` and due date; a row opens the run; "View all runs" opens
-    `/runs?project=:id`. With no runs the §6 empty state renders and only
-    writers get "New run".
+    `/runs?project=:id`. With no runs the §6 empty state renders. Admin/Lead on
+    an active project also get a "New run" button in the header.
 14. A slow or failing card never blocks another: the tab strip and the project
     header render as soon as the project loads, each card has its own skeleton
     and its own error with Retry, and retrying one card does not refetch the
@@ -220,6 +231,12 @@ milestones"), matching §4.7's rule.
 18. All date rendering goes through `web/src/lib/dates.ts`; the card never
     formats a date itself, and `days left` is computed there as it is on the
     milestones screen.
+19. The "New milestone" and "New run" header buttons open the list screens'
+    create dialogs in place (create mode, no navigation). Cancel closes the
+    dialog and leaves the cards unchanged; a successful save closes it, keeps
+    the overview on screen and refetches both cards; a rejected save keeps the
+    dialog open with the API's field errors, as on the list screens. Tester,
+    Viewer and archived projects have no button.
 
 ## Decisions (proposed — for approval)
 1. **Tabs are routes, not panels.** Each live tab is a link to the screen that

@@ -465,16 +465,24 @@ unambiguous.
 **Milestones card.** Up to 5, sorted by due date ascending with undated last
 (the milestones screen's default), each with name, due date, days left (or
 "No due date"), the 8px status bar and `% complete`. Rows link to the milestone.
-Header link "View all milestones" → `/milestones?project=:id`. Empty: "No
-milestones yet. Create one to track a release." plus "New milestone" for
-Admin/Lead only.
+Header: for Admin/Lead on an active project, a "New milestone" button that opens
+`MilestoneFormDialog` in create mode in place (no navigation; Cancel closes, a
+save closes and refreshes both cards), then the "View all milestones" link →
+`/milestones?project=:id`. Empty: "No milestones yet. Create one to track a
+release."; the button lives in the header, and Tester/Viewer get the read-only
+reason instead.
 
 **Test Runs card.** Up to 5 live runs, newest first, each with name, plan (or
 `—`), milestone (or `—`), status badge, `31 of 50`, the status bar, `74%
-complete` and due date. Rows link to the run. Header link "View all runs" →
-`/runs?project=:id`. Empty: "No runs yet. Create a run to start recording
-results." plus "New run" for Admin/Lead only. No "By" column: the run resource
-carries no author name and `GET /users` is Admin-only (see PRD decision 8).
+complete` and due date. Rows link to the run. Header: for Admin/Lead on an
+active project, a "New run" button that opens `RunFormDialog` in create mode in
+place, then the "View all runs" link → `/runs?project=:id`. The dialog loads the
+project's plans, milestones and suites when it opens (a loading shell with
+Cancel), because those pickers need them before the form can mount. Empty: "No
+runs yet. Create a run to start recording results."; the button lives in the
+header, and Tester/Viewer get the read-only reason instead. No "By" column: the
+run resource carries no author name and `GET /users` is Admin-only (see PRD
+decision 8).
 
 **Description.** The slice-1 Description panel moves into the Overview tab,
 above the trend card: description or "No description.", then created / last
