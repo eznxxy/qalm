@@ -35,7 +35,7 @@ exists and is approved (see `/AGENTS.md`).
   link is additive in `api-runs.md`; `api-plans.md` records that an embedded run
   does not take one.
 
-## Slice 5 (project overview) — status: proposed, awaiting approval
+## Slice 5 (project overview) — status: approved by Arif 2026-10-28, merged (PR #3)
 - `PRD-project-overview.md` / `api-project-overview.md` — the project page gains
   a tab strip (Overview / Milestones / Test runs / Test cases live, Reports
   disabled), a results trend over a 1/7/14/30-day window backed by the new
@@ -43,5 +43,13 @@ exists and is approved (see `/AGENTS.md`).
   card, and moves the description into Overview. One new read-only endpoint and
   one index; no existing resource changes.
 
+## Slice 6 (reports) — status: proposed, awaiting approval
+- `PRD-reports.md` / `api-reports.md` — the Reports tab becomes live
+  (`/reports?project=:id`): a window (1/7/14/30 days, 30 default), plan /
+  milestone / status filters, four tiles, a failures-over-time chart and a
+  paginated progress-per-run table, all from one new read-only endpoint
+  `GET /projects/:projectId/reports/summary`. No migration, no existing
+  resource or field changes; export stays in slice 7.
+
 ## Later slices (no docs yet)
-Dashboards/reports → CSV import/export.
+CSV import/export (slice 7) → dashboards beyond the project report.

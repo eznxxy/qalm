@@ -182,7 +182,8 @@ Reading a trend is reading results, which every signed-in role may already do
 | Result at `23:59:59.999Z` on `from − 1 day` | excluded |
 | Soft-deleted run | its results are excluded |
 | Archived project | `200` for Admin, `404` for Lead/Tester/Viewer |
-| Unknown `projectId` (not a UUID / no row) | `404` |
+| `projectId` is not a UUID | `400` `VALIDATION_ERROR` (path validation) |
+| Well-formed `projectId` with no row | `404` |
 
 ## Implementation notes (Hephaestus)
 

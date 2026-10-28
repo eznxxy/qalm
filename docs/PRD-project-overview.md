@@ -84,6 +84,11 @@ Under the project header, above the Overview content, per `docs/DESIGN.md` §5
 | Test cases | `/cases?project=:id` | live |
 | Reports | — | **disabled**, with "Reports arrive in a later slice" on hover/focus and `aria-disabled="true"`; no `href` |
 
+> **Amended by slice 6** (`PRD-reports.md`, approved scope): Reports is a live
+> link to `/reports?project=:id`. The `<span>`, `aria-disabled`, its hover/focus
+> hint and the `sr-only` hint text are removed; the other four rows are
+> unchanged. Everything else in this PRD still stands.
+
 No Todo tab: Qalm has no todo resource, and a permanent dead tab would teach
 users to ignore the strip. The active tab is decided by the route, not by local
 state, so reloading `/projects/:id` always lands on Overview.
@@ -247,7 +252,9 @@ milestones"), matching §4.7's rule.
 2. **Reports ships disabled, Todo does not ship.** A visible, explained
    "later slice" tab is honest about the roadmap; a Todo tab would advertise a
    resource the product does not have. Reports is a `<span>` with
-   `aria-disabled`, not a dead link.
+   `aria-disabled`, not a dead link. **Superseded in slice 6**: the reports
+   slice owns that tab and turns it into a real link (`PRD-reports.md`); the Todo
+   half of the decision stands.
 3. **The description moves into Overview; the header stays.** The reference puts
    the tabs directly under the project header, which leaves no room for a
    description card above them. Keeping title/key/status and Edit/Archive in the
