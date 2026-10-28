@@ -68,6 +68,19 @@ export default function ProjectDetailPage() {
   );
   const [busy, setBusy] = useState(false);
 
+  // The same route serves every project, so a scope switch only changes the
+  // param. Edit mode, an action error and an open archive/restore dialog belong
+  // to the project that was on screen; carry none of them over, and re-read
+  // `?edit=1` for the new URL. Adjust during render (React docs pattern) — the
+  // shell's switcher does the same for `?project=`.
+  const [renderedId, setRenderedId] = useState(id);
+  if (renderedId !== id) {
+    setRenderedId(id);
+    setEditing(searchParams.get("edit") === "1");
+    setActionError(null);
+    setConfirmAction(null);
+  }
+
   const load = useCallback(async () => {
     setState({ kind: "loading" });
     try {

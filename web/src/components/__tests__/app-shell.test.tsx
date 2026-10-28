@@ -387,6 +387,77 @@ describe("project switcher", () => {
     );
   });
 
+  it("leaves a milestone detail for the new project's milestones list", async () => {
+    // A milestone detail belongs to the milestone's project, not ?project=;
+    // rewriting the query left the screen on the old project.
+    mockRouterState.pathname = "/milestones/m-1";
+    mockRouterState.search = "project=p-1";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/milestones?project=p-2")
+    );
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+
+  it("scopes from the project detail path, not the first project in the list", async () => {
+    // /projects/<id> names its project in the path; the detail page reads
+    // params.id and ignores ?project=. Falling back to projects[0] labelled
+    // the wrong project and scoped the sidebar to it.
+    mockRouterState.pathname = "/projects/p-2";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    const switcher = screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement;
+    await waitFor(() => expect(switcher.value).toBe("p-2"));
+    expect(screen.getByRole("link", { name: "Test cases" })).toHaveAttribute(
+      "href",
+      "/cases?project=p-2"
+    );
+  });
+
+  it("switches project on the project detail by rewriting the path (bug)", async () => {
+    // Regression: the switcher only replaced ?project=, but the detail page
+    // renders params.id — the URL and the switcher changed, the content did not.
+    mockRouterState.pathname = "/projects/p-1";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith("/projects/p-2", {
+        scroll: false,
+      })
+    );
+    expect(mockRouterState.replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps the trend window but drops ?edit= on a project switch", async () => {
+    mockRouterState.pathname = "/projects/p-1";
+    mockRouterState.search = "days=30&edit=1&project=p-1";
+    await renderShell();
+    await screen.findByRole("option", { name: "Checkout" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Project" }), {
+      target: { value: "p-2" },
+    });
+
+    await waitFor(() =>
+      expect(mockRouterState.push).toHaveBeenCalledWith(
+        "/projects/p-2?days=30",
+        { scroll: false }
+      )
+    );
+  });
+
   it("is enabled once projects are listed, and disabled while loading", async () => {
     const ready = await renderShell();
     // findByRole resolves as soon as the combobox exists — during the

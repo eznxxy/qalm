@@ -599,3 +599,56 @@ describe("overview: summary cards", () => {
     expect(screen.queryByRole("link", { name: "New milestone" })).toBeNull();
   });
 });
+
+describe("overview: switching project", () => {
+  it("reloads for the new id and leaves the previous edit form behind (bug)", async () => {
+    // Regression: the top-bar switcher only rewrote ?project= and the page
+    // renders params.id, so the URL and the switcher changed while the screen
+    // kept showing the project that was already open.
+    mockApi();
+    const base = fetchMock.getMockImplementation()!;
+    const payments = { ...PROJECT, id: "p-2", key: "PAY", name: "Payments" };
+    fetchMock.mockImplementation((url: string, init?: RequestInit) =>
+      /\/projects\/p-2$/.test(String(url))
+        ? Promise.resolve(jsonResponse(200, { data: payments }))
+        : base(url, init)
+    );
+
+    mockRouterState.search = "edit=1";
+    const { default: ProjectDetailPage } = await import(
+      "@/app/(app)/projects/[id]/page"
+    );
+    const { RequireAuth } = await import("@/components/require-auth");
+    const { SessionProvider } = await import("@/lib/session");
+    const tree = (
+      <SessionProvider>
+        <RequireAuth>
+          <ProjectDetailPage />
+        </RequireAuth>
+      </SessionProvider>
+    );
+    const view = render(tree);
+    expect(
+      await screen.findByRole("form", { name: "Edit project Checkout" })
+    ).toBeInTheDocument();
+
+    // What the shell now does: a path change to /projects/p-2, no ?edit=.
+    mockRouterState.params = { id: "p-2" };
+    mockRouterState.search = "";
+    view.rerender(
+      <SessionProvider>
+        <RequireAuth>
+          <ProjectDetailPage />
+        </RequireAuth>
+      </SessionProvider>
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /Payments/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: /Edit project/ })).toBeNull();
+    expect(
+      trendCalls().some((url) => url.includes("/projects/p-2/reports/trend"))
+    ).toBe(true);
+  });
+});

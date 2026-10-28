@@ -173,6 +173,22 @@ function isActiveNav(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * The project detail route names its project in the path, not in `?project=`.
+ * The page reads `params.id`, so the shell has to scope from the path as well:
+ * otherwise the switcher shows whichever project happens to be first in the
+ * list, and a switch written to `?project=` leaves the page on the old project.
+ */
+function projectIdFromPath(pathname: string): string | null {
+  const match = /^\/projects\/([^/]+)\/?$/.exec(pathname);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).slice(0, 2);
   const initials = parts.map((p) => p[0]?.toUpperCase() ?? "").join("");
@@ -194,10 +210,13 @@ function AppShellInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // ---- project scope: ?project=<id> in the URL is the source of truth ----
+  // ---- project scope: the URL is the source of truth ----
+  // `/projects/<id>` carries its project in the path (the detail page reads
+  // `params.id` and ignores `?project=`); every other screen is scoped by
+  // `?project=<id>`, and the path wins if both are present.
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsState, setProjectsState] = useState<"loading" | "ready" | "error">("loading");
-  const urlProject = searchParams.get("project");
+  const urlProject = projectIdFromPath(pathname) ?? searchParams.get("project");
   // Adjust-during-render sync (React docs pattern): back/forward updates the
   // requested scope without an effect round-trip.
   const [renderedProject, setRenderedProject] = useState(urlProject);
@@ -260,14 +279,38 @@ function AppShellInner({ children }: { children: ReactNode }) {
     : "";
 
   function onProjectChange(id: string) {
-    // A detail URL (a run or a plan) belongs to the project in its path, not
-    // the `?project=` scope: the detail page rewrites the query back to the
-    // entity's project, so rewriting it here would be a silent no-op (QA card
-    // 3.18). Switch to the picked project's collection instead. Plans have no
-    // list route of their own — the runs screen carries the Plan column and
-    // the create dialog — so both detail screens land on /runs (QA 4.2).
+    // The project detail reads its project from the path, so rewriting only
+    // `?project=` left the page showing the old project while the switcher
+    // claimed the new one. Open the picked project's overview instead, keeping
+    // the trend window (`?days=`) and dropping a stale `?project=` or `?edit=1`.
+    if (projectIdFromPath(pathname)) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("project");
+      params.delete("edit");
+      const qs = params.toString();
+      router.push(
+        id
+          ? `/projects/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`
+          : "/projects",
+        { scroll: false }
+      );
+      return;
+    }
+    // A detail URL (a run, a plan or a milestone) belongs to the project of the
+    // entity in its path, not the `?project=` scope: the detail page rewrites
+    // the query back to the entity's project, so rewriting it here would be a
+    // silent no-op (QA card 3.18). Switch to the picked project's collection
+    // instead. Plans have no list route of their own — the runs screen carries
+    // the Plan column and the create dialog — so runs and plans both land on
+    // /runs (QA 4.2).
     if (/^\/(runs|plans)\/[^/]+$/.test(pathname)) {
       router.push(id ? `/runs?project=${encodeURIComponent(id)}` : "/runs");
+      return;
+    }
+    if (/^\/milestones\/[^/]+$/.test(pathname)) {
+      router.push(
+        id ? `/milestones?project=${encodeURIComponent(id)}` : "/milestones"
+      );
       return;
     }
     const params = new URLSearchParams(searchParams.toString());
