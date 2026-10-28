@@ -1,0 +1,189 @@
+/*
+ * Project reports (docs/DESIGN.md §4.9). Tokens only; no new palette. The
+ * card chrome is defined here because both report cards mount on this screen
+ * and share it — the values match FailuresChart.css so the two never drift.
+ */
+
+.rep-breadcrumb {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* ---------- filter bar ---------- */
+
+.rep-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+/* The trend card's segmented control, same selected treatment: filled
+ * surface plus aria-pressed, never colour alone. */
+.rep-range {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.rep-range button {
+  min-width: 40px;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rep-range button + button {
+  border-left: 1px solid var(--line);
+}
+
+.rep-range button:hover:not([aria-pressed="true"]) {
+  background: var(--canvas);
+}
+
+.rep-range button[aria-pressed="true"] {
+  background: var(--brand);
+  color: var(--text-on-brand);
+}
+
+.rep-range button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+/* ---------- tiles ---------- */
+
+.rep-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.rep-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: var(--space-5);
+}
+
+.rep-tile-label {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rep-tile-value {
+  margin: var(--space-2) 0 0;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rep-tile-sub {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-500);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+@media (max-width: 1024px) {
+  .rep-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .rep-tiles {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- cards ---------- */
+
+.rep-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: var(--space-5);
+}
+
+.rep-page > .rep-card + .rep-card {
+  margin-top: var(--space-5);
+}
+
+.rep-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.rep-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.rep-count {
+  color: var(--ink-500);
+  font-size: 12px;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- skeletons ---------- */
+
+.rep-skeleton {
+  display: block;
+  width: 100%;
+  height: 12px;
+  border-radius: var(--radius-badge);
+  background: var(--canvas);
+  animation: rep-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.rep-skeleton-tile {
+  height: 72px;
+}
+
+.rep-skeleton-chart {
+  height: 220px;
+}
+
+@keyframes rep-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rep-skeleton {
+    animation: none;
+  }
+}
