@@ -179,6 +179,7 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       milestoneId?: string | null;
       dueDate?: string | null;
       completedAt?: string | null;
+      name?: string;
     } = {},
   ): Promise<string> => {
     fixtureRunSeq += 1;
@@ -207,7 +208,11 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       values.push(userIds['admin']);
     }
     columns.push('name', 'created_by', 'updated_by');
-    values.push(`Trend fixture ${fixtureRunSeq}`, userIds['admin'], userIds['admin']);
+    values.push(
+      options.name ?? `Trend fixture ${fixtureRunSeq}`,
+      userIds['admin'],
+      userIds['admin'],
+    );
     const res = await test.db.query<{ id: string }>(
       `INSERT INTO runs (${columns.join(', ')})
        VALUES (${columns.map((_column, index) => `$${index + 1}`).join(', ')}) RETURNING id`,
@@ -713,7 +718,7 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       });
     });
 
-    it('orders open runs first, then due_date ascending with undated last', async () => {
+    it('orders open runs first, then due_date ascending with undated last, then name', async () => {
       // Created out of order on purpose: the sequence must come from the
       // contract, never from insertion order.
       const completed = await insertRun(projectId, {
@@ -723,16 +728,27 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       const openUndated = await insertRun(projectId);
       const openLater = await insertRun(projectId, { dueDate: utcDay(10) });
       const openSooner = await insertRun(projectId, { dueDate: utcDay(2) });
+      // Same due date, and `Zulu` is inserted before `alpha`, so only a
+      // case-insensitive (lower(name)) ascending sort can put alpha first.
+      // Runs cannot tie on name — `(project_id, lower(name))` is unique among
+      // live runs — so the contract's `id` tiebreak (step 4) is unreachable
+      // from legal data and is not asserted here.
+      const zulu = await insertRun(projectId, { dueDate: utcDay(3), name: 'Zulu' });
+      const alpha = await insertRun(projectId, { dueDate: utcDay(3), name: 'alpha' });
 
       const data = (await getSummary('admin', projectId)).body.data as SummaryData;
 
       expect(data.progress.data.map((run) => run.id)).toEqual([
         openSooner,
+        alpha,
+        zulu,
         openLater,
         openUndated,
         completed,
       ]);
       expect(data.progress.data.map((run) => run.status)).toEqual([
+        'open',
+        'open',
         'open',
         'open',
         'open',
