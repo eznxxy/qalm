@@ -1,7 +1,6 @@
 import { resolveReportFilters, toReportFiltersDto } from './reports.filters';
 
 const PLAN = '018f1c31-9d4e-7b2a-8c1f-2a3b4c5d6e7f';
-const MILESTONE = '018f4c40-8d5f-7a80-9c13-8d9e0f123456';
 
 describe('resolveReportFilters', () => {
   it('turns an absent filter into no filter at all', () => {
