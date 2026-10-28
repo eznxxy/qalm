@@ -19,8 +19,7 @@
   list-style: none;
 }
 
-.project-tabs a,
-.project-tab-disabled {
+.project-tabs a {
   display: inline-flex;
   align-items: center;
   min-height: var(--control-height);
@@ -42,16 +41,8 @@
   color: var(--brand);
 }
 
-.project-tabs a:focus-visible,
-.project-tab-disabled:focus-visible {
+.project-tabs a:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
   border-radius: var(--radius-control) var(--radius-control) 0 0;
-}
-
-/* A disabled tab is still a tab stop so its explanation is reachable by
- * keyboard (§8). It is not a link and has no href. */
-.project-tab-disabled {
-  color: var(--ink-500);
-  cursor: not-allowed;
 }

@@ -83,7 +83,7 @@ function navGroups(isAdmin: boolean): ReadonlyArray<ReadonlyArray<{ href: string
       { href: "/cases", label: "Test cases", icon: <NavIcon icon="cases" /> },
       { href: "/runs", label: "Test runs", icon: <NavIcon icon="runs" /> },
       { href: "/milestones", label: "Milestones", icon: <NavIcon icon="milestones" /> },
-      { href: "/wip/reports", label: "Reports", icon: <NavIcon icon="reports" /> },
+      { href: "/reports", label: "Reports", icon: <NavIcon icon="reports" /> },
     ],
     secondary,
   ];
