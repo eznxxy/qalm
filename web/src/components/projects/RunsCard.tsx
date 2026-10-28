@@ -8,6 +8,11 @@
  * so names come from the project's plans list; if that fetch fails every plan
  * cell falls back to `—` rather than failing the card.
  *
+ * Writers create in place: the header's "New run" opens the runs screen's
+ * create dialog and, on success, both cards refresh through `onChanged` (a new
+ * run changes a milestone's counts). PRD project-overview acceptance
+ * criterion 19.
+ *
  * There is deliberately no "By" column: the run resource has no author name
  * and `GET /users` is Admin-only (PRD decision 8).
  */
@@ -23,10 +28,11 @@ import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
 import { formatDateOnly } from "@/lib/dates";
 import { StatusBar } from "@/components/ui";
+import { NewRunDialog } from "@/components/runs/NewRunDialog";
 import {
   CardActionLink,
-  CardCreateShortcut,
   CardError,
+  CardNewButton,
   CardSkeleton,
   OverviewCard,
 } from "./OverviewCard";
@@ -34,6 +40,7 @@ import "./RunsCard.css";
 
 const CARD_LIMIT = 5;
 const LOAD_ERROR = "Couldn't load runs. Check your connection and retry.";
+const READ_ONLY_REASON = "Only Admins and Leads can create runs.";
 
 type State =
   | { kind: "loading" }
@@ -43,18 +50,41 @@ type State =
 export interface RunsCardProps {
   projectId: string;
   canCreate: boolean;
+  /** Bumped by the page after a create so this card refetches. */
+  refreshToken: number;
+  /** Ask the page to refresh both cards after a create here. */
+  onChanged: () => void;
 }
 
-export function RunsCard({ projectId, canCreate }: RunsCardProps) {
+export function RunsCard({
+  projectId,
+  canCreate,
+  refreshToken,
+  onChanged,
+}: RunsCardProps) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [retry, setRetry] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  // A project switch must not leave this project's dialog open on the next one.
+  const [renderedProjectId, setRenderedProjectId] = useState(projectId);
+  if (renderedProjectId !== projectId) {
+    setRenderedProjectId(projectId);
+    setCreating(false);
+  }
 
   useEffect(() => {
     let active = true;
     void (async () => {
       await Promise.resolve();
       if (!active) return;
-      setState({ kind: "loading" });
+      // A refresh keeps the rows on screen (and marks the card busy) instead of
+      // flashing a skeleton after every save.
+      setState((current) =>
+        current.kind === "ready" ? current : { kind: "loading" }
+      );
+      setRefreshing(true);
       try {
         const [runsPage, plansPage] = await Promise.all([
           api.listRuns(projectId, {
@@ -75,21 +105,29 @@ export function RunsCard({ projectId, canCreate }: RunsCardProps) {
           kind: "error",
           message: err instanceof ApiError ? err.message || LOAD_ERROR : LOAD_ERROR,
         });
+      } finally {
+        if (active) setRefreshing(false);
       }
     })();
     return () => {
       active = false;
     };
-  }, [projectId, retry]);
+  }, [projectId, retry, refreshToken]);
 
   return (
     <OverviewCard
       title="Test runs"
       className="ov-runs-card"
+      busy={refreshing}
       action={
-        <CardActionLink href={`/runs?project=${encodeURIComponent(projectId)}`}>
-          View all runs
-        </CardActionLink>
+        <div className="ov-card-actions">
+          {canCreate && (
+            <CardNewButton label="New run" onClick={() => setCreating(true)} />
+          )}
+          <CardActionLink href={`/runs?project=${encodeURIComponent(projectId)}`}>
+            View all runs
+          </CardActionLink>
+        </div>
       }
     >
       {state.kind === "loading" && <CardSkeleton rows={3} />}
@@ -101,12 +139,11 @@ export function RunsCard({ projectId, canCreate }: RunsCardProps) {
       {state.kind === "ready" && state.rows.length === 0 && (
         <div className="ov-empty">
           <p>No runs yet. Create a run to start recording results.</p>
-          <CardCreateShortcut
-            href={`/runs?project=${encodeURIComponent(projectId)}&new=1`}
-            label="New run"
-            reason="Only Admins and Leads can create runs."
-            canWrite={canCreate}
-          />
+          {!canCreate && (
+            <p className="muted ov-card-readonly" title={READ_ONLY_REASON}>
+              {READ_ONLY_REASON}
+            </p>
+          )}
         </div>
       )}
 
@@ -157,6 +194,17 @@ export function RunsCard({ projectId, canCreate }: RunsCardProps) {
             );
           })}
         </ul>
+      )}
+
+      {creating && (
+        <NewRunDialog
+          projectId={projectId}
+          onCreated={() => {
+            setCreating(false);
+            onChanged();
+          }}
+          onCancel={() => setCreating(false)}
+        />
       )}
     </OverviewCard>
   );

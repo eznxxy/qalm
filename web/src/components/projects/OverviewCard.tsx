@@ -97,30 +97,20 @@ export function CardActionLink({
 }
 
 /**
- * Writers get the create shortcut; everyone else sees the sentence plus the
- * reason on hover (DESIGN §4.7's rule for unwritable controls).
+ * The header's create button. It opens a dialog in place (PRD project-overview
+ * acceptance criterion 19) instead of linking to the list screen, so the
+ * overview stays on screen after a save.
  */
-export function CardCreateShortcut({
-  href,
+export function CardNewButton({
   label,
-  reason,
-  canWrite,
+  onClick,
 }: {
-  href: string;
   label: string;
-  reason: string;
-  canWrite: boolean;
+  onClick: () => void;
 }) {
-  if (canWrite) {
-    return (
-      <Link className="button-link ov-card-create" href={href}>
-        {label}
-      </Link>
-    );
-  }
   return (
-    <p className="muted ov-card-readonly" title={reason}>
-      {reason}
-    </p>
+    <button type="button" className="ov-card-new" onClick={onClick}>
+      {label}
+    </button>
   );
 }

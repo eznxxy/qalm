@@ -296,6 +296,20 @@ function trendCalls(): string[] {
     .filter((url) => /\/reports\/trend(\?|$)/.test(url));
 }
 
+/**
+ * GETs for one summary card's list. The cards ask for `limit=5`; dialogs ask
+ * for `limit=100`, so this counts card loads (mount + refresh) only.
+ */
+function cardListCalls(resource: "milestones" | "runs"): number {
+  return fetchMock.mock.calls.filter(([url, init]) => {
+    const method = (init as RequestInit | undefined)?.method ?? "GET";
+    return (
+      method === "GET" &&
+      new RegExp(`/projects/p-1/${resource}\\?.*limit=5`).test(String(url))
+    );
+  }).length;
+}
+
 function lastReplaceUrl(): string {
   const calls = mockRouterState.replace.mock.calls;
   return String(calls[calls.length - 1]?.[0] ?? "");
@@ -545,24 +559,32 @@ describe("overview: summary cards", () => {
       "href",
       "/runs?project=p-1"
     );
+
+    // Writers get the create buttons in the headers, rows or not.
+    expect(
+      screen.getByRole("button", { name: "New milestone" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New run" })).toBeInTheDocument();
   });
 
-  it("admin: empty cards offer the create shortcuts", async () => {
+  it("admin: empty cards keep the create buttons in their headers", async () => {
     mockApi({ milestones: [], runs: [], trend: makeTrend(14, true) });
     await renderPage();
 
-    expect(await screen.findByText("No milestones yet. Create one to track a release.")).toBeInTheDocument();
-    const newMilestone = await screen.findByRole("link", { name: "New milestone" });
-    expect(newMilestone).toHaveAttribute(
-      "href",
-      "/milestones?project=p-1&new=1"
-    );
-
     expect(
-      await screen.findByText("No runs yet. Create a run to start recording results.")
+      await screen.findByText("No milestones yet. Create one to track a release.")
     ).toBeInTheDocument();
-    const newRun = await screen.findByRole("link", { name: "New run" });
-    expect(newRun).toHaveAttribute("href", "/runs?project=p-1&new=1");
+    expect(
+      screen.getByRole("button", { name: "New milestone" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("No runs yet. Create a run to start recording results.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New run" })).toBeInTheDocument();
+
+    // The empty state no longer links writers off the overview.
+    expect(screen.queryByRole("link", { name: "New milestone" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "New run" })).toBeNull();
   });
 
   it("tester: empty cards explain the rule instead of offering a shortcut", async () => {
@@ -582,9 +604,11 @@ describe("overview: summary cards", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New milestone" })).toBeNull();
     expect(screen.queryByRole("link", { name: "New run" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New milestone" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New run" })).toBeNull();
   });
 
-  it("archived project: admins still read the cards, with no create shortcuts", async () => {
+  it("archived project: admins still read the cards, with no create buttons", async () => {
     mockApi({
       project: { ...PROJECT, status: "archived" },
       milestones: [],
@@ -597,6 +621,117 @@ describe("overview: summary cards", () => {
       await screen.findByText("Only Admins and Leads can create milestones.")
     ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New milestone" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New milestone" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New run" })).toBeNull();
+  });
+});
+
+describe("overview: create in place", () => {
+  it("creates a milestone without leaving the overview, then refreshes both cards", async () => {
+    mockApi({ milestones: [], runs: [], trend: makeTrend(14, true) });
+    const base = fetchMock.getMockImplementation()!;
+    const posted: unknown[] = [];
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        init?.method === "POST" &&
+        /\/projects\/p-1\/milestones$/.test(String(url))
+      ) {
+        posted.push(JSON.parse(String(init.body)));
+        return Promise.resolve(
+          jsonResponse(201, {
+            data: { ...MILESTONE, id: "m-2", name: "Release 2.5" },
+          })
+        );
+      }
+      return base(url, init);
+    });
+
+    await renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "New milestone" })
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "New milestone" });
+    fireEvent.change(within(dialog).getByLabelText("Name"), {
+      target: { value: "Release 2.5" },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Create milestone" })
+    );
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(posted).toEqual([
+      { name: "Release 2.5", description: null, due_date: null },
+    ]);
+    // The save refetches both cards: a new milestone changes its own list but a
+    // new run would also change the milestone counts, so they move together.
+    await waitFor(() => expect(cardListCalls("milestones")).toBe(2));
+    expect(cardListCalls("runs")).toBe(2);
+    expect(mockRouterState.push).not.toHaveBeenCalled();
+  });
+
+  it("creates a run in place and stays on the overview", async () => {
+    mockApi({ milestones: [], runs: [], trend: makeTrend(14, true) });
+    const base = fetchMock.getMockImplementation()!;
+    let posted: unknown = null;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && /\/projects\/p-1\/runs$/.test(String(url))) {
+        posted = JSON.parse(String(init.body));
+        return Promise.resolve(
+          jsonResponse(201, { data: { ...RUN, id: "r-2", name: "Smoke" } })
+        );
+      }
+      return base(url, init);
+    });
+
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "New run" }));
+
+    // The dialog loads the project's plans, milestones and suites first.
+    fireEvent.change(await screen.findByLabelText("Name"), {
+      target: { value: "Smoke" },
+    });
+    const dialog = screen.getByRole("dialog", { name: "New run" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create run" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(posted).toMatchObject({ name: "Smoke" });
+    // Creating a run is the goal; its detail screen is a second step.
+    expect(mockRouterState.push).not.toHaveBeenCalled();
+    await waitFor(() => expect(cardListCalls("runs")).toBe(2));
+    expect(cardListCalls("milestones")).toBe(2);
+  });
+
+  it("closes an open create dialog when the project changes", async () => {
+    // The dialog's submit posts to the `projectId` prop; carrying it across a
+    // switch would create in the project the writer just left.
+    mockApi();
+    const { MilestonesCard } = await import(
+      "@/components/projects/MilestonesCard"
+    );
+    const view = render(
+      <MilestonesCard
+        projectId="p-1"
+        canCreate
+        refreshToken={0}
+        onChanged={jest.fn()}
+      />
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "New milestone" }));
+    expect(
+      await screen.findByRole("dialog", { name: "New milestone" })
+    ).toBeInTheDocument();
+
+    view.rerender(
+      <MilestonesCard
+        projectId="p-2"
+        canCreate
+        refreshToken={0}
+        onChanged={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 

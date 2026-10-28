@@ -36,6 +36,7 @@ import { isSessionDead } from "@/components/require-auth";
 import { isDateOnly } from "@/lib/dates";
 import { suiteSearchOptions } from "@/lib/suites";
 import { Combobox, DisabledHint } from "@/components/ui";
+import "./run-dialog.css";
 
 export const RUN_NAME_MAX = 120;
 export const RUN_DESCRIPTION_MAX = 1000;

@@ -35,9 +35,21 @@
   white-space: nowrap;
 }
 
-.ov-card-create {
-  align-self: flex-start;
-  margin-top: var(--space-4);
+.ov-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* The header's create button (PRD project-overview criterion 19). It sits next
+ * to a 13px link, so the default control height would dwarf it. */
+button.ov-card-new {
+  height: 28px;
+  padding: 0 var(--space-3);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .ov-card-readonly {

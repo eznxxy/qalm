@@ -67,6 +67,15 @@ export default function ProjectDetailPage() {
     null
   );
   const [busy, setBusy] = useState(false);
+  /**
+   * Creating a milestone or a run happens in the card that owns the button, but
+   * a new run changes a milestone's counts, so both cards refresh together.
+   * The card calls `onChanged`; the page bumps this token for both.
+   */
+  const [cardsVersion, setCardsVersion] = useState(0);
+  const onCardsChanged = useCallback(() => {
+    setCardsVersion((version) => version + 1);
+  }, []);
 
   // The same route serves every project, so a scope switch only changes the
   // param. Edit mode, an action error and an open archive/restore dialog belong
@@ -313,9 +322,16 @@ export default function ProjectDetailPage() {
             <MilestonesCard
               projectId={project.id}
               canCreate={canCreateMilestone}
+              refreshToken={cardsVersion}
+              onChanged={onCardsChanged}
             />
 
-            <RunsCard projectId={project.id} canCreate={canCreateRun} />
+            <RunsCard
+              projectId={project.id}
+              canCreate={canCreateRun}
+              refreshToken={cardsVersion}
+              onChanged={onCardsChanged}
+            />
           </div>
         </>
       )}
