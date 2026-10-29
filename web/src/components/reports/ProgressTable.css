@@ -1,0 +1,75 @@
+/*
+ * Progress-per-run table (docs/DESIGN.md §4.9). Layout only: the shared
+ * .dt-* primitives own borders, row heights and hover, so nothing here
+ * restyles a row. The card chrome (.rep-card/.rep-card-head) belongs to the
+ * reports screen and is not repeated.
+ */
+
+/* Eight columns need room. Below ~880px the table scrolls inside its own
+ * container (§3) instead of crushing the progress and activity cells; the
+ * page body never scrolls sideways. DataTable's own overflow rule starts at
+ * 767px, so this container keeps its scroll at 768px too. */
+.rep-progress-table {
+  overflow-x: auto;
+}
+
+.rep-progress-table .dt-table {
+  min-width: 880px;
+}
+
+/* Two lines per cell: the count, then the status bar beside the percentage.
+ * 16px + 2px gap + 16px leaves the 8px bar inside a 36px row (§2.5, §4.9). */
+.rep-progress {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-width: 180px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rep-progress-count {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  color: var(--ink-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.rep-progress .stb-root {
+  grid-column: 1;
+  grid-row: 2;
+  /* The bar is 8px tall in tables; the grid row keeps its 16px baseline. */
+  height: 8px;
+}
+
+.rep-progress-percent {
+  grid-column: 2;
+  grid-row: 2;
+  color: var(--ink-700);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The state is written in words; the pill is decoration only, so Open and
+ * Completed share one neutral --canvas/--ink-700 treatment (§2.2 keeps the
+ * status colours for test statuses). */
+.rep-run-state {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-badge);
+  background: var(--canvas);
+  color: var(--ink-700);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+/* "38 in window · 2 h ago" is one phrase; the shared cell default
+ * (overflow-wrap: anywhere) would break it mid-value. */
+.rep-activity {
+  color: var(--ink-700);
+  white-space: nowrap;
+}

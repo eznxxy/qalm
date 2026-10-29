@@ -4,8 +4,14 @@ import { Test } from '@nestjs/testing';
 import { AuthUser, UserRole } from '../auth/current-user';
 import { ErrorCode } from '../errors';
 import type { ProjectRef } from '../runs/runs.store';
+import type { ReportFilter } from './reports.filters';
 import { ReportsService } from './reports.service';
-import { ReportsStore, TrendRow } from './reports.store';
+import {
+  ProgressItemsRow,
+  ProgressRunRow,
+  ReportsStore,
+  TrendRow,
+} from './reports.store';
 
 /**
  * Decision-logic tests for ReportsService over an in-memory fake of the reports
@@ -17,15 +23,71 @@ import { ReportsStore, TrendRow } from './reports.store';
 class FakeStore {
   project: ProjectRef | null = { id: 'p-1', status: 'active' };
   rows: TrendRow[] = [];
+  runs: ProgressRunRow[] = [];
+  runCount = 0;
+  items: ProgressItemsRow = { total: 0, with_results: 0 };
   calls: Array<{ projectId: string; from: string; to: string }> = [];
+  /** The filter each read saw, in call order; `null` is the overview trend. */
+  filters: Array<ReportFilter | null> = [];
+  countCalls: Array<{ projectId: string; filter: ReportFilter }> = [];
+  progressCalls: Array<{
+    projectId: string;
+    filter: ReportFilter;
+    from: string;
+    to: string;
+    limit: number;
+    offset: number;
+  }> = [];
+  itemCalls: Array<{ projectId: string; filter: ReportFilter }> = [];
 
   async findProject(): Promise<ProjectRef | null> {
     return this.project;
   }
 
-  async trend(projectId: string, from: string, to: string): Promise<TrendRow[]> {
+  async trend(
+    projectId: string,
+    from: string,
+    to: string,
+    filter: ReportFilter | null = null,
+  ): Promise<TrendRow[]> {
     this.calls.push({ projectId, from, to });
+    this.filters.push(filter);
     return this.rows;
+  }
+
+  async countRuns(projectId: string, filter: ReportFilter): Promise<number> {
+    this.countCalls.push({ projectId, filter });
+    return this.runCount;
+  }
+
+  async progress(
+    projectId: string,
+    filter: ReportFilter,
+    from: string,
+    to: string,
+    limit: number,
+    offset: number,
+  ): Promise<ProgressRunRow[]> {
+    this.progressCalls.push({ projectId, filter, from, to, limit, offset });
+    return this.runs;
+  }
+
+  async progressItems(
+    projectId: string,
+    filter: ReportFilter,
+  ): Promise<ProgressItemsRow> {
+    this.itemCalls.push({ projectId, filter });
+    return this.items;
+  }
+
+  /** Every argument any read recorded, so "nothing was read" is one assertion. */
+  get allReads(): number {
+    return (
+      this.calls.length +
+      this.countCalls.length +
+      this.progressCalls.length +
+      this.itemCalls.length
+    );
   }
 }
 
@@ -65,7 +127,36 @@ function zeroRows(from: string, to: string): TrendRow[] {
   return rows;
 }
 
-describe('ReportsService (unit, in-memory trend)', () => {
+/**
+ * One run row exactly as the SQL returns it: `::text` dates, a real `Date` for
+ * `last_result_at` (the mapper calls `.toISOString()`), and the counts already
+ * reduced to the latest result per item.
+ */
+function progressRow(overrides: Partial<ProgressRunRow> = {}): ProgressRunRow {
+  return {
+    id: 'r-1',
+    name: 'Release smoke',
+    plan_id: null,
+    plan_name: null,
+    milestone_id: null,
+    milestone_name: null,
+    start_date: '2026-10-20',
+    due_date: '2026-10-30',
+    completed: false,
+    total: 10,
+    passed: 4,
+    failed: 2,
+    blocked: 1,
+    retest: 1,
+    skipped: 1,
+    untested: 1,
+    results_in_window: 3,
+    last_result_at: new Date('2026-10-28T08:00:00Z'),
+    ...overrides,
+  };
+}
+
+describe('ReportsService (unit, in-memory store)', () => {
   let service: ReportsService;
   let store: FakeStore;
 
@@ -211,6 +302,117 @@ describe('ReportsService (unit, in-memory trend)', () => {
           pass_rate: null,
         },
       });
+    });
+  });
+
+  describe('summary', () => {
+    const NO_FILTER: ReportFilter = {
+      planId: null,
+      planNone: false,
+      milestoneId: null,
+      milestoneNone: false,
+      status: null,
+    };
+
+    it('defaults to 30 days, page 1, limit 25 and null filters', async () => {
+      const summary = await service.summary(AS('viewer'), 'p-1', {});
+
+      expect(store.calls).toEqual([
+        { projectId: 'p-1', from: '2026-09-29', to: '2026-10-28' },
+      ]);
+      expect(store.countCalls).toEqual([{ projectId: 'p-1', filter: NO_FILTER }]);
+      expect(store.progressCalls).toEqual([
+        {
+          projectId: 'p-1',
+          filter: NO_FILTER,
+          from: '2026-09-29',
+          to: '2026-10-28',
+          limit: 25,
+          offset: 0,
+        },
+      ]);
+      expect(store.itemCalls).toEqual([{ projectId: 'p-1', filter: NO_FILTER }]);
+      expect(summary).toMatchObject({
+        project_id: 'p-1',
+        from: '2026-09-29',
+        to: '2026-10-28',
+        days: 30,
+        filters: { plan_id: null, milestone_id: null, status: null },
+      });
+      expect(summary.progress.meta).toEqual({
+        page: 1,
+        limit: 25,
+        total: 0,
+        total_pages: 1,
+      });
+    });
+
+    it('resolves none for the store while echoing the raw sentinel', async () => {
+      const summary = await service.summary(AS('admin'), 'p-1', {
+        plan_id: 'none',
+        milestone_id: 'none',
+        status: 'open',
+      });
+
+      const resolved: ReportFilter = {
+        planId: null,
+        planNone: true,
+        milestoneId: null,
+        milestoneNone: true,
+        status: 'open',
+      };
+      // All four reads share one filter, so the tiles and the table agree.
+      expect(store.filters).toEqual([resolved]);
+      expect(store.countCalls[0]!.filter).toEqual(resolved);
+      expect(store.progressCalls[0]!.filter).toEqual(resolved);
+      expect(store.itemCalls[0]!.filter).toEqual(resolved);
+      expect(summary.filters).toEqual({
+        plan_id: 'none',
+        milestone_id: 'none',
+        status: 'open',
+      });
+    });
+
+    it('maps one page and the all-runs items rollup', async () => {
+      store.runs = [progressRow()];
+      store.runCount = 1;
+      store.items = { total: 120, with_results: 85 };
+
+      const summary = await service.summary(AS('admin'), 'p-1', {
+        limit: 10,
+        page: 2,
+      });
+
+      expect(store.progressCalls[0]).toMatchObject({ limit: 10, offset: 10 });
+      const run = summary.progress.data[0]!;
+      expect(run.counts.percent_complete).toBe(90);
+      expect(run.pass_rate).toBe(50);
+      expect(run.last_result_at).toBe('2026-10-28T08:00:00.000Z');
+      expect(run.status).toBe('open');
+      expect(summary.progress.items).toEqual({
+        total: 120,
+        with_results: 85,
+        untested: 35,
+        percent_complete: 71,
+      });
+      expect(summary.progress.meta).toEqual({
+        page: 2,
+        limit: 10,
+        total: 1,
+        total_pages: 1,
+      });
+    });
+
+    it('applies the archived-project rule before reading anything', async () => {
+      store.project = { id: 'p-1', status: 'archived' };
+
+      await expectCode(service.summary(AS('viewer'), 'p-1', {}), 'NOT_FOUND');
+      expect(store.allReads).toBe(0);
+
+      const summary = await service.summary(AS('admin'), 'p-1', {});
+
+      expect(summary.project_id).toBe('p-1');
+      expect(store.allReads).toBe(4);
     });
   });
 });

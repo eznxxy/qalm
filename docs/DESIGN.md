@@ -390,6 +390,12 @@ Chart rules: use status colours only for status data. Label directly where
 possible. Always provide a "View as table" toggle for accessibility. Titles
 state the insight source ("Pass rate, last 30 days"), not decoration.
 
+**Shipped in slice 6.** The project Reports tab (§4.9) ships three of these
+widgets — the window pass rate, failures over time and every matching run with
+its status bar — behind one aggregate endpoint. "Failures by section" and the
+activity feed stay sketches for a later dashboard slice; no screen renders them
+yet, and slice 6 adds no widget without a contract.
+
 ### 4.7 Settings and users
 
 Left sub-nav: Project, Members and roles, Case fields (phase 2), Integrations
@@ -421,10 +427,9 @@ below them, a tab strip; below that, the Overview tab's content.
 **Tab strip.** Underline tabs (§5): 2px `--brand` underline on the active tab,
 `aria-current="page"`, real links. `Overview` → `/projects/:id`;
 `Milestones` → `/milestones?project=:id`; `Test runs` → `/runs?project=:id`;
-`Test cases` → `/cases?project=:id`. `Reports` is rendered as a disabled tab
-(`aria-disabled="true"`, no `href`, explanation on hover/focus: "Reports arrive
-in a later slice"). No Todo tab. The active tab follows the route, never local
-state.
+`Test cases` → `/cases?project=:id`; `Reports` → `/reports?project=:id`
+(§4.9). All five are real links. No Todo tab. The active tab follows the route,
+never local state.
 
 **Grid.** 12 columns, 16px gutters (§4.6): trend card 8, Milestones card 4,
 Test Runs card 12. One column below 1024px, in that order.
@@ -494,6 +499,104 @@ slices" line is removed.
 refetches only that card. The header and tab strip render as soon as the project
 loads. The archived-project banner and the project-level 404/403 states are
 unchanged.
+
+### 4.9 Project reports
+
+The Reports tab is the project's read-only quality view (PRD-reports.md): one
+window, one set of filters, one aggregate request. It is a project-scoped screen
+like `/runs`, not a panel inside the overview: the top-bar project switcher
+scopes it, `?project=` is the source of truth, and a direct link with no project
+resolves the first visible project and writes it into the URL. Unlike the
+overview it does not repeat the project tab strip; a breadcrumb `← <Project
+name>` to `/projects/:id` sits above the "Reports" heading.
+
+```
+┌ ← Checkout                                                ┐
+│ Reports                                                   │
+│ [1d│7d│14d│30d]  Plan ▾  Milestone ▾  Status ▾  [Reset]   │
+├──────────────┬──────────────┬──────────────┬──────────────┤
+│ Pass rate    │ Recorded     │ Runs         │ Items done   │
+│ 85.7%        │ 470          │ 3            │ 71%          │
+├──────────────┴──────────────┴──────────────┴──────────────┤
+│ Failures over time, last 30 days           [as table]     │
+│  ▁▂▅▃▆▂▁  ● Failed ● Blocked ● Retest                     │
+├───────────────────────────────────────────────────────────┤
+│ Progress per run                                          │
+│ Run · Status · Plan · Milestone · Due · Progress · Rate   │
+└───────────────────────────────────────────────────────────┘
+```
+
+**Filter bar.** The window is the same segmented control as the trend card
+(`aria-pressed`, 32px targets, labelled group "Report window") but with **30
+days** selected on first load; the four presets are 1, 7, 14 and 30. Plan,
+milestone and status are native selects: "All plans" / each live plan / "No
+plan", the milestone equivalent, and All / Open / Completed. "Reset filters"
+appears only when one of the three selects is not "All", resets those three and
+keeps the window. Every control lives in the URL (`?days`, `?plan`,
+`?milestone`, `?status`, `?page`) so reload and sharing keep the view; any
+change resets `page` to 1. The filter bar renders as soon as the project loads
+and stays usable while the report loads or after it fails.
+
+**Tiles.** Four equal cards, 12-column grid, wrapping 4 → 2 → 1 below 1024px:
+pass rate (one decimal, `—` when there were no verdicts), results recorded,
+matching runs, items complete with "`x` of `y` items". Each has a one-line
+sub-label naming its window or scope; none is a link. An empty project reads
+`—` / `0` / `0` / `0%` — never `0%` for a missing rate (§9).
+
+**Failures over time.** One card, 12 columns, titled "Failures over time, last
+30 days" (or "… today"). Stacked daily columns of Failed, Blocked and Retest
+only, in that order, one slot per UTC day of the window including days with no
+results; a zero day keeps its slot and draws no bar. Status colours only (§2.2),
+text legend naming all three series, integer count axis anchored at 0 with at
+most five gridlines, exact counts in the hover/focus tooltip, and a "UTC days"
+footer. "View as table" (`aria-expanded`) swaps in Date / Failed / Blocked /
+Retest / Total for the same days and does not refetch. The plot is one
+`role="img"` with an `aria-label` naming the window and the three totals; the
+table is the accessible detail path. This card never plots `passed`, `skipped`
+or `untested`, and it is the only chart on the screen — pass rate is a tile and
+a per-run column, not a second series here.
+
+**Progress per run.** A data table (§5) of every live run matching the filters:
+Run (link to `/runs/:id`), Status (`Open`/`Completed` badge), Plan, Milestone,
+Due (`dates.ts`, §9), Progress (`31 of 50`, status bar, `74% complete`, the same
+markup as the overview's Test Runs card), Pass rate (one decimal, `—` when
+null), Activity ("38 in window · 2 h ago" from `results_in_window` and
+`last_result_at`; "No results in window" at 0; "No results yet" when there is no
+result at all). Fixed order — open first, then due date ascending with undated
+last, then name — and no sort control. Plan and milestone are `—` when absent.
+Twenty-five rows per page with Previous/Next and "Page `p` of `n`"; the tiles
+and item rollup cover every filtered run, so they do not change with the page.
+The table scrolls horizontally inside its own container at 768px (§3); the
+progress cell may wrap to two lines but the status bar keeps its 8px height.
+
+**Two clocks, labelled.** The tiles and the chart describe results recorded in
+the window; the progress columns describe where each run stands now. The screen
+never lets one read as the other: the tiles name their window in the sub-label,
+the chart's title names it, and the table's Activity column says "in window"
+while Progress and Pass rate carry no window qualifier. A run whose results all
+predate the window still shows its real completion beside "No results in
+window".
+
+**States.** Skeletons for the tiles and both cards while the single request is
+in flight (chart = axis skeleton), with the heading, breadcrumb and filter bar
+live; one page-level error panel with Retry on failure (not per-card — it is one
+request). Empty project: "No results recorded in the last 30 days." with a "Go
+to Test runs" link, and "No runs in this project yet." in the table. A filter
+matching nothing: "No runs match these filters." with "Clear filters"; a page
+past the end: "No runs on this page." with "Go to page 1". A window with
+results but no failures reads "No failed, blocked or retested results in the
+last 30 days." and keeps its axes and legend.
+
+**Read-only.** No create, edit, delete, export or print control for any role;
+Admin, Lead, Tester and Viewer see the same data and controls. An archived
+project renders the report for an Admin and the existing 404 state for everyone
+else — no separate read-only banner is added, because nothing here writes.
+
+**Entry points.** Two: the overview's Reports tab (§4.8) and the §3 sidebar's
+Reports item, which now points at `/reports` (the `/wip/reports` placeholder is
+retired) and resolves the first visible project exactly as "Test runs" does at
+`/runs`. Both land on the same screen; neither carries a project id from a
+previous visit.
 
 ---
 

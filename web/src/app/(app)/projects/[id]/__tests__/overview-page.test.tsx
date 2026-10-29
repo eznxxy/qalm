@@ -14,10 +14,10 @@ import type {
 /**
  * Project overview (docs/DESIGN.md §4.8, docs/PRD-project-overview.md).
  *
- * Covers what the components do not own: the tab strip's routes and the
- * disabled Reports tab, the 1/7/14/30 window read from and written to the URL,
- * the trend chart/table toggle, the two summary cards and their links, the
- * empty states, and the Admin/Lead create gating.
+ * Covers what the components do not own: the tab strip's routes, the
+ * 1/7/14/30 window read from and written to the URL, the trend chart/table
+ * toggle, the two summary cards and their links, the empty states, and the
+ * Admin/Lead create gating.
  */
 
 const mockRouterState = {
@@ -346,16 +346,21 @@ describe("overview: tab strip", () => {
       "href",
       "/cases?project=p-1"
     );
+    expect(within(tabs).getByRole("link", { name: "Reports" })).toHaveAttribute(
+      "href",
+      "/reports?project=p-1"
+    );
   });
 
-  it("shows Reports disabled with a reason and no link", async () => {
+  it("links Reports to the project's reports screen", async () => {
     mockApi();
     await renderPage();
 
-    const reports = await screen.findByText("Reports");
-    expect(reports.closest("a")).toBeNull();
-    expect(reports).toHaveAttribute("aria-disabled", "true");
-    expect(reports).toHaveAttribute("title", "Reports arrive in a later slice");
+    const tabs = await screen.findByRole("navigation", { name: "Project sections" });
+    expect(within(tabs).getByRole("link", { name: "Reports" })).toHaveAttribute(
+      "href",
+      "/reports?project=p-1"
+    );
   });
 });
 

@@ -28,6 +28,18 @@ import { ApiError } from "@/lib/api-error";
 import { isSessionDead } from "@/components/require-auth";
 import { formatDateOnly, formatDayMonth } from "@/lib/dates";
 import {
+  BASE_Y,
+  CHART_HEIGHT,
+  CHART_MARGIN,
+  CHART_WIDTH,
+  PLOT_HEIGHT,
+  PLOT_WIDTH,
+  bucketX,
+  labelIndices,
+  niceScale,
+  roundedTopRect,
+} from "@/lib/chart-scale";
+import {
   formatPassRate,
   trendEmptyCopy,
   trendTitle,
@@ -63,71 +75,8 @@ interface Point {
   y: number;
 }
 
-const WIDTH = 680;
-const HEIGHT = 250;
-const MARGIN = { top: 16, right: 48, bottom: 32, left: 38 };
-const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
-const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
-const BASE_Y = MARGIN.top + PLOT_HEIGHT;
-
-/**
- * A count axis with integer ticks and at most five gridlines, always anchored
- * at 0. An empty window keeps a quiet 0–4 frame so the plot is never a bare
- * line.
- */
-function niceScale(maxValue: number): { max: number; ticks: number[] } {
-  if (maxValue <= 4) return { max: 4, ticks: [0, 2, 4] };
-  const rough = maxValue / 4;
-  const magnitude = 10 ** Math.floor(Math.log10(rough));
-  const norm = rough / magnitude;
-  const step =
-    (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * magnitude;
-  const max = Math.ceil(maxValue / step) * step;
-  const ticks: number[] = [];
-  for (let value = 0; value <= max + 1e-9; value += step) ticks.push(value);
-  return { max, ticks };
-}
-
-/** Indices that get an x-axis label: at most 7, always first and last. */
-function labelIndices(days: number): Set<number> {
-  const count = Math.min(days, 7);
-  const indices = new Set<number>();
-  if (count === 1) {
-    indices.add(0);
-    return indices;
-  }
-  for (let i = 0; i < count; i += 1) {
-    indices.add(Math.round((i * (days - 1)) / (count - 1)));
-  }
-  return indices;
-}
-
-function bucketX(index: number, days: number): number {
-  return MARGIN.left + (PLOT_WIDTH / days) * (index + 0.5);
-}
-
 function rateY(rate: number): number {
-  return MARGIN.top + PLOT_HEIGHT * (1 - rate / 100);
-}
-
-/** A column's top segment gets rounded shoulders; the stack stays crisp. */
-function roundedTopRect(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number
-): string {
-  const r = Math.max(0, Math.min(radius, width / 2, height));
-  return [
-    `M ${x} ${y + r}`,
-    `Q ${x} ${y} ${x + r} ${y}`,
-    `H ${x + width - r}`,
-    `Q ${x + width} ${y} ${x + width} ${y + r}`,
-    `V ${y + height}`,
-    `H ${x}`,
-    "Z",
-  ].join(" ");
+  return CHART_MARGIN.top + PLOT_HEIGHT * (1 - rate / 100);
 }
 
 function segmentPoints(buckets: TrendBucket[], days: number): Point[][] {
@@ -191,7 +140,7 @@ function TrendChart({
     <div className="ov-trend-plot">
       <svg
         className="ov-trend-svg"
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
         role="img"
         aria-label={chartSummary(trend, days)}
       >
@@ -201,14 +150,14 @@ function TrendChart({
           return (
             <g key={`grid-${tick}`}>
               <line
-                x1={MARGIN.left}
-                x2={WIDTH - MARGIN.right}
+                x1={CHART_MARGIN.left}
+                x2={CHART_WIDTH - CHART_MARGIN.right}
                 y1={y}
                 y2={y}
                 className="ov-trend-grid"
               />
               <text
-                x={MARGIN.left - 8}
+                x={CHART_MARGIN.left - 8}
                 y={y + 4}
                 textAnchor="end"
                 className="ov-trend-axis"
@@ -224,14 +173,14 @@ function TrendChart({
         {[0, 50, 100].map((rate) => (
           <g key={`rate-${rate}`}>
             <line
-              x1={WIDTH - MARGIN.right}
-              x2={WIDTH - MARGIN.right + 4}
+              x1={CHART_WIDTH - CHART_MARGIN.right}
+              x2={CHART_WIDTH - CHART_MARGIN.right + 4}
               y1={rateY(rate)}
               y2={rateY(rate)}
               className="ov-trend-axis-tick"
             />
             <text
-              x={WIDTH - MARGIN.right + 8}
+              x={CHART_WIDTH - CHART_MARGIN.right + 8}
               y={rateY(rate) + 4}
               textAnchor="start"
               className="ov-trend-axis"
@@ -243,8 +192,8 @@ function TrendChart({
 
         {/* baseline */}
         <line
-          x1={MARGIN.left}
-          x2={WIDTH - MARGIN.right}
+          x1={CHART_MARGIN.left}
+          x2={CHART_WIDTH - CHART_MARGIN.right}
           y1={BASE_Y}
           y2={BASE_Y}
           className="ov-trend-axis-line"
@@ -276,8 +225,8 @@ function TrendChart({
               <title>{bucketTitle(bucket)}</title>
               <rect
                 className="ov-trend-col-bg"
-                x={MARGIN.left + slot * index}
-                y={MARGIN.top}
+                x={CHART_MARGIN.left + slot * index}
+                y={CHART_MARGIN.top}
                 width={slot}
                 height={PLOT_HEIGHT}
               />
@@ -343,7 +292,7 @@ function TrendChart({
             <text
               key={`label-${bucket.date}`}
               x={bucketX(index, days)}
-              y={HEIGHT - 10}
+              y={CHART_HEIGHT - 10}
               textAnchor="middle"
               className="ov-trend-axis"
             >

@@ -8,9 +8,8 @@
  * that data filtered to this project. The active tab is decided by the route,
  * never by local state, so reloading a project always lands on Overview.
  *
- * Reports is deliberately a focusable `<span>`, not a dead link: it has
- * `aria-disabled`, no `href`, and its explanation is both a `title` (hover) and
- * an `aria-describedby` target (focus). There is no Todo tab — Qalm has no
+ * Every tab is a real link to a real route — Reports included — so the strip
+ * has no dead controls left to explain. There is no Todo tab — Qalm has no
  * todo resource.
  */
 
@@ -22,7 +21,7 @@ export interface ProjectTabsProps {
   projectId: string;
 }
 
-type TabKey = "overview" | "milestones" | "runs" | "cases";
+type TabKey = "overview" | "milestones" | "runs" | "cases" | "reports";
 
 export function ProjectTabs({ projectId }: ProjectTabsProps) {
   const pathname = usePathname();
@@ -33,7 +32,9 @@ export function ProjectTabs({ projectId }: ProjectTabsProps) {
       ? "runs"
       : pathname.startsWith("/cases")
         ? "cases"
-        : "overview";
+        : pathname.startsWith("/reports")
+          ? "reports"
+          : "overview";
 
   const tabs: Array<{ key: TabKey; label: string; href: string }> = [
     {
@@ -44,6 +45,7 @@ export function ProjectTabs({ projectId }: ProjectTabsProps) {
     { key: "milestones", label: "Milestones", href: `/milestones?${projectQuery}` },
     { key: "runs", label: "Test runs", href: `/runs?${projectQuery}` },
     { key: "cases", label: "Test cases", href: `/cases?${projectQuery}` },
+    { key: "reports", label: "Reports", href: `/reports?${projectQuery}` },
   ];
 
   return (
@@ -59,21 +61,7 @@ export function ProjectTabs({ projectId }: ProjectTabsProps) {
             </Link>
           </li>
         ))}
-        <li>
-          <span
-            className="project-tab-disabled"
-            aria-disabled="true"
-            tabIndex={0}
-            aria-describedby="project-tab-reports-hint"
-            title="Reports arrive in a later slice"
-          >
-            Reports
-          </span>
-        </li>
       </ul>
-      <span id="project-tab-reports-hint" className="sr-only">
-        Reports arrive in a later slice
-      </span>
     </nav>
   );
 }

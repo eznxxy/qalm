@@ -35,6 +35,65 @@ interface TrendData {
   };
 }
 
+/** One progress row as it arrives over HTTP, docs/api-reports.md § Resource. */
+interface ProgressRunData {
+  id: string;
+  name: string;
+  status: 'open' | 'completed';
+  plan_id: string | null;
+  plan_name: string | null;
+  milestone_id: string | null;
+  milestone_name: string | null;
+  start_date: string | null;
+  due_date: string | null;
+  counts: {
+    total: number;
+    passed: number;
+    failed: number;
+    blocked: number;
+    retest: number;
+    skipped: number;
+    untested: number;
+    percent_complete: number;
+  };
+  pass_rate: number | null;
+  results_in_window: number;
+  last_result_at: string | null;
+}
+
+interface ProgressData {
+  data: ProgressRunData[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+  };
+  items: {
+    total: number;
+    with_results: number;
+    untested: number;
+    percent_complete: number;
+  };
+}
+
+interface SummaryData {
+  project_id: string;
+  from: string;
+  to: string;
+  days: number;
+  filters: {
+    plan_id: string | null;
+    milestone_id: string | null;
+    status: 'open' | 'completed' | null;
+  };
+  trend: {
+    buckets: TrendBucketData[];
+    totals: TrendData['totals'];
+  };
+  progress: ProgressData;
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /** The UTC calendar date `offset` days from now, `YYYY-MM-DD`. */
@@ -114,18 +173,50 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
   /** Inserts a run directly; the reports read must not depend on the runs API. */
   const insertRun = async (
     targetProjectId: string,
-    options: { deletedAt?: string | null } = {},
+    options: {
+      deletedAt?: string | null;
+      planId?: string | null;
+      milestoneId?: string | null;
+      dueDate?: string | null;
+      completedAt?: string | null;
+      name?: string;
+    } = {},
   ): Promise<string> => {
     fixtureRunSeq += 1;
+    const completedAt = options.completedAt ?? null;
+    // Columns and values are appended in the same order, so the `$n` positions
+    // come from the array itself and can never drift.
+    const columns = [
+      'project_id',
+      'deleted_at',
+      'plan_id',
+      'milestone_id',
+      'due_date',
+      'completed_at',
+    ];
+    const values: unknown[] = [
+      targetProjectId,
+      options.deletedAt ?? null,
+      options.planId ?? null,
+      options.milestoneId ?? null,
+      options.dueDate ?? null,
+      completedAt,
+    ];
+    if (completedAt !== null) {
+      // runs_completed_pair rejects a completion without its author.
+      columns.push('completed_by');
+      values.push(userIds['admin']);
+    }
+    columns.push('name', 'created_by', 'updated_by');
+    values.push(
+      options.name ?? `Trend fixture ${fixtureRunSeq}`,
+      userIds['admin'],
+      userIds['admin'],
+    );
     const res = await test.db.query<{ id: string }>(
-      `INSERT INTO runs (project_id, name, created_by, updated_by, deleted_at)
-       VALUES ($1, $2, $3, $3, $4) RETURNING id`,
-      [
-        targetProjectId,
-        `Trend fixture ${fixtureRunSeq}`,
-        userIds['admin'],
-        options.deletedAt ?? null,
-      ],
+      `INSERT INTO runs (${columns.join(', ')})
+       VALUES (${columns.map((_column, index) => `$${index + 1}`).join(', ')}) RETURNING id`,
+      values,
     );
     return res.rows[0]!.id;
   };
@@ -177,6 +268,33 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       await record(itemId, entry.status, entry.at);
     }
   };
+
+  const insertPlan = async (targetProjectId: string, name: string): Promise<string> => {
+    const res = await test.db.query<{ id: string }>(
+      `INSERT INTO plans (project_id, name, created_by, updated_by)
+       VALUES ($1, $2, $3, $3) RETURNING id`,
+      [targetProjectId, name, userIds['admin']],
+    );
+    return res.rows[0]!.id;
+  };
+
+  const insertMilestone = async (
+    targetProjectId: string,
+    name: string,
+    dueDate?: string,
+  ): Promise<string> => {
+    const res = await test.db.query<{ id: string }>(
+      `INSERT INTO milestones (project_id, name, created_by, updated_by, due_date)
+       VALUES ($1, $2, $3, $3, $4) RETURNING id`,
+      [targetProjectId, name, userIds['admin'], dueDate ?? null],
+    );
+    return res.rows[0]!.id;
+  };
+
+  const getSummary = (role: UserRole, targetProjectId = projectId, query = '') =>
+    test.req
+      .get(`/api/v1/projects/${targetProjectId}/reports/summary${query ? `?${query}` : ''}`)
+      .set(as(role));
 
   describe('window', () => {
     it('defaults to 14 zero-filled UTC days ending today', async () => {
@@ -400,6 +518,311 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
         expect(res.status).toBe(404);
         expect(res.body.error.code).toBe('NOT_FOUND');
       }
+    });
+  });
+
+  describe('GET /projects/:projectId/reports/summary', () => {
+    it('defaults to 30 buckets and echoes the resolved window and filters', async () => {
+      const res = await getSummary('viewer');
+
+      expect(res.status).toBe(200);
+      const data = res.body.data as SummaryData;
+      expect(data).toMatchObject({
+        project_id: projectId,
+        from: utcDay(-29),
+        to: utcDay(0),
+        days: 30,
+        filters: { plan_id: null, milestone_id: null, status: null },
+      });
+      expect(data.trend.buckets.map((bucket) => bucket.date)).toEqual(expectedDays(30));
+      expect(data.trend.buckets[29]).toEqual({
+        date: utcDay(0),
+        status_counts: zeroCounts,
+        total: 0,
+        pass_rate: null,
+      });
+      expect(data.progress).toEqual({
+        data: [],
+        meta: { page: 1, limit: 25, total: 0, total_pages: 1 },
+        items: { total: 0, with_results: 0, untested: 0, percent_complete: 0 },
+      });
+    });
+
+    it('days=1 is a single bucket ending today', async () => {
+      const data = (await getSummary('viewer', projectId, 'days=1')).body.data as SummaryData;
+
+      expect(data.days).toBe(1);
+      expect(data.from).toBe(utcDay(0));
+      expect(data.from).toBe(data.to);
+      expect(data.trend.buckets).toHaveLength(1);
+      expect(data.trend.buckets[0]).toEqual({
+        date: utcDay(0),
+        status_counts: zeroCounts,
+        total: 0,
+        pass_rate: null,
+      });
+    });
+
+    it('rejects days=0, days=91 and days=1.5 with a 400 on days', async () => {
+      for (const days of ['0', '91', '1.5']) {
+        const res = await getSummary('admin', projectId, `days=${days}`);
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        expect(res.body.error.details[0].field).toBe('days');
+      }
+    });
+
+    it('uses UTC day boundaries: 00:00Z on from counts, 23:59:59.999Z on from - 1 does not', async () => {
+      await recordMany([
+        { status: 'passed', at: `${utcDay(-1)}T00:00:00.000Z` },
+        { status: 'failed', at: `${utcDay(-2)}T23:59:59.999Z` },
+      ]);
+
+      const data = (await getSummary('admin', projectId, 'days=2')).body.data as SummaryData;
+
+      expect(data.from).toBe(utcDay(-1));
+      expect(data.trend.buckets[0]).toMatchObject({
+        date: utcDay(-1),
+        total: 1,
+        status_counts: { ...zeroCounts, passed: 1 },
+        pass_rate: 100,
+      });
+      expect(data.trend.buckets[0]!.status_counts.failed).toBe(0);
+      expect(data.trend.totals.total).toBe(1);
+      expect(data.progress.data[0]!.results_in_window).toBe(1);
+    });
+
+    it('keeps a stale run in progress while its results_in_window is zero', async () => {
+      const runId = await insertRun(projectId);
+      await record(await insertItem(runId), 'passed', `${utcDay(-40)}T09:00:00.000Z`);
+
+      const data = (await getSummary('admin', projectId, 'days=7')).body.data as SummaryData;
+
+      expect(data.trend.totals.total).toBe(0);
+      const run = data.progress.data[0]!;
+      expect(run.counts.passed).toBe(1);
+      expect(run.counts.percent_complete).toBe(100);
+      expect(run.results_in_window).toBe(0);
+      // Activity is not window-limited: the last touch is still visible.
+      expect(run.last_result_at).toBe(`${utcDay(-40)}T09:00:00.000Z`);
+    });
+
+    it('counts a retest in trend without changing the run’s counts', async () => {
+      const runId = await insertRun(projectId);
+      const itemId = await insertItem(runId);
+      await record(itemId, 'passed', `${utcDay(0)}T08:00:00.000Z`);
+      await record(itemId, 'retest', `${utcDay(0)}T09:00:00.000Z`);
+
+      const data = (await getSummary('admin', projectId, 'days=7')).body.data as SummaryData;
+
+      expect(data.trend.totals.status_counts).toMatchObject({ passed: 1, retest: 1 });
+      expect(data.trend.totals.total).toBe(2);
+      const run = data.progress.data[0]!;
+      expect(run.counts.retest).toBe(1);
+      expect(run.counts.passed).toBe(0);
+      expect(run.counts.total).toBe(1);
+      expect(run.pass_rate).toBe(0);
+      expect(run.results_in_window).toBe(2);
+    });
+
+    it('plan_id=none and milestone_id=none select the null groups', async () => {
+      const planId = await insertPlan(projectId, 'Release 1');
+      const milestoneId = await insertMilestone(projectId, 'Release 1', utcDay(14));
+      const linked = await insertRun(projectId, { planId, milestoneId });
+      await record(await insertItem(linked), 'passed', `${utcDay(0)}T08:00:00.000Z`);
+      const bare = await insertRun(projectId);
+      await record(await insertItem(bare), 'passed', `${utcDay(0)}T09:00:00.000Z`);
+
+      const byPlan = (await getSummary('admin', projectId, 'plan_id=none'))
+        .body.data as SummaryData;
+      expect(byPlan.filters.plan_id).toBe('none');
+      expect(byPlan.progress.data.map((run) => run.id)).toEqual([bare]);
+      expect(byPlan.progress.meta.total).toBe(1);
+      expect(byPlan.progress.items.total).toBe(1);
+      expect(byPlan.trend.totals.total).toBe(1);
+
+      const byMilestone = (await getSummary('admin', projectId, 'milestone_id=none'))
+        .body.data as SummaryData;
+      expect(byMilestone.filters.milestone_id).toBe('none');
+      expect(byMilestone.progress.data.map((run) => run.id)).toEqual([bare]);
+      expect(byMilestone.trend.totals.total).toBe(1);
+
+      const byPlanId = (await getSummary('admin', projectId, `plan_id=${planId}`))
+        .body.data as SummaryData;
+      expect(byPlanId.filters.plan_id).toBe(planId);
+      expect(byPlanId.progress.data.map((run) => run.id)).toEqual([linked]);
+    });
+
+    it('an unknown plan uuid returns an empty 200, not 404', async () => {
+      const runId = await insertRun(projectId);
+      await record(await insertItem(runId), 'passed', `${utcDay(0)}T08:00:00.000Z`);
+      const unknown = '00000000-0000-4000-8000-000000000000';
+
+      const res = await getSummary('admin', projectId, `plan_id=${unknown}`);
+
+      expect(res.status).toBe(200);
+      const data = res.body.data as SummaryData;
+      expect(data.filters.plan_id).toBe(unknown);
+      expect(data.trend.buckets.every((bucket) => bucket.total === 0)).toBe(true);
+      expect(data.trend.totals.total).toBe(0);
+      expect(data.progress.data).toEqual([]);
+      expect(data.progress.meta).toMatchObject({ total: 0, total_pages: 1 });
+      expect(data.progress.items.total).toBe(0);
+    });
+
+    it('status filters both sections and closing a run moves its earlier results', async () => {
+      const runId = await insertRun(projectId);
+      await record(await insertItem(runId), 'passed', `${utcDay(-1)}T09:00:00.000Z`);
+
+      const open = (await getSummary('admin', projectId, 'status=open&days=7'))
+        .body.data as SummaryData;
+      expect(open.trend.totals.status_counts['passed']).toBe(1);
+      expect(open.progress.data.map((run) => run.id)).toEqual([runId]);
+      expect(open.progress.items.total).toBe(1);
+
+      // The API, not raw SQL, so the derived completed_at/completed_by is what
+      // the report reads. Closing is admin/lead only.
+      const closed = await test.req.post(`/api/v1/runs/${runId}/close`).set(as('admin'));
+      expect(closed.status).toBe(200);
+
+      const completed = (await getSummary('admin', projectId, 'status=completed&days=7'))
+        .body.data as SummaryData;
+      expect(completed.trend.totals.status_counts['passed']).toBe(1);
+      expect(completed.progress.data.map((run) => run.id)).toEqual([runId]);
+      expect(completed.progress.data[0]!.status).toBe('completed');
+      expect(completed.progress.items.total).toBe(1);
+
+      const stillOpen = (await getSummary('admin', projectId, 'status=open&days=7'))
+        .body.data as SummaryData;
+      expect(stillOpen.trend.totals.total).toBe(0);
+      expect(stillOpen.progress.data).toEqual([]);
+      expect(stillOpen.progress.items.total).toBe(0);
+    });
+
+    it('progress.items covers every matching run, not just the page', async () => {
+      const first = await insertRun(projectId);
+      await record(await insertItem(first), 'passed', `${utcDay(0)}T08:00:00.000Z`);
+      await record(await insertItem(first), 'failed', `${utcDay(0)}T08:01:00.000Z`);
+      const second = await insertRun(projectId);
+      await record(await insertItem(second), 'passed', `${utcDay(0)}T09:00:00.000Z`);
+
+      const data = (await getSummary('admin', projectId, 'limit=1')).body.data as SummaryData;
+
+      expect(data.progress.data).toHaveLength(1);
+      expect(data.progress.meta).toEqual({ page: 1, limit: 1, total: 2, total_pages: 2 });
+      expect(data.progress.items).toEqual({
+        total: 3,
+        with_results: 3,
+        untested: 0,
+        percent_complete: 100,
+      });
+    });
+
+    it('orders open runs first, then due_date ascending with undated last, then name', async () => {
+      // Created out of order on purpose: the sequence must come from the
+      // contract, never from insertion order.
+      const completed = await insertRun(projectId, {
+        dueDate: utcDay(1),
+        completedAt: `${utcDay(0)}T08:00:00.000Z`,
+      });
+      const openUndated = await insertRun(projectId);
+      const openLater = await insertRun(projectId, { dueDate: utcDay(10) });
+      const openSooner = await insertRun(projectId, { dueDate: utcDay(2) });
+      // Same due date, and `Zulu` is inserted before `alpha`, so only a
+      // case-insensitive (lower(name)) ascending sort can put alpha first.
+      // Runs cannot tie on name — `(project_id, lower(name))` is unique among
+      // live runs — so the contract's `id` tiebreak (step 4) is unreachable
+      // from legal data and is not asserted here.
+      const zulu = await insertRun(projectId, { dueDate: utcDay(3), name: 'Zulu' });
+      const alpha = await insertRun(projectId, { dueDate: utcDay(3), name: 'alpha' });
+
+      const data = (await getSummary('admin', projectId)).body.data as SummaryData;
+
+      expect(data.progress.data.map((run) => run.id)).toEqual([
+        openSooner,
+        alpha,
+        zulu,
+        openLater,
+        openUndated,
+        completed,
+      ]);
+      expect(data.progress.data.map((run) => run.status)).toEqual([
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'completed',
+      ]);
+    });
+
+    it('a run with zero items reports zero counts and a null pass rate', async () => {
+      await insertRun(projectId);
+
+      const data = (await getSummary('admin', projectId)).body.data as SummaryData;
+
+      const run = data.progress.data[0]!;
+      expect(run.counts).toEqual({
+        total: 0,
+        passed: 0,
+        failed: 0,
+        blocked: 0,
+        retest: 0,
+        skipped: 0,
+        untested: 0,
+        percent_complete: 0,
+      });
+      expect(run.pass_rate).toBeNull();
+      expect(run.results_in_window).toBe(0);
+      expect(run.last_result_at).toBeNull();
+      expect(data.progress.items).toEqual({
+        total: 0,
+        with_results: 0,
+        untested: 0,
+        percent_complete: 0,
+      });
+    });
+
+    it('a page past the last page is an empty 200 with the real meta', async () => {
+      await insertRun(projectId);
+
+      const data = (await getSummary('admin', projectId, 'page=99')).body.data as SummaryData;
+
+      expect(data.progress.data).toEqual([]);
+      expect(data.progress.meta).toEqual({ page: 99, limit: 25, total: 1, total_pages: 1 });
+    });
+
+    it('archived project: 200 for Admin, 404 for the other roles', async () => {
+      await insertRun(projectId);
+      await archiveProject(projectId);
+
+      const admin = await getSummary('admin');
+      expect(admin.status).toBe(200);
+      expect(admin.body.error).toBeUndefined();
+
+      for (const role of ['lead', 'tester', 'viewer'] as UserRole[]) {
+        const res = await getSummary(role);
+        expect(res.status).toBe(404);
+        expect(res.body.error.code).toBe('NOT_FOUND');
+      }
+    });
+
+    it('a Viewer gets the same body as an Admin', async () => {
+      const planId = await insertPlan(projectId, 'Release 1');
+      const milestoneId = await insertMilestone(projectId, 'Release 1', utcDay(7));
+      const runId = await insertRun(projectId, {
+        planId,
+        milestoneId,
+        dueDate: utcDay(7),
+      });
+      await record(await insertItem(runId), 'passed', `${utcDay(0)}T08:00:00.000Z`);
+
+      const admin = await getSummary('admin');
+      const viewer = await getSummary('viewer');
+
+      expect(admin.status).toBe(200);
+      expect(viewer.status).toBe(200);
+      expect(viewer.body.data).toEqual(admin.body.data);
     });
   });
 });

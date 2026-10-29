@@ -1,0 +1,191 @@
+/*
+ * Failures-over-time card (docs/DESIGN.md §4.9). Status colours are the §2.2
+ * solids — no new palette. The card mirrors the overview trend's spacing so
+ * the two charts read as the same object at different scopes.
+ */
+
+.rep-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: var(--space-5);
+}
+
+.rep-failures {
+  min-width: 0;
+}
+
+.rep-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.rep-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.rep-toggle {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink-700);
+  height: var(--control-height-small);
+}
+
+.rep-toggle:hover {
+  background: var(--canvas);
+}
+
+/* ---------- plot ---------- */
+
+.rep-plot {
+  position: relative;
+}
+
+.rep-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.rep-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+
+.rep-axis-line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.rep-axis {
+  fill: var(--ink-500);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The column is the tooltip target; the title lives on the <g>. */
+.rep-col:hover .rep-bar {
+  opacity: 0.85;
+}
+
+.rep-bar {
+  stroke: none;
+}
+
+.rep-bar-failed {
+  fill: var(--failed);
+}
+
+.rep-bar-blocked {
+  fill: var(--blocked);
+}
+
+.rep-bar-retest {
+  fill: var(--retest);
+}
+
+/* Sit the copy on the card surface so gridlines do not run through it. */
+.rep-empty {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 85%;
+  margin: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink-700);
+  text-align: center;
+}
+
+/* ---------- legend and footer ---------- */
+
+.rep-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-700);
+  font-size: 12px;
+}
+
+.rep-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rep-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.rep-swatch-failed {
+  background: var(--failed);
+}
+
+.rep-swatch-blocked {
+  background: var(--blocked);
+}
+
+.rep-swatch-retest {
+  background: var(--retest);
+}
+
+.rep-note {
+  margin: var(--space-3) 0 0;
+  color: var(--ink-500);
+  font-size: 11px;
+}
+
+/* ---------- table view ---------- */
+
+.rep-table-wrap {
+  overflow-x: auto;
+}
+
+.rep-failures-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rep-failures-table th,
+.rep-failures-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.rep-failures-table thead th {
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.rep-failures-table tbody th {
+  font-weight: 500;
+}
+
+.rep-failures-table .rep-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
