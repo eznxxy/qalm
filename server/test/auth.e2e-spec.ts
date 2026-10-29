@@ -119,6 +119,24 @@ describe('Auth API — bootstrap, login, guard (integration)', () => {
   });
 
   describe('POST /api/v1/auth/login', () => {
+    it('ignores a spoofed X-Forwarded-For when counting failures', async () => {
+      // Every attempt claims a different client address. The limiter keys on
+      // the socket peer unless TRUST_PROXY=true, so the 11th attempt for one
+      // email is blocked no matter what the header says.
+      let status = 0;
+      let code = '';
+      for (let attempt = 1; attempt <= 11; attempt++) {
+        const res = await test.req
+          .post('/api/v1/auth/login')
+          .set('X-Forwarded-For', `203.0.113.${attempt}`)
+          .send({ email: 'ghost@example.com', password: 'wrong-wrong1' });
+        status = res.status;
+        code = res.body.error?.code ?? '';
+      }
+      expect(status).toBe(429);
+      expect(code).toBe('RATE_LIMITED');
+    });
+
     it('returns the session shape with a refresh cookie (200)', async () => {
       await seedUser(test.db, { email: 'ada@example.com', role: 'admin' });
       const res = await test.req.post('/api/v1/auth/login').send({
@@ -160,8 +178,9 @@ describe('Auth API — bootstrap, login, guard (integration)', () => {
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('429 RATE_LIMITED with Retry-After after 10 failures; other IPs unaffected', async () => {
+    it('429 RATE_LIMITED with Retry-After after 10 failures; another email is unaffected', async () => {
       await seedUser(test.db, { email: 'ada@example.com', role: 'viewer' });
+      await seedUser(test.db, { email: 'grace@example.com', role: 'viewer' });
       for (let i = 0; i < 10; i++) {
         const res = await test.req.post('/api/v1/auth/login')
           .set('X-Forwarded-For', '203.0.113.7')
@@ -177,11 +196,45 @@ describe('Auth API — bootstrap, login, guard (integration)', () => {
       expect(retryAfter).toBeGreaterThan(0);
       expect(retryAfter).toBeLessThanOrEqual(900);
 
-      // Different IP, same email: still allowed.
-      const otherIp = await test.req.post('/api/v1/auth/login')
+      // Same socket peer, different email: a separate counter, still allowed.
+      // A different address cannot be simulated from one socket unless the app
+      // trusts the proxy - see the TRUST_PROXY opt-in test below.
+      const otherEmail = await test.req.post('/api/v1/auth/login')
         .set('X-Forwarded-For', '198.51.100.9')
-        .send({ email: 'ada@example.com', password: SHARED_FIXTURE_PASSWORD });
-      expect(otherIp.status).toBe(200);
+        .send({ email: 'grace@example.com', password: SHARED_FIXTURE_PASSWORD });
+      expect(otherEmail.status).toBe(200);
+    }, 60000);
+
+    it('honours X-Forwarded-For only when TRUST_PROXY=true', async () => {
+      const previous = process.env['TRUST_PROXY'];
+      process.env['TRUST_PROXY'] = 'true';
+      let proxied: TestApp | undefined;
+      try {
+        proxied = await createTestApp();
+        // Eleven failures from eleven claimed addresses are eleven counters,
+        // so none of them reaches 429.
+        for (let attempt = 1; attempt <= 11; attempt++) {
+          const res = await proxied.req.post('/api/v1/auth/login')
+            .set('X-Forwarded-For', `198.51.100.${attempt}`)
+            .send({ email: 'proxied-a@example.com', password: 'wrong-wrong1' });
+          expect(res.status).toBe(401);
+        }
+        // One claimed address, eleven failures: the counter still applies.
+        for (let attempt = 1; attempt <= 10; attempt++) {
+          const res = await proxied.req.post('/api/v1/auth/login')
+            .set('X-Forwarded-For', '203.0.113.50')
+            .send({ email: 'proxied-b@example.com', password: 'wrong-wrong1' });
+          expect(res.status).toBe(401);
+        }
+        const limited = await proxied.req.post('/api/v1/auth/login')
+          .set('X-Forwarded-For', '203.0.113.50')
+          .send({ email: 'proxied-b@example.com', password: 'wrong-wrong1' });
+        expect(limited.status).toBe(429);
+      } finally {
+        if (proxied) await proxied.close();
+        if (previous === undefined) delete process.env['TRUST_PROXY'];
+        else process.env['TRUST_PROXY'] = previous;
+      }
     }, 60000);
   });
 

@@ -161,11 +161,10 @@ export const CurrentUser = createParamDecorator(
 export const ClientIp = createParamDecorator(
   (_data: unknown, context: ExecutionContext): string => {
     const request = context.switchToHttp().getRequest<Request>();
-    const forwarded = request.headers['x-forwarded-for'];
-    if (typeof forwarded === 'string' && forwarded.length > 0) {
-      const first = forwarded.split(',')[0]?.trim();
-      if (first) return first;
-    }
-    return request.socket?.remoteAddress || 'unknown';
+    // Express derives `request.ip` from the socket peer. It consults
+    // `X-Forwarded-For` only when `trust proxy` is enabled (TRUST_PROXY=true);
+    // this decorator never reads the header itself, so by default a spoofed
+    // value cannot reset the login rate limiter.
+    return request.ip || request.socket?.remoteAddress || 'unknown';
   },
 );

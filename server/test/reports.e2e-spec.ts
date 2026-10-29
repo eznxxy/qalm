@@ -653,6 +653,26 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       expect(byPlanId.progress.data.map((run) => run.id)).toEqual([linked]);
     });
 
+    it('drops a soft-deleted milestone name while keeping its id, like the runs list', async () => {
+      const milestoneId = await insertMilestone(projectId, 'Retired milestone');
+      const runId = await insertRun(projectId, { milestoneId });
+      // The service detaches runs before it soft-deletes, so this state is only
+      // reachable if that transaction is bypassed. The two read paths must still
+      // agree: the runs list joins milestones with `deleted_at IS NULL`, so the
+      // id survives and the name does not.
+      await test.db.query(
+        'UPDATE milestones SET deleted_at = now() WHERE id = $1',
+        [milestoneId],
+      );
+
+      const data = (await getSummary('admin')).body.data as SummaryData;
+      const row = data.progress.data.find((run) => run.id === runId);
+
+      expect(row).toBeDefined();
+      expect(row!.milestone_id).toBe(milestoneId);
+      expect(row!.milestone_name).toBeNull();
+    });
+
     it('an unknown plan uuid returns an empty 200, not 404', async () => {
       const runId = await insertRun(projectId);
       await record(await insertItem(runId), 'passed', `${utcDay(0)}T08:00:00.000Z`);

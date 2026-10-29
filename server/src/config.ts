@@ -25,6 +25,13 @@ export interface AppConfig {
    * working directory; default `./storage`. Never logged; gitignored.
    */
   storageDir: string;
+  /**
+   * Trust `X-Forwarded-For` from a reverse proxy. Off unless TRUST_PROXY is
+   * exactly "true". With it off, Express derives `request.ip` from the socket
+   * peer, so a spoofed header cannot reset the login rate limiter
+   * (docs/api-auth.md § login).
+   */
+  trustProxy: boolean;
 }
 
 export class ConfigError extends Error {
@@ -150,6 +157,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     problems.push('STORAGE_DIR must be a non-empty path');
   }
 
+  const trustProxyRaw = env['TRUST_PROXY'] ?? '';
+  if (trustProxyRaw !== '' && trustProxyRaw !== 'true') {
+    problems.push('TRUST_PROXY must be empty or exactly "true"');
+  }
+
   if (problems.length > 0) {
     throw new ConfigError(problems);
   }
@@ -164,6 +176,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     refreshCookieSecure: secureRaw === 'true',
     corsOrigins,
     storageDir,
+    trustProxy: trustProxyRaw === 'true',
   };
 }
 

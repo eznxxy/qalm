@@ -18,6 +18,7 @@ const CONFIG: AppConfig = {
   refreshCookieSecure: false,
   corsOrigins: [],
   storageDir: './storage',
+  trustProxy: false,
 };
 
 interface FakeUser {

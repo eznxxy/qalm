@@ -209,6 +209,7 @@ export class ReportsStore {
          FROM runs r
          LEFT JOIN plans p ON p.id = r.plan_id
          LEFT JOIN milestones m ON m.id = r.milestone_id
+                               AND m.deleted_at IS NULL
          LEFT JOIN run_items i ON i.run_id = r.id
          ${LATEST_RESULT_JOIN}
         WHERE r.project_id = $1

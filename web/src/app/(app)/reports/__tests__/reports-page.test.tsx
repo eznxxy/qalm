@@ -537,6 +537,84 @@ describe("reports screen", () => {
     expect(chartTitles()).toHaveLength(7);
   });
 
+  it("never leaves the previous project's report under a new project's breadcrumb", async () => {
+    mockApi();
+    const { view, tree } = await renderPage();
+    await screen.findByText("97.9%");
+    expect(
+      screen.getByRole("option", { name: "Release 2.4" })
+    ).toBeInTheDocument();
+
+    // Project B answers its own fetch, but its report and its filter options
+    // are slow. Nothing from project A may stay on screen meanwhile.
+    const second: Project = {
+      ...PROJECT,
+      id: "p-2",
+      key: "CRM",
+      name: "Customer portal",
+    };
+    const heldReport = deferred<ReportSummary>();
+    const heldOptions = deferred<void>();
+    const base = fetchMock.getMockImplementation();
+    if (!base) throw new Error("fetch mock is not installed");
+    fetchMock.mockImplementation((url: string, init?: unknown) => {
+      const target = String(url);
+      if (/\/projects\/p-2$/.test(target)) {
+        return Promise.resolve(jsonResponse(200, { data: second }));
+      }
+      if (/\/projects\/p-2\/(plans|milestones)\?/.test(target)) {
+        return heldOptions.promise.then(() =>
+          jsonResponse(200, {
+            data: [],
+            meta: { page: 1, limit: 100, total: 0, total_pages: 1 },
+          })
+        );
+      }
+      if (target.includes("/projects/p-2/reports/summary")) {
+        return heldReport.promise.then((body) =>
+          jsonResponse(200, { data: body })
+        );
+      }
+      return base(url, init);
+    });
+
+    moveTo(view, tree, "project=p-2");
+
+    await screen.findByText(/Customer portal/);
+    expect(screen.queryByText("97.9%")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Pass rate" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Release 2.4" })
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      heldOptions.resolve();
+      heldReport.resolve(
+        summary({
+          project_id: "p-2",
+          trend: {
+            buckets: [bucket("2026-10-28", 1, 1, 0)],
+            totals: {
+              status_counts: {
+                passed: 1,
+                failed: 1,
+                blocked: 0,
+                retest: 0,
+                skipped: 0,
+              },
+              total: 2,
+              pass_rate: 50,
+            },
+          },
+        })
+      );
+    });
+
+    expect(await screen.findByText("50%")).toBeInTheDocument();
+  });
+
   it("maps the plan, milestone and status filters to the API and shows Reset filters only when they are set", async () => {
     mockApi();
     // A non-default window rides along so Reset can prove it keeps it.
