@@ -11,7 +11,9 @@ import { ReportSummaryQuery, TrendQuery } from './reports.dto';
 import { ReportsService } from './reports.service';
 
 /**
- * Project reports, docs/api-project-overview.md § Endpoint:
+ * Project reports. The trend route is documented in
+ * docs/api-project-overview.md § Endpoint; the summary (same trend body plus
+ * filtered run progress) in docs/api-reports.md § Endpoint:
  *   GET /projects/:projectId/reports/trend    any authenticated role
  *   GET /projects/:projectId/reports/summary  any authenticated role
  * Read-only; every role may read results already. The archived-project rule

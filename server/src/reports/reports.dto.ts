@@ -6,9 +6,10 @@ import { TREND_MAX_DAYS, TREND_MIN_DAYS } from './reports.constants';
 import type { ReportStatus } from './reports.filters';
 
 /**
- * Query DTOs for the reports endpoints, docs/api-project-overview.md
- * § Endpoint. `days` is the only input; `from`/`to` are derived so a client
- * cannot ask for an unbounded window.
+ * Query DTOs for the reports endpoints. The trend route takes only `days`
+ * (docs/api-project-overview.md § Endpoint); the summary adds the `none`
+ * filters and paging (docs/api-reports.md § Endpoint). `days` is 1–90 either
+ * way; `from`/`to` are derived so a client cannot ask for an unbounded window.
  */
 function transformToNumber(): PropertyDecorator {
   return Transform((params: TransformFnParams): unknown => {
