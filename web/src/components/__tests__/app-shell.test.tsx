@@ -204,7 +204,7 @@ describe("sidebar navigation", () => {
   it("points sections at their routes", async () => {
     await renderShell();
 
-    for (const [label, href] of [
+    for (const [label, route] of [
       ["Overview", "/wip/overview"],
       ["Test cases", "/cases"],
       ["Test runs", "/runs"],
@@ -212,7 +212,11 @@ describe("sidebar navigation", () => {
       ["Reports", "/reports"],
       ["Settings", "/settings"],
     ] as const) {
-      expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", expect.stringContaining(href));
+      // Compare the pathname, not a substring: a retired /wip/reports would
+      // still contain "/reports" and would pass a stringContaining assertion.
+      // The query string is the project scope and is allowed to differ.
+      const href = screen.getByRole("link", { name: label }).getAttribute("href");
+      expect(new URL(href ?? "", "http://localhost").pathname).toBe(route);
     }
   });
 
