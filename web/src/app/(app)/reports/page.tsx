@@ -155,6 +155,9 @@ export default function ReportsPage() {
   // unaffected.
   const [plans, setPlans] = useState<Plan[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  // Which project the two lists came from. A switch to another project must
+  // not offer the previous project's plans/milestones, not even for a frame.
+  const [optionsFor, setOptionsFor] = useState<string | null>(null);
   useEffect(() => {
     if (!projectId) return;
     let active = true;
@@ -169,12 +172,14 @@ export default function ReportsPage() {
         if (!active) return;
         setPlans(planPage.data);
         setMilestones(milestonePage.data);
+        setOptionsFor(projectId);
       } catch (err) {
         // A session death is already handled by RequireAuth.
         if (isSessionDead(err)) return;
         if (active) {
           setPlans([]);
           setMilestones([]);
+          setOptionsFor(projectId);
         }
       }
     })();
@@ -196,9 +201,13 @@ export default function ReportsPage() {
       if (!active) return;
       // A filter/window change on a screen that already has a summary keeps
       // the old numbers visible (and marks them busy) instead of blanking the
-      // page back to skeletons. The first load has nothing to keep.
+      // page back to skeletons. The first load has nothing to keep, and a
+      // different project is a different report.
       setReport((previous) =>
-        previous.kind === "ready" ? previous : { kind: "loading" }
+        previous.kind === "ready" &&
+        previous.summary.project_id === projectId
+          ? previous
+          : { kind: "loading" }
       );
       setRefreshing(true);
       try {
@@ -319,7 +328,14 @@ export default function ReportsPage() {
     );
   }
 
-  const summary = report.kind === "ready" ? report.summary : null;
+  // The payload names its project, so a retained summary from the previous
+  // project cannot be shown under this one — not even for the first frame.
+  const summary =
+    report.kind === "ready" && report.summary.project_id === projectId
+      ? report.summary
+      : null;
+  const planOptions = optionsFor === projectId ? plans : [];
+  const milestoneOptions = optionsFor === projectId ? milestones : [];
 
   return (
     <div className="page rep-page">
@@ -351,7 +367,7 @@ export default function ReportsPage() {
           }
         >
           <option value="">All plans</option>
-          {plans.map((plan) => (
+          {planOptions.map((plan) => (
             <option key={plan.id} value={plan.id}>
               {plan.name}
             </option>
@@ -361,7 +377,7 @@ export default function ReportsPage() {
               filter that is actually applied, and the URL is not rewritten. */}
           {url.planId &&
             url.planId !== "none" &&
-            !plans.some((plan) => plan.id === url.planId) && (
+            !planOptions.some((plan) => plan.id === url.planId) && (
               <option value={url.planId}>{url.planId}</option>
             )}
           <option value="none">No plan</option>
@@ -375,14 +391,14 @@ export default function ReportsPage() {
           }
         >
           <option value="">All milestones</option>
-          {milestones.map((milestone) => (
+          {milestoneOptions.map((milestone) => (
             <option key={milestone.id} value={milestone.id}>
               {milestone.name}
             </option>
           ))}
           {url.milestoneId &&
             url.milestoneId !== "none" &&
-            !milestones.some(
+            !milestoneOptions.some(
               (milestone) => milestone.id === url.milestoneId
             ) && <option value={url.milestoneId}>{url.milestoneId}</option>}
           <option value="none">No milestone</option>
