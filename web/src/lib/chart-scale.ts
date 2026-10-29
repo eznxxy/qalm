@@ -50,6 +50,29 @@ export function bucketX(index: number, days: number): number {
   return CHART_MARGIN.left + (PLOT_WIDTH / days) * (index + 0.5);
 }
 
+/** One day's slice of the plot; a one-day window owns all of it. */
+export function slotWidth(days: number): number {
+  return PLOT_WIDTH / Math.max(days, 1);
+}
+
+/**
+ * A column is a little over half its slot but keeps a readable floor and a
+ * ceiling (a one-day window may pass a taller cap than the seven-plus ones).
+ */
+export function barWidthFor(days: number, maxBar = 46): number {
+  return Math.max(5, Math.min(maxBar, slotWidth(days) * 0.56));
+}
+
+/** Shoulder radius for a column's top segment: softer as the column widens. */
+export function barRadius(barWidth: number): number {
+  return barWidth >= 34 ? 4 : barWidth >= 12 ? 3 : 2;
+}
+
+/** A count's y position on the share count axis, anchored at `BASE_Y` for 0. */
+export function valueY(value: number, yMax: number): number {
+  return BASE_Y - (value / yMax) * PLOT_HEIGHT;
+}
+
 /** A column's top segment gets rounded shoulders; the stack stays crisp. */
 export function roundedTopRect(
   x: number,

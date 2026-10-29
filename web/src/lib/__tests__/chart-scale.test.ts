@@ -1,10 +1,16 @@
 import {
+  BASE_Y,
   CHART_MARGIN,
+  PLOT_HEIGHT,
   PLOT_WIDTH,
+  barRadius,
+  barWidthFor,
   bucketX,
   labelIndices,
   niceScale,
   roundedTopRect,
+  slotWidth,
+  valueY,
 } from "../chart-scale";
 
 describe("niceScale", () => {
@@ -38,8 +44,37 @@ describe("bucketX", () => {
   });
 });
 
-describe("roundedTopRect", () => {
-  it("clamps the radius to half the width and to the segment height", () => {
+describe("slotWidth, barWidthFor and barRadius", () => {
+  it("splits the plot into one slot per day and narrows the column with it", () => {
+    expect(slotWidth(7)).toBeCloseTo(PLOT_WIDTH / 7);
+    const narrow = barWidthFor(30);
+    expect(narrow).toBeCloseTo((PLOT_WIDTH / 30) * 0.56);
+    expect(narrow).toBeGreaterThanOrEqual(5);
+  });
+
+  it("lets a single-day column grow to its own cap and never past the default", () => {
+    expect(barWidthFor(1, 88)).toBe(88);
+    expect(barWidthFor(1)).toBe(46);
+    // A one-day window still occupies one whole slot.
+    expect(slotWidth(1)).toBe(PLOT_WIDTH);
+  });
+
+  it("steps the shoulder radius down with the column width", () => {
+    expect(barRadius(46)).toBe(4);
+    expect(barRadius(20)).toBe(3);
+    expect(barRadius(6)).toBe(2);
+  });
+});
+
+describe("valueY", () => {
+  it("anchors zero at the baseline and the axis maximum at the plot top", () => {
+    expect(valueY(0, 10)).toBe(BASE_Y);
+    expect(valueY(10, 10)).toBeCloseTo(CHART_MARGIN.top);
+    expect(valueY(5, 10)).toBeCloseTo(BASE_Y - PLOT_HEIGHT / 2);
+  });
+});
+
+describe("roundedTopRect", () => {  it("clamps the radius to half the width and to the segment height", () => {
     expect(roundedTopRect(10, 10, 10, 4, 99)).toBe(
       "M 10 14 Q 10 10 14 10 H 16 Q 20 10 20 14 V 14 H 10 Z"
     );
