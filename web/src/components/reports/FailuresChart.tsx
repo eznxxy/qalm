@@ -22,10 +22,13 @@ import {
   CHART_WIDTH,
   PLOT_HEIGHT,
   PLOT_WIDTH,
+  barRadius,
+  barWidthFor,
   bucketX,
   labelIndices,
   niceScale,
   roundedTopRect,
+  valueY,
 } from "@/lib/chart-scale";
 import "./FailuresChart.css";
 
@@ -65,11 +68,10 @@ export function FailuresChart({ projectId, buckets, days, loading = false }: Fai
   const [view, setView] = useState<"chart" | "table">("chart");
   const max = Math.max(0, ...buckets.map(failureTotal));
   const { max: yMax, ticks } = niceScale(max);
-  const slot = PLOT_WIDTH / Math.max(days, 1);
-  const barWidth = Math.max(5, Math.min(46, slot * 0.56));
-  const radius = barWidth >= 34 ? 4 : barWidth >= 12 ? 3 : 2;
+  const barWidth = barWidthFor(days);
+  const radius = barRadius(barWidth);
   const labels = labelIndices(Math.max(days, 1));
-  const yFor = (value: number) => BASE_Y - (value / yMax) * PLOT_HEIGHT;
+  const yFor = (value: number) => valueY(value, yMax);
   const empty = max === 0;
   const windowTitle = days === 1 ? "today" : `last ${days} days`;
   const windowPhrase = days === 1 ? "today" : `in the last ${days} days`;

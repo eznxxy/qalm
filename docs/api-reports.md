@@ -300,7 +300,11 @@ bucketing, same `generate_series` zero-fill, same pass-rate helpers
 (`passRate`, `sumRecordedCounts`, `totalRecorded`). Do not re-derive pass rate
 in a second place.
 
-Filter fragment (resolve `none` in the service, pass `NULL` for absent):
+Filter fragment (resolve `none` in the service, pass `NULL` for absent).
+Illustrative only: the parameter numbers show the fragment in the context of the
+full statement, not a binding contract. The implementation binds the same five
+values as `$2`–`$6`, right after the project id in `$1`, and the window as
+`$7`/`$8`; read the shape, not the numbers.
 
 ```sql
 AND ($4::uuid IS NULL OR r.plan_id = $4::uuid)

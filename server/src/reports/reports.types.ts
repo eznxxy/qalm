@@ -11,8 +11,10 @@ import type { ReportFiltersDto } from './reports.filters';
 import { ProgressItemsRow, ProgressRunRow, TrendRow } from './reports.store';
 
 /**
- * Response shapes for docs/api-project-overview.md § Resource: Project trend.
- * `status_counts` has exactly the five recorded statuses — no `untested`.
+ * Response shapes. The trend body is docs/api-project-overview.md § Resource:
+ * Project trend; the summary that nests it (plus `filters` and `progress`) is
+ * docs/api-reports.md § Resource: Report summary. `status_counts` has exactly
+ * the five recorded statuses — no `untested`.
  */
 export interface TrendBucketDto {
   date: string;

@@ -177,6 +177,7 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       deletedAt?: string | null;
       planId?: string | null;
       milestoneId?: string | null;
+      startDate?: string | null;
       dueDate?: string | null;
       completedAt?: string | null;
       name?: string;
@@ -191,6 +192,7 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       'deleted_at',
       'plan_id',
       'milestone_id',
+      'start_date',
       'due_date',
       'completed_at',
     ];
@@ -199,6 +201,7 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       options.deletedAt ?? null,
       options.planId ?? null,
       options.milestoneId ?? null,
+      options.startDate ?? null,
       options.dueDate ?? null,
       completedAt,
     ];
@@ -572,6 +575,17 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
       }
     });
 
+    it('400s a malformed project id instead of failing inside the query', async () => {
+      // Without ParseUUIDPipe on this handler the id reaches a `::uuid` cast in
+      // every summary statement and pg raises 22P02, which surfaces as a 500.
+      // The trend route already had this case; the summary route did not.
+      const res = await getSummary('admin', 'not-a-uuid');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(res.body.data).toBeUndefined();
+    });
+
     it('uses UTC day boundaries: 00:00Z on from counts, 23:59:59.999Z on from - 1 does not', async () => {
       await recordMany([
         { status: 'passed', at: `${utcDay(-1)}T00:00:00.000Z` },
@@ -735,6 +749,83 @@ describe('GET /api/v1/projects/:projectId/reports/trend', () => {
         with_results: 3,
         untested: 0,
         percent_complete: 100,
+      });
+    });
+
+    it('pins the nested trend shape and every run-row field the client reads', async () => {
+      const planId = await insertPlan(projectId, 'Release 3');
+      const milestoneId = await insertMilestone(projectId, 'Launch', utcDay(9));
+      const runId = await insertRun(projectId, {
+        planId,
+        milestoneId,
+        startDate: utcDay(-2),
+        dueDate: utcDay(9),
+        name: 'Pinned run',
+      });
+      await record(await insertItem(runId), 'passed', `${utcDay(0)}T08:00:00.000Z`);
+
+      const res = await getSummary('admin');
+
+      expect(res.status).toBe(200);
+      const data = res.body.data as SummaryData;
+
+      // The summary owns `project_id`/`from`/`to`/`days`; the nested trend is
+      // the trend body only. A second `days` inside it would let a client read
+      // two windows, and the UI titles the card from the outer one.
+      expect(Object.keys(data.trend).sort()).toEqual(['buckets', 'totals']);
+      expect(data.trend).not.toHaveProperty('days');
+      expect(data.trend).not.toHaveProperty('from');
+      expect(data.trend).not.toHaveProperty('to');
+      expect(data.trend).not.toHaveProperty('project_id');
+
+      // A whole-row compare, so a dropped or renamed pass-through column (plan
+      // or milestone name, either date) fails here rather than in the UI.
+      expect(data.progress.data).toEqual([
+        {
+          id: runId,
+          name: 'Pinned run',
+          status: 'open',
+          plan_id: planId,
+          plan_name: 'Release 3',
+          milestone_id: milestoneId,
+          milestone_name: 'Launch',
+          start_date: utcDay(-2),
+          due_date: utcDay(9),
+          counts: {
+            total: 1,
+            passed: 1,
+            failed: 0,
+            blocked: 0,
+            retest: 0,
+            skipped: 0,
+            untested: 0,
+            percent_complete: 100,
+          },
+          pass_rate: 100,
+          results_in_window: 1,
+          last_result_at: `${utcDay(0)}T08:00:00.000Z`,
+        },
+      ]);
+    });
+
+    it('counts an item with no result as untested in the row and the rollup', async () => {
+      // No e2e case had a positive `untested` before this: the zero-item run
+      // and the fully-recorded runs both report 0, so a broken LEFT JOIN could
+      // ship unnoticed.
+      const runId = await insertRun(projectId);
+      await record(await insertItem(runId), 'passed', `${utcDay(0)}T08:00:00.000Z`);
+      await insertItem(runId);
+
+      const data = (await getSummary('admin', projectId)).body.data as SummaryData;
+
+      const run = data.progress.data[0]!;
+      expect(run.counts).toMatchObject({ total: 2, passed: 1, untested: 1, percent_complete: 50 });
+      expect(run.pass_rate).toBe(100);
+      expect(data.progress.items).toEqual({
+        total: 2,
+        with_results: 1,
+        untested: 1,
+        percent_complete: 50,
       });
     });
 

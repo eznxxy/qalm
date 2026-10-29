@@ -33,11 +33,14 @@ import {
   CHART_MARGIN,
   CHART_WIDTH,
   PLOT_HEIGHT,
-  PLOT_WIDTH,
+  barRadius,
+  barWidthFor,
   bucketX,
   labelIndices,
   niceScale,
   roundedTopRect,
+  slotWidth,
+  valueY,
 } from "@/lib/chart-scale";
 import {
   formatPassRate,
@@ -128,13 +131,12 @@ function TrendChart({
   const buckets = trend.buckets;
   const maxCount = buckets.reduce((max, bucket) => Math.max(max, bucket.total), 0);
   const { max: yMax, ticks: yTicks } = niceScale(maxCount);
-  const slot = PLOT_WIDTH / days;
-  const maxBar = days === 1 ? 88 : 46;
-  const barWidth = Math.max(5, Math.min(maxBar, slot * 0.56));
-  const radius = barWidth >= 34 ? 4 : barWidth >= 12 ? 3 : 2;
+  const slot = slotWidth(days);
+  const barWidth = barWidthFor(days, days === 1 ? 88 : 46);
+  const radius = barRadius(barWidth);
   const labels = labelIndices(days);
   const segments = segmentPoints(buckets, days);
-  const yFor = (value: number) => BASE_Y - (value / yMax) * PLOT_HEIGHT;
+  const yFor = (value: number) => valueY(value, yMax);
 
   return (
     <div className="ov-trend-plot">
