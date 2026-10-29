@@ -149,7 +149,9 @@ export function ProgressTable({
     >
       <div className="rep-card-head">
         <h2 id="rep-progress-title">Progress per run</h2>
-        <span className="rep-count">{meta.total} matching runs</span>
+        <span className="rep-count">
+          {meta.total} matching {meta.total === 1 ? "run" : "runs"}
+        </span>
       </div>
 
       <DataTable
@@ -157,7 +159,7 @@ export function ProgressTable({
         columns={columns(projectId)}
         rows={data}
         getRowId={(run) => run.id}
-        caption="Progress of every run matching the report filters"
+        caption="Progress of runs matching the report filters"
         loading={loading}
         error={error}
         onRetry={onRetry}

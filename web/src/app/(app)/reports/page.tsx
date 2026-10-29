@@ -26,6 +26,7 @@ import {
   type TrendWindow,
 } from "@/lib/trend-window";
 import {
+  DEFAULT_REPORT_DAYS,
   parseReportParams,
   patchReportParams,
   type ReportUrlPatch,
@@ -251,15 +252,23 @@ export default function ReportsPage() {
     [searchKey, router, projectId]
   );
 
+  // A value outside the presets (`?days=3`) parses as the default but stays in
+  // the address bar, where the preset that resolves to it already reads as
+  // pressed. Comparing the raw parameter lets that click still rewrite the URL.
+  const canonicalDays =
+    url.days === DEFAULT_REPORT_DAYS ? null : String(url.days);
+  const daysParamCanonical = searchParams.get("days") === canonicalDays;
+
   const selectWindow = useCallback(
     (days: TrendWindow) => {
       // `patchReportParams` clears ?page= on every window change. Re-clicking
       // the preset that is already pressed would therefore send the user back
-      // to page 1 without changing the window, so it is a no-op instead.
-      if (url.days === days) return;
+      // to page 1 without changing the window, so it is a no-op instead —
+      // unless the address bar holds a non-canonical value that needs repair.
+      if (url.days === days && daysParamCanonical) return;
       pushParams({ days });
     },
-    [url.days, pushParams]
+    [url.days, daysParamCanonical, pushParams]
   );
 
   const resetFilters = useCallback(() => {
@@ -336,6 +345,14 @@ export default function ReportsPage() {
       : null;
   const planOptions = optionsFor === projectId ? plans : [];
   const milestoneOptions = optionsFor === projectId ? milestones : [];
+  // The table's empty state and the Runs tile describe the summary they are
+  // showing, not the URL: during a filter change the previous summary is still
+  // on screen, and the URL has already moved on.
+  const summaryFiltered = Boolean(
+    summary?.filters.plan_id ||
+      summary?.filters.milestone_id ||
+      summary?.filters.status
+  );
 
   return (
     <div className="page rep-page">
@@ -471,11 +488,7 @@ export default function ReportsPage() {
               <p className="rep-tile-label">Runs</p>
               <p className="rep-tile-value">{summary.progress.meta.total}</p>
               <p className="rep-tile-sub">
-                {summary.filters.plan_id ||
-                summary.filters.milestone_id ||
-                summary.filters.status
-                  ? "matching filters"
-                  : "in this project"}
+                {summaryFiltered ? "matching filters" : "in this project"}
               </p>
             </div>
 
@@ -507,7 +520,7 @@ export default function ReportsPage() {
             progress={summary.progress}
             page={summary.progress.meta.page}
             onPageChange={(page) => pushParams({ page })}
-            filtered={filtersActive}
+            filtered={summaryFiltered}
             onClearFilters={resetFilters}
             loading={false}
             // The page-level panel owns the failure: every card shares the one

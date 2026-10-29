@@ -134,6 +134,28 @@ describe("ProgressTable", () => {
     expect(onPageChange).toHaveBeenCalledWith(1);
   });
 
+  it("counts matching runs in the singular and the plural", () => {
+    const single = renderTable();
+    expect(screen.getByText("1 matching run")).toBeInTheDocument();
+    single.unmount();
+
+    renderTable({
+      progress: progress([run(), run({ id: "r-2", name: "Second run" })]),
+    });
+    expect(screen.getByText("2 matching runs")).toBeInTheDocument();
+  });
+
+  it("captions the table as paged, not as every run", () => {
+    renderTable();
+    // The table holds one page; the tile's rollup covers every filtered run.
+    expect(
+      screen.getByText("Progress of runs matching the report filters")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Progress of every run matching the report filters")
+    ).not.toBeInTheDocument();
+  });
+
   it("pages with the real meta and disables the ends", () => {
     renderTable({ progress: progress([run()], 60), page: 1 });
     expect(screen.getByText("Page 1 of 3 (60 runs)")).toBeInTheDocument();

@@ -64,6 +64,28 @@ describe("patchReportParams", () => {
     expect(paged.get("page")).toBe("2");
   });
 
+  it("drops a non-canonical window on any write, not only on a window change", () => {
+    // `days=3` parses as 30, so a write that does not mention `days` used to
+    // carry it forward forever: the address bar and the data disagreed and no
+    // preset click could repair it.
+    const invalid = patchReportParams(
+      new URLSearchParams("project=p-1&days=3"),
+      { planId: "none" }
+    );
+    expect(invalid.has("days")).toBe(false);
+    expect(invalid.get("plan")).toBe("none");
+
+    const spelledDefault = patchReportParams(
+      new URLSearchParams("project=p-1&days=30"),
+      { page: 2 }
+    );
+    expect(spelledDefault.has("days")).toBe(false);
+    expect(spelledDefault.get("page")).toBe("2");
+
+    const valid = patchReportParams(new URLSearchParams("days=7"), { page: 2 });
+    expect(valid.get("days")).toBe("7");
+  });
+
   it("removes a filter when it is cleared", () => {
     const params = patchReportParams(new URLSearchParams("plan=none&milestone=none"), {
       planId: null, milestoneId: null,

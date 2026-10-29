@@ -83,6 +83,14 @@ export function patchReportParams(
 ): URLSearchParams {
   const params = new URLSearchParams(current.toString());
 
+  // The window is a preset, so any other value — or the spelled-out default —
+  // is a non-canonical address-bar leftover (`?days=3`, `?days=30`). Rewrite
+  // it on every write, not only when the window changes: otherwise such a link
+  // keeps disagreeing with the data and a preset click cannot repair it.
+  if (params.has("days") && parseReportDays(params.get("days")) === DEFAULT_REPORT_DAYS) {
+    params.delete("days");
+  }
+
   if (patch.project !== undefined) setOrDelete(params, "project", patch.project ?? "");
   if (patch.days !== undefined) {
     setOrDelete(

@@ -709,6 +709,65 @@ describe("reports screen", () => {
     });
   });
 
+  it("keeps the table's empty state honest while a filter clear is in flight", async () => {
+    // The summary on screen is the filtered, empty one; the URL is already
+    // unfiltered. The empty state must describe the data it is showing, not
+    // the address bar.
+    const filteredEmpty = summary({
+      filters: { plan_id: "none", milestone_id: null, status: null },
+      progress: {
+        data: [],
+        meta: { page: 1, limit: 25, total: 0, total_pages: 1 },
+        items: { total: 0, with_results: 0, untested: 0, percent_complete: 0 },
+      },
+    });
+    mockRouterState.search = "project=p-1&plan=none";
+    mockApi({ summary: filteredEmpty });
+    const { view, tree } = await renderPage();
+
+    await screen.findByText("No runs match these filters.");
+
+    const baseFetch = fetchMock.getMockImplementation();
+    if (!baseFetch) throw new Error("fetch mock is not installed");
+    const held = deferred<ReportSummary>();
+    let heldOnce = true;
+    fetchMock.mockImplementation((url: string, init?: unknown) => {
+      if (heldOnce && String(url).includes("/reports/summary")) {
+        heldOnce = false;
+        return held.promise.then((body) => jsonResponse(200, { data: body }));
+      }
+      return baseFetch(url, init);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    await waitFor(() =>
+      expect(lastReplaceUrl()).toBe("/reports?project=p-1")
+    );
+    moveTo(view, tree, "project=p-1");
+    await waitFor(() => expect(summaryCalls()).toHaveLength(2));
+
+    // Still holding the filtered empty summary: it did not match "no filters",
+    // so the honest sentence stays.
+    expect(screen.getByText("No runs match these filters.")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No runs in this project yet.")
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      held.resolve(
+        summary({
+          progress: {
+            data: [progressRun()],
+            meta: { page: 1, limit: 25, total: 1, total_pages: 1 },
+            items: { total: 50, with_results: 42, untested: 8, percent_complete: 84 },
+          },
+        })
+      );
+    });
+
+    expect(await screen.findByText("Release 2.4 smoke")).toBeInTheDocument();
+  });
+
   it("keeps the tiles honest for an empty project", async () => {
     mockApi({
       summary: summary({
@@ -782,6 +841,25 @@ describe("reports screen", () => {
         /\/projects\?page=1&limit=1$/.test(String(url))
       )
     ).toBe(true);
+  });
+
+  it("repairs a non-canonical window even though its preset is already pressed", async () => {
+    mockRouterState.search = "project=p-1&days=3";
+    mockApi();
+    await renderPage();
+
+    await screen.findByText("97.9%");
+    const preset = screen.getByRole("button", { name: "Last 30 days" });
+    // `days=3` resolves to the 30-day default, so the button reads as pressed.
+    expect(preset).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(preset);
+
+    // Clicking it must still rewrite the address bar, or the bad value is
+    // stuck forever.
+    await waitFor(() =>
+      expect(lastReplaceUrl()).toBe("/reports?project=p-1")
+    );
   });
 
   it("falls back to 30 days for a URL value outside the presets", async () => {
