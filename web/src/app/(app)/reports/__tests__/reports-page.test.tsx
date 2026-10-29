@@ -216,6 +216,8 @@ interface ApiOptions {
   milestones?: Milestone[];
   /** Fail the filter-option fetch; the report itself must still render. */
   optionsError?: boolean;
+  /** HTTP status for the project read (404 = archived/invisible, 500 = down). */
+  projectStatus?: number;
 }
 
 function mockApi({
@@ -226,6 +228,7 @@ function mockApi({
   plans = [PLAN],
   milestones = [MILESTONE],
   optionsError = false,
+  projectStatus,
 }: ApiOptions = {}): void {
   const user = makeUser();
   fetchMock.mockImplementation(
@@ -299,6 +302,19 @@ function mockApi({
         );
       }
       if (/\/projects\/[\w-]+$/.test(target) && method === "GET") {
+        if (projectStatus) {
+          return Promise.resolve(
+            jsonResponse(projectStatus, {
+              error: {
+                code: projectStatus === 404 ? "NOT_FOUND" : "INTERNAL_ERROR",
+                message:
+                  projectStatus === 404
+                    ? "Project not found."
+                    : "Something went wrong.",
+              },
+            })
+          );
+        }
         return Promise.resolve(jsonResponse(200, { data: project }));
       }
       if (/\/projects(\?|$)/.test(target) && method === "GET") {
@@ -841,6 +857,180 @@ describe("reports screen", () => {
         /\/projects\?page=1&limit=1$/.test(String(url))
       )
     ).toBe(true);
+  });
+
+  it("says there are no projects when the account has none", async () => {
+    mockRouterState.search = "";
+    mockApi({ projects: [] });
+    await renderPage();
+
+    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to projects" })).toHaveAttribute(
+      "href",
+      "/projects"
+    );
+    expect(summaryCalls()).toHaveLength(0);
+  });
+
+  it("explains an invisible or archived project instead of an empty report", async () => {
+    mockApi({ projectStatus: 404 });
+    await renderPage();
+
+    expect(
+      await screen.findByRole("heading", { name: "Project not found" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to projects" })).toHaveAttribute(
+      "href",
+      "/projects"
+    );
+    expect(summaryCalls()).toHaveLength(0);
+  });
+
+  it("offers a retry when the project itself cannot be read", async () => {
+    mockApi({ projectStatus: 500 });
+    await renderPage();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Couldn't load the project");
+    expect(alert).toHaveTextContent("Something went wrong.");
+
+    const projectCalls = () =>
+      fetchMock.mock.calls.filter(([url]) =>
+        /\/projects\/p-1$/.test(String(url))
+      ).length;
+    const before = projectCalls();
+
+    fireEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(projectCalls()).toBeGreaterThan(before));
+  });
+
+  it("degrades the option lists when they cannot load, keeping the applied filter", async () => {
+    const planId = "018f1c31-9d4e-7b2a-8c1f-2a3b4c5d6e7f";
+    mockRouterState.search = `project=p-1&plan=${planId}`;
+    mockApi({ optionsError: true });
+    await renderPage();
+
+    await screen.findByText("97.9%");
+    const plan = screen.getByRole("combobox", { name: "Plan" });
+    // The applied filter is never hidden, even when the list behind it failed.
+    expect(plan).toHaveDisplayValue(planId);
+    expect(within(plan).getByRole("option", { name: "All plans" })).toBeInTheDocument();
+    expect(within(plan).getByRole("option", { name: "No plan" })).toBeInTheDocument();
+
+    const milestone = screen.getByRole("combobox", { name: "Milestone" });
+    expect(
+      within(milestone).getByRole("option", { name: "All milestones" })
+    ).toBeInTheDocument();
+    expect(
+      within(milestone).getByRole("option", { name: "No milestone" })
+    ).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(lastSummaryUrl()).toContain(`plan_id=${planId}`)
+    );
+  });
+
+  it("does not echo a malformed deep-linked filter, and does not send it", async () => {
+    mockRouterState.search = "project=p-1&plan=not-a-uuid&status=archived";
+    mockApi();
+    await renderPage();
+
+    await screen.findByText("97.9%");
+    expect(screen.getByRole("combobox", { name: "Plan" })).toHaveDisplayValue(
+      "All plans"
+    );
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveDisplayValue(
+      "All"
+    );
+    expect(
+      screen.queryByRole("button", { name: "Reset filters" })
+    ).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      const url = lastSummaryUrl();
+      expect(url).not.toContain("plan_id");
+      expect(url).not.toContain("status=");
+    });
+  });
+
+  it("labels a one-day window as today", async () => {
+    mockRouterState.search = "project=p-1&days=1";
+    mockApi({
+      summary: summary({
+        days: 1,
+        from: "2026-10-28",
+        trend: { buckets: bucketsFor(1), totals: summary().trend.totals },
+      }),
+    });
+    await renderPage();
+
+    await screen.findByText("97.9%");
+    expect(within(tile("Pass rate")).getByText("today")).toBeInTheDocument();
+    expect(within(tile("Results recorded")).getByText("today")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Failures over time, today" })
+    ).toBeInTheDocument();
+    expect(summaryCalls()[0]).toContain("days=1");
+  });
+
+  it("keeps the numbers on screen while a filter change is in flight", async () => {
+    mockApi();
+    const { view, tree } = await renderPage();
+    await screen.findByText("97.9%");
+
+    const baseFetch = fetchMock.getMockImplementation();
+    if (!baseFetch) throw new Error("fetch mock is not installed");
+    const held = deferred<ReportSummary>();
+    let heldOnce = true;
+    fetchMock.mockImplementation((url: string, init?: unknown) => {
+      if (heldOnce && String(url).includes("/reports/summary")) {
+        heldOnce = false;
+        return held.promise.then((body) => jsonResponse(200, { data: body }));
+      }
+      return baseFetch(url, init);
+    });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
+      target: { value: "completed" },
+    });
+    await waitFor(() =>
+      expect(lastReplaceUrl()).toBe("/reports?project=p-1&status=completed")
+    );
+    moveTo(view, tree, "project=p-1&status=completed");
+    await waitFor(() => expect(summaryCalls()).toHaveLength(2));
+
+    // Not blank: the previous summary is still readable, and only the marks
+    // it busy. A skeleton here would flash the whole page on every filter.
+    expect(within(tile("Pass rate")).getByText("97.9%")).toBeInTheDocument();
+    expect(document.querySelector(".rep-tiles")).toHaveAttribute(
+      "aria-busy",
+      "true"
+    );
+
+    await act(async () => {
+      held.resolve(
+        summary({
+          filters: { plan_id: null, milestone_id: null, status: "completed" },
+          trend: {
+            buckets: [bucket("2026-10-28", 1, 1, 0)],
+            totals: {
+              status_counts: {
+                passed: 1,
+                failed: 1,
+                blocked: 0,
+                retest: 0,
+                skipped: 0,
+              },
+              total: 2,
+              pass_rate: 50,
+            },
+          },
+        })
+      );
+    });
+
+    expect(await screen.findByText("50%")).toBeInTheDocument();
+    expect(within(tile("Runs")).getByText("matching filters")).toBeInTheDocument();
   });
 
   it("repairs a non-canonical window even though its preset is already pressed", async () => {
