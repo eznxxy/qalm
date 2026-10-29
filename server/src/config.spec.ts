@@ -29,6 +29,7 @@ describe('loadConfig', () => {
       refreshCookieSecure: false,
       corsOrigins: [],
       storageDir: './storage',
+      trustProxy: false,
     });
   });
 
@@ -80,6 +81,21 @@ describe('loadConfig', () => {
   it('treats REFRESH_COOKIE_SECURE=true as the dev relax flag', () => {
     const config = loadConfig(envWith({ REFRESH_COOKIE_SECURE: 'true' }));
     expect(config.refreshCookieSecure).toBe(true);
+  });
+
+  it('defaults TRUST_PROXY to false, so a forwarded address is never trusted', () => {
+    expect(loadConfig(envWith({})).trustProxy).toBe(false);
+    expect(loadConfig(envWith({ TRUST_PROXY: '' })).trustProxy).toBe(false);
+  });
+
+  it('accepts TRUST_PROXY=true as the explicit opt-in for a reverse proxy', () => {
+    expect(loadConfig(envWith({ TRUST_PROXY: 'true' })).trustProxy).toBe(true);
+  });
+
+  it('rejects any TRUST_PROXY value other than empty or exactly "true"', () => {
+    expect(() => loadConfig(envWith({ TRUST_PROXY: '1' }))).toThrow(ConfigError);
+    expect(() => loadConfig(envWith({ TRUST_PROXY: 'yes' }))).toThrow(ConfigError);
+    expect(() => loadConfig(envWith({ TRUST_PROXY: 'TRUE' }))).toThrow(ConfigError);
   });
 
   it('rejects any REFRESH_COOKIE_SECURE value other than exactly "true"', () => {

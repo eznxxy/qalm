@@ -26,6 +26,11 @@ export function configureApp(app: INestApplication): void {
   app.useGlobalFilters(new GlobalExceptionFilter(httpAdapter));
 
   const config = app.get<AppConfig>(APP_CONFIG);
+  // Only honour X-Forwarded-For when the deployment declares a proxy in front
+  // (TRUST_PROXY=true). Off by default: otherwise a client picks its own
+  // rate-limit identity.
+  const expressApp = app.getHttpAdapter().getInstance() as express.Express;
+  expressApp.set('trust proxy', config.trustProxy);
   if (config.corsOrigins.length > 0) {
     app.enableCors({
       origin: config.corsOrigins,
